@@ -1,0 +1,532 @@
+/* Task Status Tags - styles for inline status tags
+   Example: {{[[TODO]]}} #[[task-status/Active]] Do the thing
+*/
+
+:root {
+  --ts-active-bg: rgba(20, 184, 166, 0.08);
+  --ts-active-fg: #0f766e;
+  --ts-active-border: rgba(20, 184, 166, 0.2);
+
+  --ts-waiting-bg: rgba(234, 179, 8, 0.08);
+  --ts-waiting-fg: #a16207;
+  --ts-waiting-border: rgba(234, 179, 8, 0.2);
+
+  --ts-holding-bg: rgba(148, 163, 184, 0.1);
+  --ts-holding-fg: #475569;
+  --ts-holding-border: rgba(148, 163, 184, 0.24);
+
+  --ts-incubating-bg: rgba(99, 102, 241, 0.08);
+  --ts-incubating-fg: #4338ca;
+  --ts-incubating-border: rgba(99, 102, 241, 0.2);
+
+  --ts-alert-bg: rgba(244, 63, 94, 0.08);
+  --ts-alert-fg: #be123c;
+  --ts-alert-border: rgba(244, 63, 94, 0.2);
+
+  --ts-cancelled-bg: rgba(30, 41, 59, 0.06);
+  --ts-cancelled-fg: #0f172a;
+  --ts-cancelled-border: rgba(30, 41, 59, 0.16);
+
+  --ts-pill-radius: 4px;
+  --ts-pill-font-size: 11px;
+  --ts-pill-pad-y: 0px;
+  --ts-pill-pad-x: 4px;
+  --ts-pill-dot: 4px;
+  --ts-transition: 150ms ease;
+
+  --ts-preview-surface-bg: var(--bp3-surface, #ffffff);
+  --ts-preview-surface-border: rgba(0, 0, 0, 0.08);
+}
+
+body.bp3-dark,
+body.bp4-dark,
+body.bp5-dark {
+  --ts-preview-surface-bg: #1f2428;
+  --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
+}
+
+/* Base pill styling (JS annotates matching refs with data-task-status-key/label) */
+span.rm-page-ref[data-task-status-key],
+a.rm-page-ref[data-task-status-key] {
+  display: inline-flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  padding: var(--ts-pill-pad-y) var(--ts-pill-pad-x) !important;
+  border-radius: var(--ts-pill-radius) !important;
+  border: 1px solid transparent !important;
+  /* Hide Roam's rendered "#..." text; we re-render label via ::after */
+  font-size: 0 !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  vertical-align: middle !important;
+  margin-right: 4px !important;
+  transition: background-color var(--ts-transition), border-color var(--ts-transition) !important;
+}
+
+span.rm-page-ref[data-task-status-key]::after,
+a.rm-page-ref[data-task-status-key]::after {
+  content: attr(data-task-status-label) !important;
+  font-size: var(--ts-pill-font-size) !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+}
+
+span.rm-page-ref[data-task-status-key]::before,
+a.rm-page-ref[data-task-status-key]::before {
+  content: "" !important;
+  width: var(--ts-pill-dot) !important;
+  height: var(--ts-pill-dot) !important;
+  border-radius: 999px !important;
+  background-color: currentColor !important;
+  opacity: 0.72 !important;
+  margin-right: 4px !important;
+}
+
+span.rm-page-ref[data-task-status-key]:hover,
+a.rm-page-ref[data-task-status-key]:hover {
+  text-decoration: none !important;
+}
+
+.ts-status-chooser.bp3-popover {
+  position: fixed;
+  z-index: 9999;
+  max-width: min(280px, calc(100vw - 16px));
+}
+
+.ts-status-chooser .bp3-popover-content {
+  max-width: min(280px, calc(100vw - 16px));
+}
+
+.ts-status-chooser .bp3-popover-arrow {
+  pointer-events: none;
+}
+
+.ts-status-chooser .bp3-popover-arrow svg {
+  display: block;
+  height: 30px;
+  width: 30px;
+}
+
+.ts-status-chooser .bp3-menu {
+  min-width: 180px;
+  max-width: min(280px, calc(100vw - 16px));
+}
+
+.ts-status-chooser .bp3-menu-header h6 {
+  white-space: nowrap;
+}
+
+.ts-status-chooser .ts-status-choice {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ts-status-chooser .ts-status-choice-label {
+  min-width: 0;
+}
+
+/* Settings UI preview pill (not a real page ref; avoids observer stripping data-attrs) */
+.ts-status-pill-surface {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  background-color: var(--ts-preview-surface-bg);
+  box-shadow: 0 0 0 1px var(--ts-preview-surface-border);
+}
+
+.ts-status-pill-preview[data-task-status-key] {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: var(--ts-pill-pad-y) var(--ts-pill-pad-x);
+  border-radius: var(--ts-pill-radius);
+  border: 1px solid transparent;
+  font-size: var(--ts-pill-font-size);
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: default;
+  user-select: none;
+  vertical-align: middle;
+  white-space: nowrap;
+  min-width: 118px;
+}
+
+.ts-status-pill-preview[data-task-status-key]::before {
+  content: "";
+  width: var(--ts-pill-dot);
+  height: var(--ts-pill-dot);
+  border-radius: 999px;
+  background-color: currentColor;
+  opacity: 0.72;
+  margin-right: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  span.rm-page-ref[data-task-status-key],
+  a.rm-page-ref[data-task-status-key] {
+    transition: none !important;
+  }
+  span.rm-page-ref[data-task-status-key]:hover,
+  a.rm-page-ref[data-task-status-key]:hover {
+    text-decoration: none !important;
+  }
+}
+
+/* Individual status colors */
+span.rm-page-ref[data-task-status-key="ACTIVE"],
+a.rm-page-ref[data-task-status-key="ACTIVE"],
+.ts-status-pill-preview[data-task-status-key="ACTIVE"] {
+  background-color: var(--ts-active-bg) !important;
+  color: var(--ts-active-fg) !important;
+  border-color: var(--ts-active-border) !important;
+}
+
+span.rm-page-ref[data-task-status-key="WAITING"],
+a.rm-page-ref[data-task-status-key="WAITING"],
+.ts-status-pill-preview[data-task-status-key="WAITING"] {
+  background-color: var(--ts-waiting-bg) !important;
+  color: var(--ts-waiting-fg) !important;
+  border-color: var(--ts-waiting-border) !important;
+}
+
+span.rm-page-ref[data-task-status-key="HOLDING"],
+a.rm-page-ref[data-task-status-key="HOLDING"],
+.ts-status-pill-preview[data-task-status-key="HOLDING"] {
+  background-color: var(--ts-holding-bg) !important;
+  color: var(--ts-holding-fg) !important;
+  border-color: var(--ts-holding-border) !important;
+}
+
+span.rm-page-ref[data-task-status-key="INCUBATING"],
+a.rm-page-ref[data-task-status-key="INCUBATING"],
+.ts-status-pill-preview[data-task-status-key="INCUBATING"] {
+  background-color: var(--ts-incubating-bg) !important;
+  color: var(--ts-incubating-fg) !important;
+  border-color: var(--ts-incubating-border) !important;
+}
+
+span.rm-page-ref[data-task-status-key="ALERT"],
+a.rm-page-ref[data-task-status-key="ALERT"],
+.ts-status-pill-preview[data-task-status-key="ALERT"] {
+  background-color: var(--ts-alert-bg) !important;
+  color: var(--ts-alert-fg) !important;
+  border-color: var(--ts-alert-border) !important;
+}
+
+span.rm-page-ref[data-task-status-key="CANCELLED"],
+a.rm-page-ref[data-task-status-key="CANCELLED"],
+.ts-status-pill-preview[data-task-status-key="CANCELLED"] {
+  background-color: var(--ts-cancelled-bg) !important;
+  color: var(--ts-cancelled-fg) !important;
+  border-color: var(--ts-cancelled-border) !important;
+}
+
+.ts-status-names-panel {
+  width: 100%;
+  padding: 6px 0 14px;
+}
+
+.ts-status-names-card {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.ts-status-names-header {
+  margin-bottom: 12px;
+}
+
+.ts-status-names-title {
+  margin: 0;
+  text-wrap: balance;
+  color: var(--bp3-text-color, rgba(247, 249, 251, 0.92)) !important;
+}
+
+.ts-status-names-card .ts-status-names-subtitle {
+  opacity: 0.85;
+  text-wrap: pretty;
+}
+
+.ts-status-add-row {
+  padding: 2px 0;
+  margin-top: 4px;
+}
+
+.ts-status-names-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ts-status-row {
+  position: relative;
+}
+
+.ts-status-edit-row {
+  padding: 2px 0;
+}
+
+.ts-status-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ts-status-names-card .ts-status-name-input {
+  width: 260px;
+  max-width: 100%;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  border-color: rgba(16, 22, 26, 0.22) !important;
+}
+
+.ts-status-drag-handle {
+  flex: 0 0 auto;
+  width: 30px;
+  cursor: grab !important;
+  opacity: 0.68;
+}
+
+.ts-status-add-spacer {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+}
+
+.ts-status-drag-handle:active {
+  cursor: grabbing !important;
+}
+
+.ts-status-row-dragging {
+  opacity: 0.48;
+}
+
+.ts-status-row-drop-before::before,
+.ts-status-row-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--bp3-intent-primary, #137cbd);
+}
+
+.ts-status-row-drop-before::before {
+  top: -4px;
+}
+
+.ts-status-row-drop-after::after {
+  bottom: -4px;
+}
+
+.ts-status-row-preview {
+  flex: 0 1 auto;
+}
+
+.ts-status-row-menu-wrap,
+.ts-status-color-picker-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.ts-status-row-menu-button {
+  opacity: 0.72;
+}
+
+.ts-status-row-menu {
+  position: absolute !important;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10000;
+}
+
+.ts-status-row-menu .bp3-menu {
+  min-width: 108px;
+}
+
+.ts-status-row-menu .bp3-menu-item {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ts-rename-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid rgba(16, 22, 26, 0.15);
+  border-radius: 6px;
+  background: rgba(16, 22, 26, 0.03);
+}
+
+body.bp3-dark .ts-rename-prompt {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ts-rename-prompt-label {
+  opacity: 0.8;
+}
+
+.ts-status-row-error {
+  margin-top: 4px;
+  color: #c23030;
+}
+
+.ts-status-row-info {
+  margin-top: 4px;
+  opacity: 0.75;
+}
+
+.ts-status-colors-toolbar {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ts-status-colors-toolbar-error {
+  color: #c23030;
+}
+
+.ts-status-colors-toolbar-info {
+  opacity: 0.75;
+}
+
+.ts-status-inline-colors-toolbar {
+  margin-top: 8px;
+}
+
+.ts-status-inline-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+}
+
+.ts-status-color-swatch-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 112px;
+}
+
+.ts-status-color-swatch-dot {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid rgba(16, 22, 26, 0.22);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+body.bp3-dark .ts-status-color-swatch-dot,
+body.bp4-dark .ts-status-color-swatch-dot,
+body.bp5-dark .ts-status-color-swatch-dot {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.ts-status-color-swatch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-status-color-popover {
+  position: absolute !important;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10000;
+}
+
+.ts-status-color-popover-inner {
+  width: 228px;
+  padding: 8px;
+}
+
+.ts-status-color-popover-title {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
+.ts-status-color-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 20px);
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.ts-status-color-preset {
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(16, 22, 26, 0.18);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.ts-status-color-preset:hover,
+.ts-status-color-preset:focus {
+  outline: 2px solid var(--bp3-intent-primary, #137cbd);
+  outline-offset: 2px;
+}
+
+.ts-status-color-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ts-status-native-color-input {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(16, 22, 26, 0.22);
+  border-radius: 5px;
+  background: transparent;
+}
+
+.ts-status-native-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ts-status-native-color-input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 4px;
+}
+
+.ts-status-color-input {
+  width: 144px;
+  max-width: 100%;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  border-color: rgba(16, 22, 26, 0.22) !important;
+}
+
+.ts-status-color-popover-actions {
+  margin-top: 8px;
+}
+
+.ts-status-inline-color-actions {
+  flex: 0 0 auto;
+}
+
+.ts-status-color-commit-button {
+  width: 30px;
+}
