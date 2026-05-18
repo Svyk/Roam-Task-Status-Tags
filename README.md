@@ -86,6 +86,22 @@ Hotkeys note:
 
 This folder is a Roam Depot-style developer extension.
 
+### Remote Developer Extension
+
+After the GitHub Pages deployment finishes, this extension can be loaded in Roam's remote developer extension field with:
+
+```text
+https://harpreetchima.github.io/Roam-Task-Status-Tags/
+```
+
+Roam will load the required files from:
+
+- `https://harpreetchima.github.io/Roam-Task-Status-Tags/README.md`
+- `https://harpreetchima.github.io/Roam-Task-Status-Tags/extension.js`
+- `https://harpreetchima.github.io/Roam-Task-Status-Tags/extension.css`
+
+### Local Developer Extension
+
 1. Open:
 
 - `https://relemma-git-roam-app-store.roamresearch.com`
