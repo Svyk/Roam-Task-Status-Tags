@@ -94,6 +94,8 @@ After the GitHub Pages deployment finishes, this extension can be loaded in Roam
 https://harpreetchima.github.io/Roam-Task-Status-Tags/
 ```
 
+Use the URL exactly as shown. GitHub Pages project paths are case-sensitive, and the trailing slash is important for tools that append file names to the URL.
+
 Roam will load the required files from:
 
 - `https://harpreetchima.github.io/Roam-Task-Status-Tags/README.md`
