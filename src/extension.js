@@ -14,7 +14,11 @@ import {
   relativeLuminance,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
-import { createStatusPeekController } from "./status-peek.js";
+import {
+  computeGutterPopoverPlacement,
+  createStatusPeekController,
+  resolveBlockGutterAnchor,
+} from "./status-peek.js";
 
 // Task Status Tags (Roam Depot dev extension)
 //
@@ -1732,7 +1736,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const hasTodo = containsAny(blockString, TODO_PATTERNS);
     if (!hasTodo && !isTaskLike(blockString)) return null;
 
-    return { statusKey, blockUid, anchorEl, returnFocusEl: anchorEl };
+    return {
+      statusKey,
+      blockUid,
+      anchorEl,
+      placementAnchorEl: resolveBlockGutterAnchor(anchorEl),
+      returnFocusEl: anchorEl,
+    };
   }
 
   function resolveStatusPeekContext({ checkbox, input, statusKey }) {
@@ -1784,10 +1794,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   function positionStatusChooser(el, anchorEl) {
     if (!el || !anchorEl?.getBoundingClientRect) return;
-    const rect = anchorEl.getBoundingClientRect();
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const margin = 8;
     const arrow = el.querySelector(".bp3-popover-arrow");
     const arrowSvg = arrow?.querySelector("svg");
 
@@ -1797,32 +1805,37 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
     window.requestAnimationFrame(() => {
       if (!el.isConnected) return;
+      const rect = anchorEl.getBoundingClientRect();
       const chooserRect = el.getBoundingClientRect();
-      const left = Math.max(
-        margin,
-        Math.min(rect.left, viewportWidth - chooserRect.width - margin)
-      );
-      const below = rect.bottom + 8;
-      const above = rect.top - chooserRect.height - 8;
-      const opensBelow = below + chooserRect.height <= viewportHeight - margin || above < margin;
-      const top = opensBelow ? below : Math.max(margin, above);
-      const arrowLeft = Math.max(
-        4,
-        Math.min(rect.left + rect.width / 2 - left - 15, chooserRect.width - 34)
-      );
+      const placement = computeGutterPopoverPlacement({
+        anchorRect: rect,
+        floatingRect: chooserRect,
+        viewportWidth,
+        viewportHeight,
+        gap: 8,
+      });
 
-      el.style.left = `${Math.round(left)}px`;
-      el.style.top = `${Math.round(top)}px`;
-      el.style.transformOrigin = `${Math.round(arrowLeft + 15)}px ${
-        opensBelow ? "top" : "bottom"
-      }`;
-      el.classList.toggle("ts-status-chooser-above", !opensBelow);
+      el.style.left = `${Math.round(placement.left)}px`;
+      el.style.top = `${Math.round(placement.top)}px`;
+      el.setAttribute("data-ts-placement", placement.placement);
+      el.style.transformOrigin =
+        placement.placement === "left"
+          ? `right ${Math.round(placement.arrowOffset + 15)}px`
+          : `${Math.round(placement.arrowOffset + 15)}px ${placement.arrowSide}`;
+      el.classList.toggle("ts-status-chooser-above", placement.placement === "above");
+      el.classList.toggle("ts-status-chooser-left", placement.placement === "left");
       if (arrow) {
-        arrow.style.left = `${Math.round(arrowLeft)}px`;
-        arrow.style.top = opensBelow ? "-11px" : "";
-        arrow.style.bottom = opensBelow ? "" : "-11px";
+        arrow.style.left = placement.arrowSide === "right" ? "" : `${Math.round(placement.arrowOffset)}px`;
+        arrow.style.right = placement.arrowSide === "right" ? "-11px" : "";
+        arrow.style.top =
+          placement.arrowSide === "top"
+            ? "-11px"
+            : placement.arrowSide === "right"
+              ? `${Math.round(placement.arrowOffset)}px`
+              : "";
+        arrow.style.bottom = placement.arrowSide === "bottom" ? "-11px" : "";
       }
-      if (arrowSvg) arrowSvg.style.transform = opensBelow ? "rotate(90deg)" : "rotate(270deg)";
+      if (arrowSvg) arrowSvg.style.transform = `rotate(${placement.arrowRotation}deg)`;
       el.style.visibility = "visible";
     });
   }
@@ -1907,6 +1920,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     blockUid,
     statusKey,
     anchorEl,
+    placementAnchorEl = null,
     returnFocusEl = null,
     isIntentCurrent = null,
   }) {
@@ -1962,7 +1976,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
     statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
-    positionStatusChooser(chooser, anchorEl);
+    positionStatusChooser(
+      chooser,
+      placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl
+    );
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true,
     });
@@ -3225,7 +3242,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: SETTINGS_KEYS.statusLabelDisplay,
           name: "Status label display",
           description:
-            "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal the status control.",
+            "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal a theme-aware status control in the block's left gutter.",
           action: {
             type: "select",
             items: Object.values(STATUS_LABEL_DISPLAY),
@@ -3252,7 +3269,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: "task-status-help",
           name: "Help",
           description:
-            "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus the checkbox to reveal it; Enter or Alt+Down opens the chooser, Space remains native completion, and Shift+click removes.",
+            "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus reveals the control in the block's left gutter; Enter or Alt+Down opens the chooser there, Space remains native completion, and Shift+click removes.",
           action: {
             type: "button",
             content: "Print Help",

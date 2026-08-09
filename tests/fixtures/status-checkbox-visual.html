@@ -9,12 +9,41 @@
       :root {
         color-scheme: light;
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        --svy-canvas: #ffffff;
+        --svy-surface: #f5f8fa;
+        --svy-raised: #ffffff;
+        --svy-overlay: #ffffff;
+        --svy-hover: #f1f5f8;
+        --svy-selected: #dbeaf7;
+        --svy-border-subtle: #c5cbd3;
+        --svy-border: #a7b6c2;
+        --svy-text: #182026;
+        --svy-text-muted: #5c7080;
+        --svy-accent: #137cbd;
+        --svy-danger: #a82a2a;
+        --svy-ff-main: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      :root.bp3-dark {
+        color-scheme: dark;
+        --svy-canvas: #182026;
+        --svy-surface: #202b33;
+        --svy-raised: #293742;
+        --svy-overlay: #30404d;
+        --svy-hover: #26333d;
+        --svy-selected: #33485c;
+        --svy-border-subtle: #5c7080;
+        --svy-border: #738091;
+        --svy-text: #e1e8ed;
+        --svy-text-muted: #b3c1cc;
+        --svy-accent: #48aff0;
+        --svy-danger: #ff9c9c;
       }
 
       * { box-sizing: border-box; }
-      body { margin: 0; background: #e9eef2; color: #1f2937; }
+      body { margin: 0; background: var(--svy-surface); color: var(--svy-text); }
       main { display: grid; grid-template-columns: repeat(2, minmax(310px, 1fr)); gap: 24px; padding: 32px; }
-      .panel { border: 1px solid rgba(15, 23, 42, 0.14); border-radius: 14px; padding: 22px; background: #f8fafc; box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08); }
+      .panel { border: 1px solid var(--svy-border-subtle); border-radius: 14px; padding: 22px; background: var(--svy-raised); box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08); }
       .panel.dark { --svy-canvas: #1f2b33; --svy-accent: #48aff0; background: #1f2b33; color: #f8fafc; border-color: rgba(255, 255, 255, 0.16); }
       .fixture-header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
       h1 { margin: 0; font-size: 22px; }
@@ -22,8 +51,12 @@
       .fixture-actions button { border: 1px solid rgba(15, 23, 42, 0.18); border-radius: 7px; padding: 7px 10px; background: #fff; color: #1f2937; cursor: pointer; }
       #fixture-log { min-width: 260px; font-size: 12px; opacity: 0.72; text-align: right; }
       h2 { margin: 0 0 16px; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.68; }
-      .row { min-height: 43px; display: grid; grid-template-columns: 24px minmax(0, 1fr) 76px; align-items: center; column-gap: 10px; border-bottom: 1px solid rgba(100, 116, 139, 0.14); }
+      [id$="-rows"] { padding-left: 128px; }
+      .row { min-height: 43px; display: grid; grid-template-columns: 10px 24px minmax(0, 1fr) 76px; align-items: center; column-gap: 9px; border-bottom: 1px solid rgba(100, 116, 139, 0.14); }
       .row:last-child { border-bottom: 0; }
+      .rm-block__controls { display: inline-flex; align-items: center; justify-content: center; }
+      .simple-bullet-outer { display: inline-flex; align-items: center; justify-content: center; width: 10px; height: 18px; }
+      .rm-bullet { display: block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.62; }
       .label { font-size: 15px; font-weight: 550; }
       .state { font-size: 11px; opacity: 0.58; text-align: right; }
       .rm-checkbox { display: inline-flex; align-items: center; }
@@ -35,7 +68,7 @@
       .check-container input:checked ~ .checkmark::after { content: ""; position: absolute; left: 4px; top: 0.5px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
       .safety-panel { grid-column: 1 / -1; }
       .safety-sample { display: flex; align-items: center; gap: 10px; min-height: 38px; }
-      @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 18px; } .fixture-header, .safety-panel { grid-column: 1; } .fixture-header { align-items: flex-start; flex-direction: column; } #fixture-log { text-align: left; min-width: 0; } }
+      @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 18px; } [id$="-rows"] { padding-left: 104px; } .fixture-header, .safety-panel { grid-column: 1; } .fixture-header { align-items: flex-start; flex-direction: column; } #fixture-log { text-align: left; min-width: 0; } }
     </style>
   </head>
   <body>
@@ -89,7 +122,11 @@
     </main>
     <div class="ts-status-portal" data-task-status-portal="true"></div>
     <script type="module">
-      import { createStatusPeekController } from "../../src/status-peek.js";
+      import {
+        computeGutterPopoverPlacement,
+        createStatusPeekController,
+        resolveBlockGutterAnchor,
+      } from "../../src/status-peek.js";
 
       const statuses = [
         ["ACTIVE", "active", "Active · play"],
@@ -103,7 +140,8 @@
 
       function render(target, checked) {
         document.getElementById(target).innerHTML = statuses.map(([status, shape, label], index) => `
-          <div class="row">
+          <div class="row rm-block-main">
+            <span class="rm-block__controls"><span class="simple-bullet-outer"><span class="rm-bullet"></span></span></span>
             <span class="task-control">
               <span class="rm-checkbox ${checked ? "rm-done" : "rm-todo"}" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" ${status === "ALERT" && !checked ? 'data-ts-alert-beacon="true"' : ""} data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
                 <label class="check-container">
@@ -125,18 +163,83 @@
       render("dark-checked-rows", true);
 
       const log = document.getElementById("fixture-log");
+      const portalRoot = document.querySelector(".ts-status-portal");
+      let fixtureChooser = null;
+
+      function closeFixtureChooser() {
+        fixtureChooser?.remove();
+        fixtureChooser = null;
+      }
+
+      function positionFixtureChooser(chooser, anchor) {
+        chooser.style.visibility = "hidden";
+        requestAnimationFrame(() => {
+          if (!chooser.isConnected) return;
+          const placement = computeGutterPopoverPlacement({
+            anchorRect: anchor.getBoundingClientRect(),
+            floatingRect: chooser.getBoundingClientRect(),
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            gap: 8,
+          });
+          const arrow = chooser.querySelector(".bp3-popover-arrow");
+          const arrowSvg = arrow.querySelector("svg");
+          chooser.style.left = `${Math.round(placement.left)}px`;
+          chooser.style.top = `${Math.round(placement.top)}px`;
+          chooser.style.transformOrigin = placement.placement === "left"
+            ? `right ${Math.round(placement.arrowOffset + 15)}px`
+            : `${Math.round(placement.arrowOffset + 15)}px ${placement.arrowSide}`;
+          chooser.setAttribute("data-ts-placement", placement.placement);
+          arrow.style.left = placement.arrowSide === "right" ? "" : `${Math.round(placement.arrowOffset)}px`;
+          arrow.style.right = placement.arrowSide === "right" ? "-11px" : "";
+          arrow.style.top = placement.arrowSide === "top" ? "-11px" : placement.arrowSide === "right" ? `${Math.round(placement.arrowOffset)}px` : "";
+          arrow.style.bottom = placement.arrowSide === "bottom" ? "-11px" : "";
+          arrowSvg.style.transform = `rotate(${placement.arrowRotation}deg)`;
+          chooser.style.visibility = "visible";
+        });
+      }
+
+      function showFixtureChooser(context) {
+        closeFixtureChooser();
+        const chooser = document.createElement("div");
+        chooser.className = "ts-status-chooser bp3-popover";
+        chooser.innerHTML = `
+          <div class="bp3-popover-arrow">
+            <svg viewBox="0 0 30 30" aria-hidden="true">
+              <path class="bp3-popover-arrow-border" d="M8.11 6.302c1.015-.936 1.887-2.922 1.887-4.297v26c0-1.378-.868-3.357-1.888-4.297L.925 17.09c-1.237-1.14-1.233-3.034 0-4.17L8.11 6.302z"></path>
+              <path class="bp3-popover-arrow-fill" d="M8.787 7.036c1.22-1.125 2.21-3.376 2.21-5.03V0v30-2.005c0-1.654-.983-3.9-2.21-5.03l-7.183-6.616c-.81-.746-.802-1.96 0-2.7l7.183-6.614z"></path>
+            </svg>
+          </div>
+          <div class="bp3-popover-content">
+            <ul class="ts-status-choice-list bp3-menu" role="menu">
+              ${statuses.slice(0, 6).map(([status, , label]) => `<li><a class="ts-status-choice bp3-menu-item ${status === context.statusKey ? "bp3-active bp3-intent-primary" : ""}" role="menuitem" tabindex="0" ${status === context.statusKey ? 'aria-current="true"' : ""}><div class="ts-status-choice-label bp3-fill">${label.split(" · ")[0]}</div></a></li>`).join("")}
+              <li><a class="ts-status-choice ts-status-choice-remove bp3-menu-item" role="menuitem" tabindex="0"><div class="ts-status-choice-label bp3-fill">Remove status</div></a></li>
+            </ul>
+          </div>
+        `;
+        portalRoot.appendChild(chooser);
+        fixtureChooser = chooser;
+        positionFixtureChooser(chooser, resolveBlockGutterAnchor(context.checkbox));
+        chooser.addEventListener("click", () => {
+          closeFixtureChooser();
+          controller.chooserClosed();
+        }, { once: true });
+      }
+
       const controller = createStatusPeekController({
         document,
         window,
-        portalRoot: document.querySelector(".ts-status-portal"),
+        portalRoot,
         resolveContext: ({ checkbox, statusKey }) => ({
           blockUid: checkbox.getAttribute("data-fixture-uid"),
           statusKey,
           label: checkbox.getAttribute("data-fixture-label"),
         }),
-        onOpen: ({ label }) => {
+        onOpen: (context) => {
+          const { label } = context;
+          showFixtureChooser(context);
           log.textContent = `${label}: chooser handoff fired once`;
-          return false;
+          return true;
         },
         onRemove: ({ label }) => {
           log.textContent = `${label}: Shift-click remove handoff fired once`;
@@ -156,7 +259,10 @@
         log.textContent = dark ? "Global .bp3-dark enabled" : "Global .bp3-light enabled";
       });
 
-      window.addEventListener("beforeunload", () => controller.destroy(), { once: true });
+      window.addEventListener("beforeunload", () => {
+        closeFixtureChooser();
+        controller.destroy();
+      }, { once: true });
     </script>
   </body>
 </html>

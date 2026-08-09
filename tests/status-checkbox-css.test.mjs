@@ -124,6 +124,49 @@ test("Svy Theme tokens and every established dark signal are supported", () => {
   );
 });
 
+test("the chooser is a scoped Svy-themed surface rather than a Blueprint white island", () => {
+  for (const token of [
+    "--svy-overlay",
+    "--svy-surface",
+    "--svy-hover",
+    "--svy-selected",
+    "--svy-border",
+    "--svy-border-subtle",
+    "--svy-text",
+    "--svy-text-muted",
+    "--svy-accent",
+    "--svy-ff-main",
+  ]) {
+    assert.match(css, new RegExp(token));
+  }
+  assert.match(
+    css,
+    /\.ts-status-chooser \.bp3-popover-content[\s\S]*background: var\(--ts-menu-surface\) !important/
+  );
+  assert.match(css, /\.ts-status-chooser \.bp3-popover-arrow-fill[\s\S]*fill: var\(--ts-menu-surface\) !important/);
+  assert.match(css, /\.ts-status-chooser \.bp3-popover-arrow-border[\s\S]*fill: var\(--ts-menu-border\) !important/);
+  assert.match(css, /\.ts-status-chooser \.bp3-popover-arrow[\s\S]*position: absolute/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice:hover[\s\S]*var\(--ts-menu-hover\)/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice\.bp3-active[\s\S]*var\(--ts-menu-selected\)/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice:focus-visible[\s\S]*var\(--ts-menu-accent\)/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-remove[\s\S]*var\(--ts-menu-danger\)/);
+  assert.doesNotMatch(css, /(^|\n)\s*\.bp3-popover-content\s*\{/);
+});
+
+test("popover positioning prefers the current block gutter and remains viewport-safe", () => {
+  assert.match(peekSource, /computeGutterPopoverPlacement/);
+  assert.match(peekSource, /resolveBlockGutterAnchor/);
+  assert.match(peekSource, /preferredLeft >= safeMargin/);
+  assert.match(peekSource, /placement: "left"/);
+  assert.match(peekSource, /placement: opensBelow \? "below" : "above"/);
+  assert.match(peekSource, /data-ts-placement/);
+  assert.match(source, /placementAnchorEl: resolveBlockGutterAnchor\(anchorEl\)/);
+  assert.match(source, /placementAnchorEl \|\| resolveBlockGutterAnchor\(anchorEl\) \|\| anchorEl/);
+  assert.match(source, /arrowSide === "right"/);
+  assert.match(css, /\.ts-status-chooser \.bp3-menu[\s\S]*min-width: 116px/);
+  assert.doesNotMatch(peekSource, /roamAlphaAPI|data\.pull|data\.q/);
+});
+
 test("focus, target size, reduced motion, and forced colors are explicit", () => {
   assert.match(css, /input:focus-visible/);
   assert.match(css, /inset: -4px/);
@@ -131,6 +174,14 @@ test("focus, target size, reduced motion, and forced colors are explicit", () =>
   assert.match(css, /@media \(forced-colors: active\)/);
   assert.match(css, /forced-color-adjust: auto/);
   assert.match(css, /--ts-checkbox-accent: currentColor/);
+  assert.match(
+    css,
+    /forced-colors: active[\s\S]*\.ts-status-chooser \.bp3-popover-content[\s\S]*background: Canvas !important/
+  );
+  assert.match(
+    css,
+    /forced-colors: active[\s\S]*\.ts-status-chooser \.ts-status-choice\.bp3-active[\s\S]*background: Highlight !important/
+  );
   assert.doesNotMatch(
     css,
     /\.checkmark::before\s*\{[\s\S]{0,180}background: currentColor !important/

@@ -6,6 +6,115 @@ import {
 export const STATUS_PEEK_CLASS = "ts-status-peek";
 export const STATUS_PEEK_HELP_ID = "ts-status-checkbox-help";
 
+function finiteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value, minimum, maximum) {
+  const safeMaximum = Math.max(minimum, maximum);
+  return Math.max(minimum, Math.min(value, safeMaximum));
+}
+
+/**
+ * Prefer the quiet gutter immediately before the current block bullet. When a
+ * narrow viewport cannot contain the floating surface there, fall back to a
+ * conventional above/below placement and keep the entire surface on-screen.
+ */
+export function computeGutterPopoverPlacement({
+  anchorRect,
+  floatingRect,
+  viewportWidth,
+  viewportHeight,
+  margin = 8,
+  gap = 7,
+  arrowSize = 30,
+} = {}) {
+  const anchorLeft = finiteNumber(anchorRect?.left);
+  const anchorTop = finiteNumber(anchorRect?.top);
+  const anchorWidth = Math.max(0, finiteNumber(anchorRect?.width));
+  const anchorHeight = Math.max(0, finiteNumber(anchorRect?.height));
+  const width = Math.max(0, finiteNumber(floatingRect?.width));
+  const height = Math.max(0, finiteNumber(floatingRect?.height));
+  const safeViewportWidth = Math.max(0, finiteNumber(viewportWidth));
+  const safeViewportHeight = Math.max(0, finiteNumber(viewportHeight));
+  const safeMargin = Math.max(0, finiteNumber(margin, 8));
+  const safeGap = Math.max(0, finiteNumber(gap, 7));
+  const safeArrowSize = Math.max(0, finiteNumber(arrowSize, 30));
+  const anchorCenterX = anchorLeft + anchorWidth / 2;
+  const anchorCenterY = anchorTop + anchorHeight / 2;
+  const preferredLeft = anchorLeft - safeGap - width;
+
+  if (preferredLeft >= safeMargin) {
+    const anchorOffset = Math.min(height / 2, safeArrowSize);
+    const top = clamp(
+      anchorCenterY - anchorOffset,
+      safeMargin,
+      safeViewportHeight - height - safeMargin
+    );
+    return Object.freeze({
+      placement: "left",
+      left: preferredLeft,
+      top,
+      arrowSide: "right",
+      arrowOffset: clamp(
+        anchorCenterY - top - safeArrowSize / 2,
+        4,
+        height - safeArrowSize - 4
+      ),
+      arrowRotation: 180,
+    });
+  }
+
+  const left = clamp(
+    anchorCenterX - width / 2,
+    safeMargin,
+    safeViewportWidth - width - safeMargin
+  );
+  const below = anchorTop + anchorHeight + safeGap;
+  const above = anchorTop - height - safeGap;
+  const opensBelow =
+    below + height <= safeViewportHeight - safeMargin || above < safeMargin;
+  const top = opensBelow
+    ? clamp(below, safeMargin, safeViewportHeight - height - safeMargin)
+    : clamp(above, safeMargin, safeViewportHeight - height - safeMargin);
+
+  return Object.freeze({
+    placement: opensBelow ? "below" : "above",
+    left,
+    top,
+    arrowSide: opensBelow ? "top" : "bottom",
+    arrowOffset: clamp(
+      anchorCenterX - left - safeArrowSize / 2,
+      4,
+      width - safeArrowSize - 4
+    ),
+    arrowRotation: opensBelow ? 90 : 270,
+  });
+}
+
+/** Resolve the current block's bullet without reading Roam or graph state. */
+export function resolveBlockGutterAnchor(element) {
+  if (!element?.closest) return element || null;
+  const blockMain = element.closest(".rm-block-main");
+  if (!blockMain) return element;
+
+  const directControls = Array.from(blockMain.children || []).find((child) =>
+    child?.matches?.(".rm-block__controls")
+  );
+  const controls = directControls || blockMain.querySelector?.(".rm-block__controls");
+  const roots = [controls, blockMain].filter(Boolean);
+  const selectors = [".rm-bullet", ".simple-bullet-outer", ".rm-bullet__inner"];
+
+  for (const root of roots) {
+    for (const selector of selectors) {
+      const candidate = root.querySelector?.(selector);
+      if (candidate?.closest?.(".rm-block-main") === blockMain) return candidate;
+    }
+  }
+  return element;
+}
+
 function contains(container, target) {
   if (!container || !target) return false;
   if (typeof container.contains === "function") return container.contains(target);
@@ -197,11 +306,10 @@ export function createStatusPeekController({
 
   function positionPeek(button, context) {
     if (!button?.style || !context?.checkbox?.getBoundingClientRect) return;
-    const anchorRect = context.checkbox.getBoundingClientRect();
+    const placementAnchor =
+      context.placementAnchorEl || resolveBlockGutterAnchor(context.checkbox);
     const viewportWidth = windowLike?.innerWidth || documentLike.documentElement?.clientWidth || 0;
     const viewportHeight = windowLike?.innerHeight || documentLike.documentElement?.clientHeight || 0;
-    const margin = 8;
-    const gap = 7;
 
     button.style.visibility = "hidden";
     button.style.left = "0px";
@@ -215,21 +323,22 @@ export function createStatusPeekController({
         reportInvalidAnchor();
         return;
       }
+      const anchorRect = placementAnchor?.getBoundingClientRect?.();
+      if (!anchorRect) return;
       const rect = button.getBoundingClientRect?.() || { width: 0, height: 0 };
       const width = Number(button.offsetWidth) || Number(rect.width) || 0;
       const height = Number(button.offsetHeight) || Number(rect.height) || 0;
-      const centered = anchorRect.left + anchorRect.width / 2 - width / 2;
-      const left = Math.max(margin, Math.min(centered, viewportWidth - width - margin));
-      const above = anchorRect.top - height - gap;
-      const opensBelow = above < margin;
-      const below = anchorRect.bottom + gap;
-      const top = opensBelow
-        ? Math.min(below, Math.max(margin, viewportHeight - height - margin))
-        : above;
+      const placement = computeGutterPopoverPlacement({
+        anchorRect,
+        floatingRect: { width, height },
+        viewportWidth,
+        viewportHeight,
+      });
 
-      button.classList?.toggle?.("ts-status-peek-below", opensBelow);
-      button.style.left = `${Math.round(left)}px`;
-      button.style.top = `${Math.round(top)}px`;
+      button.setAttribute?.("data-ts-placement", placement.placement);
+      button.classList?.toggle?.("ts-status-peek-below", placement.placement === "below");
+      button.style.left = `${Math.round(placement.left)}px`;
+      button.style.top = `${Math.round(placement.top)}px`;
       button.style.visibility = "visible";
     };
 

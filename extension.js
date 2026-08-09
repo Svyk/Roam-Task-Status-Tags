@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.6.2 | generated; edit src/ */
+/* Roam Task Status Tags v0.7.0 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -690,6 +690,97 @@ function clearOwnedStatusPillPresentations(root) {
 // src/status-peek.js
 var STATUS_PEEK_CLASS = "ts-status-peek";
 var STATUS_PEEK_HELP_ID = "ts-status-checkbox-help";
+function finiteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+function clamp2(value, minimum, maximum) {
+  const safeMaximum = Math.max(minimum, maximum);
+  return Math.max(minimum, Math.min(value, safeMaximum));
+}
+function computeGutterPopoverPlacement({
+  anchorRect,
+  floatingRect,
+  viewportWidth,
+  viewportHeight,
+  margin = 8,
+  gap = 7,
+  arrowSize = 30
+} = {}) {
+  const anchorLeft = finiteNumber(anchorRect?.left);
+  const anchorTop = finiteNumber(anchorRect?.top);
+  const anchorWidth = Math.max(0, finiteNumber(anchorRect?.width));
+  const anchorHeight = Math.max(0, finiteNumber(anchorRect?.height));
+  const width = Math.max(0, finiteNumber(floatingRect?.width));
+  const height = Math.max(0, finiteNumber(floatingRect?.height));
+  const safeViewportWidth = Math.max(0, finiteNumber(viewportWidth));
+  const safeViewportHeight = Math.max(0, finiteNumber(viewportHeight));
+  const safeMargin = Math.max(0, finiteNumber(margin, 8));
+  const safeGap = Math.max(0, finiteNumber(gap, 7));
+  const safeArrowSize = Math.max(0, finiteNumber(arrowSize, 30));
+  const anchorCenterX = anchorLeft + anchorWidth / 2;
+  const anchorCenterY = anchorTop + anchorHeight / 2;
+  const preferredLeft = anchorLeft - safeGap - width;
+  if (preferredLeft >= safeMargin) {
+    const anchorOffset = Math.min(height / 2, safeArrowSize);
+    const top2 = clamp2(
+      anchorCenterY - anchorOffset,
+      safeMargin,
+      safeViewportHeight - height - safeMargin
+    );
+    return Object.freeze({
+      placement: "left",
+      left: preferredLeft,
+      top: top2,
+      arrowSide: "right",
+      arrowOffset: clamp2(
+        anchorCenterY - top2 - safeArrowSize / 2,
+        4,
+        height - safeArrowSize - 4
+      ),
+      arrowRotation: 180
+    });
+  }
+  const left = clamp2(
+    anchorCenterX - width / 2,
+    safeMargin,
+    safeViewportWidth - width - safeMargin
+  );
+  const below = anchorTop + anchorHeight + safeGap;
+  const above = anchorTop - height - safeGap;
+  const opensBelow = below + height <= safeViewportHeight - safeMargin || above < safeMargin;
+  const top = opensBelow ? clamp2(below, safeMargin, safeViewportHeight - height - safeMargin) : clamp2(above, safeMargin, safeViewportHeight - height - safeMargin);
+  return Object.freeze({
+    placement: opensBelow ? "below" : "above",
+    left,
+    top,
+    arrowSide: opensBelow ? "top" : "bottom",
+    arrowOffset: clamp2(
+      anchorCenterX - left - safeArrowSize / 2,
+      4,
+      width - safeArrowSize - 4
+    ),
+    arrowRotation: opensBelow ? 90 : 270
+  });
+}
+function resolveBlockGutterAnchor(element) {
+  if (!element?.closest) return element || null;
+  const blockMain = element.closest(".rm-block-main");
+  if (!blockMain) return element;
+  const directControls = Array.from(blockMain.children || []).find(
+    (child) => child?.matches?.(".rm-block__controls")
+  );
+  const controls = directControls || blockMain.querySelector?.(".rm-block__controls");
+  const roots = [controls, blockMain].filter(Boolean);
+  const selectors = [".rm-bullet", ".simple-bullet-outer", ".rm-bullet__inner"];
+  for (const root of roots) {
+    for (const selector of selectors) {
+      const candidate = root.querySelector?.(selector);
+      if (candidate?.closest?.(".rm-block-main") === blockMain) return candidate;
+    }
+  }
+  return element;
+}
 function contains(container, target) {
   if (!container || !target) return false;
   if (typeof container.contains === "function") return container.contains(target);
@@ -847,11 +938,9 @@ function createStatusPeekController({
   }
   function positionPeek(button, context) {
     if (!button?.style || !context?.checkbox?.getBoundingClientRect) return;
-    const anchorRect = context.checkbox.getBoundingClientRect();
+    const placementAnchor = context.placementAnchorEl || resolveBlockGutterAnchor(context.checkbox);
     const viewportWidth = windowLike?.innerWidth || documentLike.documentElement?.clientWidth || 0;
     const viewportHeight = windowLike?.innerHeight || documentLike.documentElement?.clientHeight || 0;
-    const margin = 8;
-    const gap = 7;
     button.style.visibility = "hidden";
     button.style.left = "0px";
     button.style.top = "0px";
@@ -863,18 +952,21 @@ function createStatusPeekController({
         reportInvalidAnchor();
         return;
       }
+      const anchorRect = placementAnchor?.getBoundingClientRect?.();
+      if (!anchorRect) return;
       const rect = button.getBoundingClientRect?.() || { width: 0, height: 0 };
       const width = Number(button.offsetWidth) || Number(rect.width) || 0;
       const height = Number(button.offsetHeight) || Number(rect.height) || 0;
-      const centered = anchorRect.left + anchorRect.width / 2 - width / 2;
-      const left = Math.max(margin, Math.min(centered, viewportWidth - width - margin));
-      const above = anchorRect.top - height - gap;
-      const opensBelow = above < margin;
-      const below = anchorRect.bottom + gap;
-      const top = opensBelow ? Math.min(below, Math.max(margin, viewportHeight - height - margin)) : above;
-      button.classList?.toggle?.("ts-status-peek-below", opensBelow);
-      button.style.left = `${Math.round(left)}px`;
-      button.style.top = `${Math.round(top)}px`;
+      const placement = computeGutterPopoverPlacement({
+        anchorRect,
+        floatingRect: { width, height },
+        viewportWidth,
+        viewportHeight
+      });
+      button.setAttribute?.("data-ts-placement", placement.placement);
+      button.classList?.toggle?.("ts-status-peek-below", placement.placement === "below");
+      button.style.left = `${Math.round(placement.left)}px`;
+      button.style.top = `${Math.round(placement.top)}px`;
       button.style.visibility = "visible";
     };
     applyPosition();
@@ -1161,7 +1253,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.6.2" : "development";
+var BUNDLED_VERSION = true ? "0.7.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -2556,7 +2648,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!isManagedStatus) return null;
     const hasTodo = containsAny(blockString, TODO_PATTERNS);
     if (!hasTodo && !isTaskLike(blockString)) return null;
-    return { statusKey, blockUid, anchorEl, returnFocusEl: anchorEl };
+    return {
+      statusKey,
+      blockUid,
+      anchorEl,
+      placementAnchorEl: resolveBlockGutterAnchor(anchorEl),
+      returnFocusEl: anchorEl
+    };
   }
   function resolveStatusPeekContext({ checkbox, input, statusKey }) {
     if (!checkbox || !input || !statusKey || !STATUSES[statusKey]?.active) return null;
@@ -2600,10 +2698,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   function positionStatusChooser(el, anchorEl) {
     if (!el || !anchorEl?.getBoundingClientRect) return;
-    const rect = anchorEl.getBoundingClientRect();
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const margin = 8;
     const arrow = el.querySelector(".bp3-popover-arrow");
     const arrowSvg = arrow?.querySelector("svg");
     el.style.visibility = "hidden";
@@ -2611,29 +2707,28 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     el.style.top = "0px";
     window.requestAnimationFrame(() => {
       if (!el.isConnected) return;
+      const rect = anchorEl.getBoundingClientRect();
       const chooserRect = el.getBoundingClientRect();
-      const left = Math.max(
-        margin,
-        Math.min(rect.left, viewportWidth - chooserRect.width - margin)
-      );
-      const below = rect.bottom + 8;
-      const above = rect.top - chooserRect.height - 8;
-      const opensBelow = below + chooserRect.height <= viewportHeight - margin || above < margin;
-      const top = opensBelow ? below : Math.max(margin, above);
-      const arrowLeft = Math.max(
-        4,
-        Math.min(rect.left + rect.width / 2 - left - 15, chooserRect.width - 34)
-      );
-      el.style.left = `${Math.round(left)}px`;
-      el.style.top = `${Math.round(top)}px`;
-      el.style.transformOrigin = `${Math.round(arrowLeft + 15)}px ${opensBelow ? "top" : "bottom"}`;
-      el.classList.toggle("ts-status-chooser-above", !opensBelow);
+      const placement = computeGutterPopoverPlacement({
+        anchorRect: rect,
+        floatingRect: chooserRect,
+        viewportWidth,
+        viewportHeight,
+        gap: 8
+      });
+      el.style.left = `${Math.round(placement.left)}px`;
+      el.style.top = `${Math.round(placement.top)}px`;
+      el.setAttribute("data-ts-placement", placement.placement);
+      el.style.transformOrigin = placement.placement === "left" ? `right ${Math.round(placement.arrowOffset + 15)}px` : `${Math.round(placement.arrowOffset + 15)}px ${placement.arrowSide}`;
+      el.classList.toggle("ts-status-chooser-above", placement.placement === "above");
+      el.classList.toggle("ts-status-chooser-left", placement.placement === "left");
       if (arrow) {
-        arrow.style.left = `${Math.round(arrowLeft)}px`;
-        arrow.style.top = opensBelow ? "-11px" : "";
-        arrow.style.bottom = opensBelow ? "" : "-11px";
+        arrow.style.left = placement.arrowSide === "right" ? "" : `${Math.round(placement.arrowOffset)}px`;
+        arrow.style.right = placement.arrowSide === "right" ? "-11px" : "";
+        arrow.style.top = placement.arrowSide === "top" ? "-11px" : placement.arrowSide === "right" ? `${Math.round(placement.arrowOffset)}px` : "";
+        arrow.style.bottom = placement.arrowSide === "bottom" ? "-11px" : "";
       }
-      if (arrowSvg) arrowSvg.style.transform = opensBelow ? "rotate(90deg)" : "rotate(270deg)";
+      if (arrowSvg) arrowSvg.style.transform = `rotate(${placement.arrowRotation}deg)`;
       el.style.visibility = "visible";
     });
   }
@@ -2703,6 +2798,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     blockUid,
     statusKey,
     anchorEl,
+    placementAnchorEl = null,
     returnFocusEl = null,
     isIntentCurrent = null
   }) {
@@ -2749,7 +2845,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
     statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
-    positionStatusChooser(chooser, anchorEl);
+    positionStatusChooser(
+      chooser,
+      placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl
+    );
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true
     });
@@ -3837,7 +3936,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.statusLabelDisplay,
           name: "Status label display",
-          description: "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal the status control.",
+          description: "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal a theme-aware status control in the block's left gutter.",
           action: {
             type: "select",
             items: Object.values(STATUS_LABEL_DISPLAY),
@@ -3862,7 +3961,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: "task-status-help",
           name: "Help",
-          description: "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus the checkbox to reveal it; Enter or Alt+Down opens the chooser, Space remains native completion, and Shift+click removes.",
+          description: "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus reveals the control in the block's left gutter; Enter or Alt+Down opens the chooser there, Space remains native completion, and Shift+click removes.",
           action: {
             type: "button",
             content: "Print Help",

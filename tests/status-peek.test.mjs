@@ -10,9 +10,11 @@ import {
   STATUS_PEEK_CLASS,
   STATUS_PEEK_HELP_ID,
   appendAttributeToken,
+  computeGutterPopoverPlacement,
   createStatusPeekController,
   isStatusChooserKey,
   removeAttributeToken,
+  resolveBlockGutterAnchor,
   resolveOwnedStatusCheckbox,
 } from "../src/status-peek.js";
 
@@ -53,6 +55,7 @@ class FakeElement {
     this.textContent = "";
     this.isConnected = false;
     this.listeners = new Map();
+    this.rect = null;
   }
 
   append(...nodes) {
@@ -157,6 +160,7 @@ class FakeElement {
   }
 
   getBoundingClientRect() {
+    if (this.rect) return this.rect;
     return this.className === STATUS_PEEK_CLASS
       ? { left: 0, top: 0, right: 108, bottom: 30, width: 108, height: 30 }
       : { left: 100, top: 100, right: 124, bottom: 124, width: 24, height: 24 };
@@ -314,6 +318,102 @@ test("chooser shortcuts are exact and Space remains native", () => {
   assert.equal(isStatusChooserKey({ key: "Enter", shiftKey: true }), false);
   assert.equal(isStatusChooserKey({ key: "ArrowDown", altKey: false }), false);
   assert.equal(isStatusChooserKey({ key: "Enter", metaKey: true }), false);
+});
+
+test("gutter placement keeps compact surfaces entirely left of the block bullet", () => {
+  const placement = computeGutterPopoverPlacement({
+    anchorRect: { left: 144, top: 150, width: 8, height: 8 },
+    floatingRect: { width: 124, height: 220 },
+    viewportWidth: 712,
+    viewportHeight: 600,
+    gap: 8,
+  });
+
+  assert.equal(placement.placement, "left");
+  assert.equal(placement.left, 12);
+  assert.ok(placement.left + 124 < 144);
+  assert.equal(placement.arrowSide, "right");
+  assert.equal(placement.arrowRotation, 180);
+  assert.ok(placement.top >= 8);
+  assert.ok(placement.top + 220 <= 592);
+});
+
+test("gutter placement falls back above or below only when the left side cannot fit", () => {
+  const below = computeGutterPopoverPlacement({
+    anchorRect: { left: 42, top: 80, width: 16, height: 16 },
+    floatingRect: { width: 124, height: 180 },
+    viewportWidth: 320,
+    viewportHeight: 600,
+  });
+  assert.equal(below.placement, "below");
+  assert.equal(below.arrowSide, "top");
+  assert.equal(below.arrowRotation, 90);
+  assert.ok(below.left >= 8);
+
+  const above = computeGutterPopoverPlacement({
+    anchorRect: { left: 42, top: 560, width: 16, height: 16 },
+    floatingRect: { width: 124, height: 180 },
+    viewportWidth: 320,
+    viewportHeight: 600,
+  });
+  assert.equal(above.placement, "above");
+  assert.equal(above.arrowSide, "bottom");
+  assert.equal(above.arrowRotation, 270);
+  assert.ok(above.top >= 8);
+});
+
+test("the gutter anchor resolves the current block bullet without crossing into descendants", () => {
+  const document = new FakeDocument();
+  const blockMain = document.createElement("div");
+  blockMain.className = "rm-block-main";
+  const controls = document.createElement("div");
+  controls.className = "rm-block__controls";
+  const bullet = document.createElement("span");
+  bullet.className = "rm-bullet";
+  const content = document.createElement("div");
+  const task = makeOwnedCheckbox(document);
+  controls.append(bullet);
+  content.append(task.host);
+  blockMain.append(controls, content);
+
+  assert.equal(resolveBlockGutterAnchor(task.checkbox), bullet);
+  assert.equal(resolveBlockGutterAnchor(task.checkbox).closest(".rm-block-main"), blockMain);
+
+  const parentWithoutControls = document.createElement("div");
+  parentWithoutControls.className = "rm-block-main";
+  const parentTask = makeOwnedCheckbox(document, "ALERT", "parent123");
+  const descendantBlock = document.createElement("div");
+  descendantBlock.className = "rm-block-main";
+  const descendantControls = document.createElement("div");
+  descendantControls.className = "rm-block__controls";
+  const descendantBullet = document.createElement("span");
+  descendantBullet.className = "rm-bullet";
+  descendantControls.append(descendantBullet);
+  descendantBlock.append(descendantControls);
+  parentWithoutControls.append(parentTask.host, descendantBlock);
+
+  assert.equal(resolveBlockGutterAnchor(parentTask.checkbox), parentTask.checkbox);
+});
+
+test("the revealed status control uses the resolved bullet gutter", () => {
+  const fixture = makeControllerFixture();
+  const blockMain = fixture.document.createElement("div");
+  blockMain.className = "rm-block-main";
+  const controls = fixture.document.createElement("div");
+  controls.className = "rm-block__controls";
+  const bullet = fixture.document.createElement("span");
+  bullet.className = "rm-bullet";
+  bullet.rect = { left: 240, top: 100, right: 248, bottom: 108, width: 8, height: 8 };
+  controls.append(bullet);
+  blockMain.append(controls, fixture.task.host);
+
+  fixture.document.emit("focusin", intentEvent({ target: fixture.task.input }).event);
+  const button = fixture.portalRoot.querySelector(`.${STATUS_PEEK_CLASS}`);
+
+  assert.equal(button.getAttribute("data-ts-placement"), "left");
+  assert.equal(button.style.left, "125px");
+  assert.equal(button.style.top, "89px");
+  assert.ok(Number.parseInt(button.style.left, 10) + 108 < bullet.rect.left);
 });
 
 test("owned description tokens preserve host aria values exactly", () => {

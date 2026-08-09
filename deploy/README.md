@@ -18,7 +18,7 @@ Example:
 ## Behavior
 
 - The recommended **Checkbox only — reveal on intent** mode keeps task lines quiet at rest: only the status-aware native checkbox and task text are visible.
-- Hover or focus that checkbox to reveal a compact status control. Click it, or press `Enter` / `Alt+ArrowDown` on the focused checkbox, to open the full chooser.
+- Hover or focus that checkbox to reveal a compact status control in the quiet gutter left of the current block bullet. Click it, or press `Enter` / `Alt+ArrowDown` on the focused checkbox, to open the full chooser in the same gutter without covering task text.
 - Shift+click the revealed control to remove the status while keeping TODO.
 - Ordinary checkbox click and `Space` remain Roam's native complete/reopen interactions.
 - **Checkbox + status pill** mode keeps the persistent v0.4-style label and its click/Shift+click interactions.
@@ -55,6 +55,14 @@ Checkbox accents are derived separately for light and dark surfaces with a minim
 3.2:1 contrast target. Svy Theme users get its public surface and focus tokens; bare
 Roam and other themes use safe fallbacks. Reduced-motion and forced-colors modes are
 supported.
+
+The reveal control and chooser are portaled so Roam cannot clip them, but they resolve
+the current block's own bullet from DOM structure and open entirely to its left whenever
+the available gutter can contain them. On a narrow viewport—or when a long custom status
+name makes the chooser too wide—they fall back above or below and remain clamped on
+screen. The chooser consumes Svy Theme's public overlay, border, hover, selected, text,
+accent, radius, and font tokens; complete light/dark fallbacks keep it usable without
+Svy Theme. This positioning and hover path performs no graph reads.
 
 Status pills use their own paired light/dark palette with at least 4.8:1 text contrast.
 The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, or diamond),
@@ -208,6 +216,7 @@ npm run check
 The tests cover status text transforms, Better Tasks routing, certified writes, exact
 checkbox and hidden-pill ownership, reveal timing and keyboard semantics, ARIA cleanup,
 light/dark contrast derivation, graph-read-free hover, zero-JavaScript native completion,
+current-bullet gutter placement and viewport fallbacks, scoped Svy Theme menu tokens,
 scoped observer behavior, CSS scoping and theme signals, lifecycle cleanup, build
 determinism, secret scanning, and multiselect target resolution.
 

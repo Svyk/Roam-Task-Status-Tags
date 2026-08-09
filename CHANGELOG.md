@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-08-09
+
+- Move the checkbox-only reveal control and full status chooser into the quiet gutter immediately left of the current block bullet, keeping task text unobstructed.
+- Resolve the current block's bullet from DOM structure only, without adding hover graph reads or touching Roam's native completion path.
+- Fall back above or below the bullet only when a narrow viewport or long custom label cannot fit safely in the left gutter, with viewport clamping in every placement.
+- Restyle the portaled chooser with Svy Theme's public overlay, border, hover, selected, text, accent, radius, and font tokens while retaining complete bare-Roam light/dark fallbacks.
+- Add a compact current-state treatment, themed arrow, destructive-action styling, visible keyboard focus, and forced-colors support, all scoped to extension-owned UI.
+- Add pure geometry, current-bullet ownership, nested-block isolation, theme-token, accessibility, and browser visual regression coverage.
+
 ## 0.6.2 — 2026-08-09
 
 - Fix the remaining graph freeze when hovering or completing an Alert task.
