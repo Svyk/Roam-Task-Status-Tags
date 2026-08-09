@@ -200,43 +200,52 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   outline-offset: 2px !important;
 }
 
-/* The host theme continues to own checked fill and .checkmark::after geometry. */
+/*
+ * The center glyph describes workflow status only while the task is unchecked.
+ * The host theme continues to own checked fill and .checkmark::after geometry.
+ */
 .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
   content: "";
   position: absolute;
   z-index: 2;
-  top: -3px;
-  right: -3px;
-  width: 6px;
-  height: 6px;
+  top: 50%;
+  left: 50%;
+  width: var(--ts-checkbox-glyph-width, 8px);
+  height: var(--ts-checkbox-glyph-height, 8px);
   box-sizing: border-box;
+  border: var(--ts-checkbox-glyph-border, 0 solid transparent);
+  border-radius: var(--ts-checkbox-glyph-radius, 0);
   pointer-events: none;
-  background: var(--ts-checkbox-accent);
-  transition: opacity 140ms ease;
+  background: var(--ts-checkbox-glyph-background, var(--ts-checkbox-accent));
+  clip-path: var(--ts-checkbox-glyph-clip, none);
+  transform: translate(-50%, -50%) var(--ts-checkbox-glyph-transform, rotate(0deg));
+  transform-origin: center;
+  opacity: 1;
 }
 
 .rm-checkbox[data-ts-checkbox-status]
   > .check-container
   > input:checked
   ~ .checkmark::before {
-  opacity: 0.55;
+  content: none !important;
 }
 
-.rm-checkbox[data-ts-checkbox-shape="active"]
-  > .check-container
-  > .checkmark::before {
-  border-radius: 999px;
+.rm-checkbox[data-ts-checkbox-shape="active"] {
+  --ts-checkbox-glyph-width: 8px;
+  --ts-checkbox-glyph-height: 9px;
+  --ts-checkbox-glyph-background: var(--ts-checkbox-accent);
+  --ts-checkbox-glyph-clip: polygon(10% 4%, 94% 50%, 10% 96%);
 }
 
-.rm-checkbox[data-ts-checkbox-shape="waiting"]
-  > .check-container
-  > .checkmark::before {
-  border-radius: 1px;
-  background: linear-gradient(
+.rm-checkbox[data-ts-checkbox-shape="waiting"] {
+  --ts-checkbox-glyph-width: 9px;
+  --ts-checkbox-glyph-height: 9px;
+  --ts-checkbox-glyph-radius: 1px;
+  --ts-checkbox-glyph-background: linear-gradient(
     90deg,
-    var(--ts-checkbox-accent) 0 2px,
-    transparent 2px 4px,
-    var(--ts-checkbox-accent) 4px 6px
+    var(--ts-checkbox-accent) 0 3px,
+    transparent 3px 6px,
+    var(--ts-checkbox-accent) 6px 9px
   );
 }
 
@@ -247,14 +256,12 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   border-style: dashed !important;
 }
 
-.rm-checkbox[data-ts-checkbox-shape="holding"]
-  > .check-container
-  > .checkmark::before {
-  top: -1px;
-  right: -4px;
-  width: 7px;
-  height: 2px;
-  border-radius: 1px;
+.rm-checkbox[data-ts-checkbox-shape="holding"] {
+  --ts-checkbox-glyph-width: 8px;
+  --ts-checkbox-glyph-height: 8px;
+  --ts-checkbox-glyph-border: 2px solid var(--ts-checkbox-accent);
+  --ts-checkbox-glyph-radius: 1px;
+  --ts-checkbox-glyph-background: transparent;
 }
 
 .rm-checkbox[data-ts-checkbox-shape="incubating"]
@@ -264,41 +271,52 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   border-style: dotted !important;
 }
 
-.rm-checkbox[data-ts-checkbox-shape="incubating"]
-  > .check-container
-  > .checkmark::before {
-  border: 2px solid var(--ts-checkbox-accent);
-  border-radius: 999px;
-  background: var(--ts-checkbox-surface);
+.rm-checkbox[data-ts-checkbox-shape="incubating"] {
+  --ts-checkbox-glyph-width: 9px;
+  --ts-checkbox-glyph-height: 9px;
+  --ts-checkbox-glyph-border: 2px solid var(--ts-checkbox-accent);
+  --ts-checkbox-glyph-radius: 999px;
+  --ts-checkbox-glyph-background: transparent;
 }
 
-.rm-checkbox[data-ts-checkbox-shape="alert"]
-  > .check-container
-  > .checkmark::before {
-  top: -2px;
-  right: -2px;
-  width: 6px;
-  height: 6px;
-  transform: rotate(45deg);
-  border-radius: 1px;
+.rm-checkbox[data-ts-checkbox-shape="alert"] {
+  --ts-checkbox-glyph-width: 9px;
+  --ts-checkbox-glyph-height: 10px;
+  --ts-checkbox-glyph-background:
+    radial-gradient(
+      circle at 50% 90%,
+      var(--ts-checkbox-accent) 0 1.4px,
+      transparent 1.6px
+    ),
+    linear-gradient(var(--ts-checkbox-accent), var(--ts-checkbox-accent)) center 0 / 2.5px
+      6px no-repeat;
 }
 
-.rm-checkbox[data-ts-checkbox-shape="cancelled"]
-  > .check-container
-  > .checkmark::before {
-  top: -1px;
-  right: -4px;
-  width: 8px;
-  height: 2px;
-  transform: rotate(-45deg);
-  transform-origin: center;
-  border-radius: 1px;
+.rm-checkbox[data-ts-checkbox-shape="cancelled"] {
+  --ts-checkbox-glyph-width: 9px;
+  --ts-checkbox-glyph-height: 9px;
+  --ts-checkbox-glyph-background:
+    linear-gradient(
+      45deg,
+      transparent 39%,
+      var(--ts-checkbox-accent) 39% 61%,
+      transparent 61%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 39%,
+      var(--ts-checkbox-accent) 39% 61%,
+      transparent 61%
+    );
 }
 
-.rm-checkbox[data-ts-checkbox-shape="custom"]
-  > .check-container
-  > .checkmark::before {
-  border-radius: 1px;
+.rm-checkbox[data-ts-checkbox-shape="custom"] {
+  --ts-checkbox-glyph-width: 7px;
+  --ts-checkbox-glyph-height: 7px;
+  --ts-checkbox-glyph-border: 2px solid var(--ts-checkbox-accent);
+  --ts-checkbox-glyph-radius: 1px;
+  --ts-checkbox-glyph-background: transparent;
+  --ts-checkbox-glyph-transform: rotate(45deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -312,6 +330,12 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
 }
 
 @media (forced-colors: active) {
+  .rm-checkbox[data-ts-checkbox-status] {
+    --ts-checkbox-accent: currentColor;
+    --ts-checkbox-wash: Canvas;
+    --ts-checkbox-surface: Canvas;
+  }
+
   .rm-checkbox[data-ts-checkbox-status]
     > .check-container
     > input:not(:checked)
@@ -324,7 +348,6 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
 
   .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
     border-color: currentColor !important;
-    background: currentColor !important;
     forced-color-adjust: auto;
   }
 }
@@ -447,6 +470,7 @@ a.rm-page-ref[data-task-status-key]::before {
   border: var(--ts-pill-marker-border, 0 solid transparent) !important;
   border-radius: var(--ts-pill-marker-radius, 999px) !important;
   background: var(--ts-pill-marker-background, currentColor) !important;
+  clip-path: var(--ts-pill-marker-clip, none) !important;
   opacity: var(--ts-pill-marker-opacity, 0.72) !important;
   transform: var(--ts-pill-marker-transform, none) !important;
   margin-right: 4px !important;
@@ -530,6 +554,7 @@ a.rm-page-ref[data-task-status-key]:hover {
   border: var(--ts-pill-marker-border, 0 solid transparent);
   border-radius: var(--ts-pill-marker-radius, 999px);
   background: var(--ts-pill-marker-background, currentColor);
+  clip-path: var(--ts-pill-marker-clip, none);
   opacity: var(--ts-pill-marker-opacity, 0.72);
   transform: var(--ts-pill-marker-transform, none);
   margin-right: 4px;
@@ -540,15 +565,28 @@ a.rm-page-ref[data-task-status-key]:hover {
   span.rm-page-ref,
   a.rm-page-ref,
   .ts-status-pill-preview
-)[data-task-status-key="WAITING"] {
+)[data-task-status-key="ACTIVE"] {
   --ts-pill-marker-width: 6px;
-  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-height: 7px;
+  --ts-pill-marker-radius: 0;
+  --ts-pill-marker-background: currentColor;
+  --ts-pill-marker-clip: polygon(10% 4%, 94% 50%, 10% 96%);
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="WAITING"] {
+  --ts-pill-marker-width: 7px;
+  --ts-pill-marker-height: 7px;
   --ts-pill-marker-radius: 1px;
   --ts-pill-marker-background: linear-gradient(
     90deg,
     currentColor 0 2px,
-    transparent 2px 4px,
-    currentColor 4px 6px
+    transparent 2px 5px,
+    currentColor 5px 7px
   );
   --ts-pill-marker-opacity: 0.9;
 }
@@ -558,9 +596,11 @@ a.rm-page-ref[data-task-status-key]:hover {
   a.rm-page-ref,
   .ts-status-pill-preview
 )[data-task-status-key="HOLDING"] {
-  --ts-pill-marker-width: 7px;
-  --ts-pill-marker-height: 2px;
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-border: 1.5px solid currentColor;
   --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-background: transparent;
   --ts-pill-marker-opacity: 0.9;
 }
 
@@ -581,10 +621,11 @@ a.rm-page-ref[data-task-status-key]:hover {
   a.rm-page-ref,
   .ts-status-pill-preview
 )[data-task-status-key="ALERT"] {
-  --ts-pill-marker-width: 5px;
-  --ts-pill-marker-height: 5px;
-  --ts-pill-marker-radius: 1px;
-  --ts-pill-marker-transform: rotate(45deg);
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 7px;
+  --ts-pill-marker-background:
+    radial-gradient(circle at 50% 90%, currentColor 0 1px, transparent 1.2px),
+    linear-gradient(currentColor, currentColor) center 0 / 1.5px 4px no-repeat;
   --ts-pill-marker-opacity: 0.9;
 }
 
@@ -594,9 +635,20 @@ a.rm-page-ref[data-task-status-key]:hover {
   .ts-status-pill-preview
 )[data-task-status-key="CANCELLED"] {
   --ts-pill-marker-width: 7px;
-  --ts-pill-marker-height: 2px;
-  --ts-pill-marker-radius: 1px;
-  --ts-pill-marker-transform: rotate(-45deg);
+  --ts-pill-marker-height: 7px;
+  --ts-pill-marker-background:
+    linear-gradient(
+      45deg,
+      transparent 38%,
+      currentColor 38% 62%,
+      transparent 62%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 38%,
+      currentColor 38% 62%,
+      transparent 62%
+    );
   --ts-pill-marker-opacity: 0.9;
 }
 
@@ -612,9 +664,12 @@ a.rm-page-ref[data-task-status-key]:hover {
     [data-task-status-key="ALERT"],
     [data-task-status-key="CANCELLED"]
   ) {
-  --ts-pill-marker-width: 5px;
-  --ts-pill-marker-height: 5px;
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-border: 1.5px solid currentColor;
   --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-background: transparent;
+  --ts-pill-marker-transform: rotate(45deg);
   --ts-pill-marker-opacity: 0.9;
 }
 

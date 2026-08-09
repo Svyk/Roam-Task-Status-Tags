@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.3.1 | generated; edit src/ */
+/* Roam Task Status Tags v0.4.0 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -585,7 +585,7 @@ function clearOwnedStatusCheckboxes(root) {
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.3.1" : "development";
+var BUNDLED_VERSION = true ? "0.4.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;

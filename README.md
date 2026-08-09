@@ -34,17 +34,17 @@ does not replace it, intercept it, or create another completion state.
 
 | Status | Light mode, unchecked | Dark mode, unchecked | Checked |
 |---|---|---|---|
-| Active | Darkened teal solid outline + round beacon | Teal solid outline + round beacon | Native checkmark + secondary beacon |
-| Waiting | Darkened amber outline + parallel bars | Amber outline + parallel bars | Native checkmark + secondary bars |
-| Holding | Darkened slate dashed outline + tab | Slate dashed outline + tab | Native checkmark + secondary tab |
-| Incubating | Violet dotted outline + hollow circle | Adjusted violet dotted outline + hollow circle | Native checkmark + secondary circle |
-| Alert | Rose strong outline + diamond | Rose strong outline + diamond | Native checkmark + secondary diamond |
-| Cancelled | Charcoal outline + corner slash | Lightened slate outline + corner slash | Native checkmark + secondary slash |
-| Custom status | Contrast-adjusted configured hue + square | Contrast-adjusted configured hue + square | Native checkmark + secondary square |
+| Active | Darkened teal outline + centered play symbol | Teal outline + centered play symbol | Native theme checkmark |
+| Waiting | Darkened amber outline + centered pause symbol | Amber outline + centered pause symbol | Native theme checkmark |
+| Holding | Darkened slate dashed outline + centered stop symbol | Slate dashed outline + centered stop symbol | Native theme checkmark |
+| Incubating | Violet dotted outline + centered ring | Adjusted violet dotted outline + centered ring | Native theme checkmark |
+| Alert | Rose strong outline + centered exclamation mark | Rose strong outline + centered exclamation mark | Native theme checkmark |
+| Cancelled | Charcoal outline + centered X | Lightened slate outline + centered X | Native theme checkmark |
+| Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |
 
-When a task is checked, the active Roam/Svy Theme completion fill and checkmark remain
-dominant; the status marker becomes secondary. The status pill remains the text label,
-so status is never communicated by color alone.
+When a task is checked, the workflow glyph disappears completely and the active
+Roam/Svy Theme completion fill and checkmark become authoritative. The status pill
+remains the text label, so status is never communicated by color alone.
 
 Checkbox accents are derived separately for light and dark surfaces with a minimum
 3.2:1 contrast target. Svy Theme users get its public surface and focus tokens; bare
@@ -52,7 +52,7 @@ Roam and other themes use safe fallbacks. Reduced-motion and forced-colors modes
 supported.
 
 Status pills use their own paired light/dark palette with at least 4.8:1 text contrast.
-The small pill marker repeats the checkbox cue (dot, bars, tab, ring, diamond, or slash),
+The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, or diamond),
 making statuses readable by shape as well as color. Dark base colors such as Cancelled
 are automatically lightened on Svy Theme's dark canvas without changing the configured
 hue used in light mode.

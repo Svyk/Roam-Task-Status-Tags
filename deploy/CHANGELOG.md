@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — 2026-08-08
+
+- Redesign unchecked task checkboxes with centered, semantic workflow glyphs: play, pause, stop, ring, exclamation, X, and diamond.
+- Remove the workflow glyph immediately when a task is checked so Roam or Svy Theme exclusively owns the completion checkmark.
+- Repeat the same glyph language in status pills and preserve every shape in forced-colors mode.
+- Keep all styling scoped to extension-owned markers with no new event handlers or graph writes.
+
 ## 0.3.1 — 2026-08-08
 
 - Add paired, contrast-certified light and dark colors for status pills, including custom colors and text overrides.

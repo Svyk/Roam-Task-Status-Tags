@@ -29,8 +29,31 @@ test("all built-in shapes and the custom fallback have explicit treatments", () 
   }
 });
 
-test("pill markers repeat every checkbox shape instead of using color alone", () => {
+test("unchecked checkboxes use centered semantic glyphs instead of corner ornaments", () => {
+  assert.match(css, /top: 50%/);
+  assert.match(css, /left: 50%/);
+  assert.match(css, /transform: translate\(-50%, -50%\)/);
+  assert.match(
+    css,
+    /data-ts-checkbox-shape="active"[\s\S]*--ts-checkbox-glyph-clip: polygon/
+  );
+  assert.match(
+    css,
+    /data-ts-checkbox-shape="waiting"[\s\S]*var\(--ts-checkbox-accent\) 0 3px[\s\S]*transparent 3px 6px[\s\S]*var\(--ts-checkbox-accent\) 6px 9px/
+  );
+  assert.match(
+    css,
+    /data-ts-checkbox-shape="alert"[\s\S]*radial-gradient[\s\S]*linear-gradient/
+  );
+  assert.match(
+    css,
+    /data-ts-checkbox-shape="cancelled"[\s\S]*linear-gradient\([\s\S]*45deg[\s\S]*linear-gradient\([\s\S]*-45deg/
+  );
+});
+
+test("pill markers repeat every semantic checkbox glyph instead of using color alone", () => {
   for (const status of [
+    "ACTIVE",
     "WAITING",
     "HOLDING",
     "INCUBATING",
@@ -43,13 +66,15 @@ test("pill markers repeat every checkbox shape instead of using color alone", ()
       `missing pill marker treatment for ${status}`
     );
   }
-  assert.match(css, /linear-gradient\([\s\S]*currentColor 4px 6px/);
+  assert.match(css, /--ts-pill-marker-clip: polygon/);
+  assert.match(css, /currentColor 0 2px[\s\S]*transparent 2px 5px[\s\S]*currentColor 5px 7px/);
   assert.match(
     css,
-    /data-task-status-key="CANCELLED"\][\s\S]*--ts-pill-marker-transform: rotate\(-45deg\)/
+    /data-task-status-key="CANCELLED"\][\s\S]*45deg[\s\S]*-45deg/
   );
   assert.match(css, /width: var\(--ts-pill-marker-width/);
   assert.match(css, /border: var\(--ts-pill-marker-border/);
+  assert.match(css, /clip-path: var\(--ts-pill-marker-clip/);
 });
 
 test("status pills expose paired light and dark variables with a visible Cancelled fallback", () => {
@@ -72,9 +97,9 @@ test("status pills expose paired light and dark variables with a visible Cancell
   assert.match(source, /border-color: var\(--ts-status-border\) !important/);
 });
 
-test("checked fill remains host-owned and only the secondary ornament changes", () => {
+test("checked fill remains host-owned and the workflow glyph is removed", () => {
   assert.doesNotMatch(css, /input:checked\s*~\s*\.checkmark\s*\{/);
-  assert.match(css, /input:checked\s*\n\s*~ \.checkmark::before/);
+  assert.match(css, /input:checked\s*\n\s*~ \.checkmark::before\s*\{\s*content: none !important;/);
   assert.match(css, /host theme continues to own checked fill/i);
 });
 
@@ -104,6 +129,11 @@ test("focus, target size, reduced motion, and forced colors are explicit", () =>
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /@media \(forced-colors: active\)/);
   assert.match(css, /forced-color-adjust: auto/);
+  assert.match(css, /--ts-checkbox-accent: currentColor/);
+  assert.doesNotMatch(
+    css,
+    /\.checkmark::before\s*\{[\s\S]{0,180}background: currentColor !important/
+  );
 });
 
 test("observer handles mutation scopes synchronously without a full-document debounce", () => {

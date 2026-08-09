@@ -188,7 +188,7 @@ test("an already passing accent is preserved", () => {
   assert.deepEqual(deriveAccessibleAccent(base, { r: 255, g: 255, b: 255 }, 3.2), base);
 });
 
-test("built-in shapes are stable and unknown statuses use the custom square", () => {
+test("built-in shapes are stable and unknown statuses use the custom diamond", () => {
   assert.deepEqual(
     Object.keys(DEFAULT_COLORS).map(getStatusCheckboxShape),
     ["active", "waiting", "holding", "incubating", "alert", "cancelled"]

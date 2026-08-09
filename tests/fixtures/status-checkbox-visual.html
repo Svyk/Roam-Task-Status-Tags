@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" class="bp3-light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Status checkbox visual fixture</title>
+    <link rel="stylesheet" href="../../src/extension.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #e9eef2; color: #1f2937; }
+      main { display: grid; grid-template-columns: repeat(2, minmax(310px, 1fr)); gap: 24px; padding: 32px; }
+      .panel { border: 1px solid rgba(15, 23, 42, 0.14); border-radius: 14px; padding: 22px; background: #f8fafc; box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08); }
+      .panel.dark { --svy-canvas: #1f2b33; --svy-accent: #48aff0; background: #1f2b33; color: #f8fafc; border-color: rgba(255, 255, 255, 0.16); }
+      h1 { grid-column: 1 / -1; margin: 0; font-size: 22px; }
+      h2 { margin: 0 0 16px; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.68; }
+      .row { min-height: 43px; display: grid; grid-template-columns: 24px minmax(0, 1fr) 76px; align-items: center; column-gap: 10px; border-bottom: 1px solid rgba(100, 116, 139, 0.14); }
+      .row:last-child { border-bottom: 0; }
+      .label { font-size: 15px; font-weight: 550; }
+      .state { font-size: 11px; opacity: 0.58; text-align: right; }
+      .rm-checkbox { display: inline-flex; align-items: center; }
+      .check-container { display: inline-block; position: relative; width: 16px; height: 16px; }
+      .check-container input { position: absolute; opacity: 0; width: 16px; height: 16px; margin: 0; }
+      .checkmark { position: absolute; inset: 0; width: 16px; height: 16px; border: 2px solid #738091; border-radius: 4px; background: transparent; }
+      .check-container input:checked ~ .checkmark { background: #1684b7; border-color: #1684b7; }
+      .check-container input:checked ~ .checkmark::after { content: ""; position: absolute; left: 4px; top: 0.5px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+      @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 18px; } h1 { grid-column: 1; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Semantic workflow glyphs</h1>
+      <section class="panel" aria-label="Light mode statuses">
+        <h2>Light · unchecked</h2>
+        <div id="light-rows"></div>
+      </section>
+      <section class="panel dark rm-dark-theme" aria-label="Dark mode statuses">
+        <h2>Dark · unchecked</h2>
+        <div id="dark-rows"></div>
+      </section>
+      <section class="panel" aria-label="Light mode checked statuses">
+        <h2>Light · checked</h2>
+        <div id="light-checked-rows"></div>
+      </section>
+      <section class="panel dark rm-dark-theme" aria-label="Dark mode checked statuses">
+        <h2>Dark · checked</h2>
+        <div id="dark-checked-rows"></div>
+      </section>
+    </main>
+    <script>
+      const statuses = [
+        ["ACTIVE", "active", "Active · play"],
+        ["WAITING", "waiting", "Waiting · pause"],
+        ["HOLDING", "holding", "Holding · stop"],
+        ["INCUBATING", "incubating", "Incubating · ring"],
+        ["ALERT", "alert", "Alert · exclamation"],
+        ["CANCELLED", "cancelled", "Cancelled · X"],
+        ["CUSTOM", "custom", "Custom · diamond"],
+      ];
+
+      function render(target, checked) {
+        document.getElementById(target).innerHTML = statuses.map(([status, shape, label]) => `
+          <div class="row">
+            <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}">
+              <label class="check-container">
+                <input type="checkbox" ${checked ? "checked" : ""} aria-label="${label}" />
+                <span class="checkmark"></span>
+              </label>
+            </span>
+            <span class="label">${label}</span>
+            <span class="state">${checked ? "completed" : "workflow"}</span>
+          </div>
+        `).join("");
+      }
+
+      render("light-rows", false);
+      render("dark-rows", false);
+      render("light-checked-rows", true);
+      render("dark-checked-rows", true);
+    </script>
+  </body>
+</html>
