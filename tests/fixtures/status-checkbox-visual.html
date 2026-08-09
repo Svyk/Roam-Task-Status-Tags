@@ -43,7 +43,7 @@
       <header class="fixture-header">
         <div>
           <h1>Checkbox-only status display</h1>
-          <div style="margin-top: 5px; opacity: 0.68; font-size: 13px;">Hover or focus any checkbox. Press Enter to exercise the chooser handoff; Space remains native.</div>
+          <div style="margin-top: 5px; opacity: 0.68; font-size: 13px;">Hover or focus any checkbox. Alert gives two quick beats, then a long quiet interval; Space remains native.</div>
         </div>
         <div class="fixture-actions">
           <span id="fixture-log" aria-live="polite">No interaction yet</span>
@@ -68,6 +68,10 @@
       </section>
       <section class="panel safety-panel" aria-label="Fail-visible safety examples">
         <h2>Fail-visible safety</h2>
+        <div class="safety-sample">
+          <span class="label">Certified persistent Alert pill:</span>
+          <span class="rm-page-ref" data-tag="task-status/Alert" data-task-status-key="ALERT" data-task-status-label="Alert" data-ts-managed-status-pill="true" data-ts-alert-beacon="true">#[[task-status/Alert]]</span>
+        </div>
         <div class="safety-sample">
           <span class="label">Query result without an exact checkbox:</span>
           <span class="rm-page-ref" data-task-status-key="ALERT" data-task-status-label="Alert">#[[task-status/Alert]]</span>
@@ -96,13 +100,13 @@
         document.getElementById(target).innerHTML = statuses.map(([status, shape, label], index) => `
           <div class="row">
             <span class="task-control">
-              <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
+              <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" ${status === "ALERT" && !checked ? 'data-ts-alert-beacon="true"' : ""} data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
                 <label class="check-container">
                   <input type="checkbox" ${checked ? "checked" : ""} aria-label="${label}" />
                   <span class="checkmark"></span>
                 </label>
               </span>
-              <span class="rm-page-ref" data-tag="task-status/${label.split(" · ")[0]}" data-task-status-key="${status}" data-task-status-label="${label.split(" · ")[0]}" data-ts-managed-status-pill="true" data-ts-status-pill-hidden="true">#[[task-status/${label.split(" · ")[0]}]]</span>
+              <span class="rm-page-ref" data-tag="task-status/${label.split(" · ")[0]}" data-task-status-key="${status}" data-task-status-label="${label.split(" · ")[0]}" data-ts-managed-status-pill="true" data-ts-status-pill-hidden="true" ${status === "ALERT" && !checked ? 'data-ts-alert-beacon="true"' : ""}>#[[task-status/${label.split(" · ")[0]}]]</span>
             </span>
             <span class="label">${label}</span>
             <span class="state">${checked ? "completed" : "workflow"}</span>
@@ -135,6 +139,7 @@
         onError: (error) => {
           log.textContent = `Fixture error: ${error.message}`;
         },
+        alertBeaconEnabled: true,
       });
       controller.start();
       controller.setEnabled(true);

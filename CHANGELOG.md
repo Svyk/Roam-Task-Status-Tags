@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-08-09
+
+- Add an eye-catching Alert beacon: two brief rose halo beats followed by a long quiet interval on the exact unchecked Alert checkbox.
+- Echo the beacon on the certified persistent Alert pill and the checkbox-only hover/focus control without animating query results or later-prose Alert references.
+- Stop the beacon immediately when the native checkbox is completed, and keep checked tasks, reduced-motion, forced-colors, and print fully still.
+- Add an **Animate Alert status** switch, enabled by default; changing it is presentation-only and writes no Roam or Better Tasks data.
+- Derive light and dark beacon colors from configured status colors, retaining Svy Theme compatibility and exact unload/reload cleanup.
+
 ## 0.5.0 — 2026-08-09
 
 - Add the recommended **Checkbox only — reveal on intent** display mode while preserving the exact queryable `task-status/<Name>` graph token.

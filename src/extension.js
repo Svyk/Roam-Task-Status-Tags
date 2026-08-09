@@ -10,6 +10,7 @@ import {
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
+  OWNED_CHECKBOX_SELECTOR,
   relativeLuminance,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
@@ -435,6 +436,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusColorOverrides: "status-color-overrides",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
+    alertBeacon: "task-status-alert-beacon",
   };
 
   const STATUS_LABEL_DISPLAY = Object.freeze({
@@ -487,6 +489,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
   );
+  let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let colorProbeEl = null;
   let statusColorStyleEl = null;
@@ -730,6 +733,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
   --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
   --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
+  --ts-checkbox-beacon-light: ${checkboxValues.lightBeaconCss};
+  --ts-checkbox-beacon-dark: ${checkboxValues.darkBeaconCss};
 }`);
     });
 
@@ -1258,6 +1263,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       syncStatusPresentationForPill({
         statusPill: pill,
         enabled: checkboxStylingEnabled,
+        alertBeaconEnabled,
         hideManagedPill:
           statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
@@ -1301,6 +1307,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
   }
 
+  function setAlertBeaconEnabled(nextValue) {
+    alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
+    statusPeekController?.setAlertBeaconEnabled?.(alertBeaconEnabled);
+    refreshStatusVisuals(document);
+  }
+
   function refreshMutationScopes(mutations) {
     const refreshed = new Set();
     const refreshOnce = (node) => {
@@ -1328,6 +1340,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         refreshOnce(mutation.target);
       }
     }
+  }
+
+  function handleNativeCheckboxChange(event) {
+    const input = event?.target;
+    if (!input?.matches?.('input[type="checkbox"]')) return;
+    const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
+    if (!checkbox) return;
+    // Change bubbles after the native checked state flips. Re-certification is
+    // presentation-only and makes the Alert beacon stop/start immediately.
+    refreshStatusVisuals(checkbox);
   }
 
   function startStatusPillObserver() {
@@ -3203,6 +3225,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.alertBeacon,
+          name: "Animate Alert status",
+          description:
+            "Adds a brief two-beat attention halo to exact unchecked Alert tasks, then stays quiet. This is cosmetic, writes no task data, and automatically stays still for reduced-motion, forced-colors, and print.",
+          action: {
+            type: "switch",
+            onChange: (value) => setAlertBeaconEnabled(value),
+          },
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -3257,9 +3289,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       onRemove: (context) => setStatusForTargets(context.blockUid, null),
       onAnchorInvalid: () => closeStatusChooser(),
       onError: (error) => log("Status peek error:", error),
+      alertBeaconEnabled,
     });
     statusPeekController.start();
     statusPeekController.setEnabled(isStatusPeekEnabled());
+    statusPeekController.setAlertBeaconEnabled(alertBeaconEnabled);
 
     // Apply persisted status color overrides (if any)
     clearStatusColorOverrides();
@@ -3280,6 +3314,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
+    window.addEventListener("change", handleNativeCheckboxChange, true);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
@@ -3300,6 +3335,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
+    window.removeEventListener("change", handleNativeCheckboxChange, true);
     pendingOperations.clear();
 
     await unregisterAllCommands();

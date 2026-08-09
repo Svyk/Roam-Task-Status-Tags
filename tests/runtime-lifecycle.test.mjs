@@ -243,7 +243,18 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     ]);
     displaySetting.action.onChange("Checkbox + status pill");
     displaySetting.action.onChange("Checkbox only — reveal on intent");
+
+    const alertBeaconSetting = latestPanelConfig.settings.find(
+      (entry) => entry.id === "task-status-alert-beacon"
+    );
+    assert.equal(alertBeaconSetting.action.type, "switch");
+    alertBeaconSetting.action.onChange(false);
+    alertBeaconSetting.action.onChange(true);
     assert.equal(graphWriteCalls, 0);
+
+    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ALERT");
+    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "alert");
+    ownedCheckbox.setAttribute("data-ts-alert-beacon", "true");
 
     const ownedPill = new FakeElement("span");
     ownedPill.className = "rm-page-ref";
@@ -266,6 +277,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(slashCalls.removed.length, 6);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-alert-beacon"), null);
     assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
     assert.equal(ownedPill.getAttribute("data-ts-managed-status-pill"), null);
     assert.equal(ownedPill.getAttribute("data-ts-status-pill-hidden"), null);

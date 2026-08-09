@@ -137,6 +137,36 @@ test("focus, target size, reduced motion, and forced colors are explicit", () =>
   );
 });
 
+test("Alert attention is a scoped two-beat beacon with a long quiet interval", () => {
+  assert.match(
+    css,
+    /\.rm-checkbox\[data-ts-alert-beacon="true"\]\[data-ts-checkbox-status="ALERT"\][\s\S]*input:not\(:checked\)[\s\S]*animation: ts-alert-outline-beacon 5\.2s/
+  );
+  assert.match(
+    css,
+    /rm-page-ref\[data-ts-managed-status-pill="true"\]\[data-ts-alert-beacon="true"\]\[data-task-status-key="ALERT"\]/
+  );
+  assert.match(
+    css,
+    /\.ts-status-peek\[data-ts-alert-beacon="true"\]\[data-task-status-key="ALERT"\]::after/
+  );
+  assert.match(css, /@keyframes ts-alert-outline-beacon[\s\S]*5%,[\s\S]*17%/);
+  assert.match(css, /24%,[\s\S]*100%/);
+  assert.match(css, /@media print/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*animation: none !important/);
+  assert.match(css, /forced-colors: active[\s\S]*data-ts-alert-beacon/);
+  assert.doesNotMatch(
+    css,
+    /rm-page-ref\[data-task-status-key="ALERT"\]\s*\{[^}]*animation:/s
+  );
+  assert.match(source, /Animate Alert status/);
+  assert.match(source, /This is cosmetic, writes no task data/);
+  assert.match(source, /addEventListener\("change", handleNativeCheckboxChange, true\)/);
+  assert.match(source, /removeEventListener\("change", handleNativeCheckboxChange, true\)/);
+  assert.match(checkboxSource, /ALERT_BEACON_ATTRIBUTE/);
+  assert.match(peekSource, /setAlertBeaconEnabled/);
+});
+
 test("observer handles mutation scopes synchronously without a full-document debounce", () => {
   assert.match(source, /refreshMutationScopes\(mutations\)/);
   assert.match(source, /refreshStatusVisuals\(scope\)/);

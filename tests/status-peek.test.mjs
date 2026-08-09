@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ALERT_BEACON_ATTRIBUTE,
   CHECKBOX_SHAPE_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
   OWNED_CHECKBOX_SELECTOR,
@@ -228,6 +229,7 @@ function makeOwnedCheckbox(document, statusKey = "WAITING", blockUid = "abcdefgh
   checkbox.setAttribute("data-block-uid", blockUid);
   const input = document.createElement("input");
   input.setAttribute("type", "checkbox");
+  input.checked = false;
   const checkmark = document.createElement("span");
   checkmark.className = "checkmark";
   checkbox.append(input, checkmark);
@@ -335,6 +337,33 @@ test("owned resolver requires the exact marked checkbox, input, and checkmark", 
 
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   assert.equal(resolveOwnedStatusCheckbox(input), null);
+});
+
+test("peek Alert beacon follows the setting, exact status, and native checked state", () => {
+  const fixture = makeControllerFixture();
+  fixture.task.checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, "ALERT");
+  fixture.controller.setAlertBeaconEnabled(true);
+  fixture.document.emit("focusin", intentEvent({ target: fixture.task.input }).event);
+
+  const button = fixture.portalRoot.querySelector(`.${STATUS_PEEK_CLASS}`);
+  assert.equal(button.getAttribute("data-task-status-key"), "ALERT");
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+
+  fixture.task.input.checked = true;
+  fixture.controller.refresh();
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+
+  fixture.task.input.checked = false;
+  fixture.task.checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, "WAITING");
+  fixture.controller.refresh();
+  assert.equal(button.getAttribute("data-task-status-key"), "WAITING");
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+
+  fixture.task.checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, "ALERT");
+  fixture.controller.refresh();
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+  fixture.controller.setAlertBeaconEnabled(false);
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
 });
 
 test("focus reveals one accessible portaled control and Enter opens the chooser", async () => {

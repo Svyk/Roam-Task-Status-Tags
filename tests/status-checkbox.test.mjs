@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createTaskStatusTextHelpers } from "../src/extension.js";
 import {
+  ALERT_BEACON_ATTRIBUTE,
   CHECKBOX_SHAPE_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
   HIDDEN_STATUS_PILL_ATTRIBUTE,
@@ -117,6 +118,7 @@ function taskRender() {
   const label = new FakeElement("label", ["check-container"]);
   const input = new FakeElement("input");
   input.setAttribute("type", "checkbox");
+  input.checked = false;
   const checkmark = new FakeElement("span", ["checkmark"]);
   const pill = new FakeElement("span", ["rm-page-ref"]);
   label.append(input, checkmark);
@@ -403,12 +405,14 @@ test("owned cleanup removes only Task Status attributes", () => {
   const second = taskRender().checkbox;
   applyStatusCheckboxAnnotation(first, { statusKey: "ACTIVE", shape: "active" });
   applyStatusCheckboxAnnotation(second, { statusKey: "ALERT", shape: "alert" });
+  second.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
   first.setAttribute("data-foreign-owner", "keep");
   root.append(first, second);
 
   assert.equal(clearOwnedStatusCheckboxes(root), 2);
   assert.equal(first.getAttribute(CHECKBOX_STATUS_ATTRIBUTE), null);
   assert.equal(second.getAttribute(CHECKBOX_SHAPE_ATTRIBUTE), null);
+  assert.equal(second.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
   assert.equal(first.getAttribute("data-foreign-owner"), "keep");
 
   clearStatusCheckboxAnnotation(first);
@@ -432,6 +436,110 @@ test("checkbox-only presentation hides only after exact checkbox annotation succ
   assert.equal(checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE), "WAITING");
   assert.equal(pill.getAttribute(MANAGED_STATUS_PILL_ATTRIBUTE), "true");
   assert.equal(pill.getAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE), "true");
+});
+
+test("Alert beacon belongs only to the exact managed unchecked Alert presentation", () => {
+  const active = taggedTaskRender("task-status/Alert");
+  const activeResult = syncStatusPresentationForPill({
+    statusPill: active.pill,
+    hideManagedPill: false,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString: "{{[[TODO]]}} #[[task-status/Alert]] Escalate incident",
+    textHelpers,
+  });
+
+  assert.equal(activeResult.alertBeacon, true);
+  assert.equal(active.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+  assert.equal(active.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+
+  active.input.checked = true;
+  const checkedResult = syncStatusPresentationForPill({
+    statusPill: active.pill,
+    hideManagedPill: false,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString: "{{[[DONE]]}} #[[task-status/Alert]] Escalate incident",
+    textHelpers,
+  });
+  assert.equal(checkedResult.alertBeacon, false);
+  assert.equal(active.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+  assert.equal(active.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+
+  active.input.checked = false;
+  const disabledResult = syncStatusPresentationForPill({
+    statusPill: active.pill,
+    hideManagedPill: false,
+    alertBeaconEnabled: false,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString: "{{[[TODO]]}} #[[task-status/Alert]] Escalate incident",
+    textHelpers,
+  });
+  assert.equal(disabledResult.alertBeacon, false);
+  assert.equal(active.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+  assert.equal(active.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+});
+
+test("Alert lookalikes and non-Alert managed statuses never gain beacon ownership", () => {
+  const later = taggedTaskRender("task-status/Alert");
+  const laterResult = syncStatusPresentationForPill({
+    statusPill: later.pill,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString: "{{[[TODO]]}} Discuss #[[task-status/Alert]] in prose",
+    textHelpers,
+  });
+  assert.equal(laterResult.annotated, false);
+  assert.equal(later.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+  assert.equal(later.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+
+  const waiting = taggedTaskRender("task-status/Waiting");
+  const waitingResult = syncStatusPresentationForPill({
+    statusPill: waiting.pill,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Waiting",
+    statusTagToKey,
+    blockString: "{{[[TODO]]}} #[[task-status/Waiting]] Await reply",
+    textHelpers,
+  });
+  assert.equal(waitingResult.alertBeacon, false);
+  assert.equal(waiting.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+  assert.equal(waiting.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+});
+
+test("a later duplicate Alert ref cannot clear the exact prefix beacon", () => {
+  const render = taggedTaskRender("task-status/Alert");
+  const duplicate = new FakeElement("span", ["rm-page-ref"]);
+  duplicate.setAttribute("data-tag", "task-status/Alert");
+  render.parent.append(duplicate);
+  const blockString =
+    "{{[[TODO]]}} #[[task-status/Alert]] Escalate; mention #[[task-status/Alert]] later";
+
+  const exact = syncStatusPresentationForPill({
+    statusPill: render.pill,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString,
+    textHelpers,
+  });
+  const later = syncStatusPresentationForPill({
+    statusPill: duplicate,
+    alertBeaconEnabled: true,
+    tagTitle: "task-status/Alert",
+    statusTagToKey,
+    blockString,
+    textHelpers,
+  });
+
+  assert.equal(exact.alertBeacon, true);
+  assert.equal(later.annotated, false);
+  assert.equal(render.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+  assert.equal(duplicate.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
 });
 
 test("pill presentation fails visible for later prose, disabled styling, and missing exact checkbox", () => {
@@ -582,10 +690,11 @@ test("only the first fully-accounted duplicate status ref can own presentation",
   });
 
   assert.equal(firstResult.hidden, true);
-  assert.equal(duplicateResult.annotated, true);
+  assert.equal(duplicateResult.annotated, false);
   assert.equal(duplicateResult.managed, false);
   assert.equal(duplicateResult.reason, "not-exact-managed-pill");
   assert.equal(duplicate.getAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE), null);
+  assert.equal(first.checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE), "WAITING");
 });
 
 test("a partial duplicate render fails visible even for the first status ref", () => {
@@ -600,8 +709,9 @@ test("a partial duplicate render fails visible even for the first status ref", (
     textHelpers,
   });
 
-  assert.equal(result.annotated, true);
+  assert.equal(result.annotated, false);
   assert.equal(result.managed, false);
+  assert.equal(render.checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE), null);
   assert.equal(render.pill.getAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE), null);
 });
 
@@ -697,12 +807,14 @@ test("owned pill cleanup is idempotent, view-local, and preserves foreign attrib
   const second = taskRender().pill;
   applyManagedStatusPillPresentation(first, { hidden: true });
   applyManagedStatusPillPresentation(second, { hidden: false });
+  first.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
   first.setAttribute("data-foreign-owner", "keep");
   root.append(first, second);
 
   assert.equal(clearOwnedStatusPillPresentations(root), 2);
   assert.equal(first.getAttribute(MANAGED_STATUS_PILL_ATTRIBUTE), null);
   assert.equal(first.getAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE), null);
+  assert.equal(first.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
   assert.equal(second.getAttribute(MANAGED_STATUS_PILL_ATTRIBUTE), null);
   assert.equal(first.getAttribute("data-foreign-owner"), "keep");
   assert.equal(clearOwnedStatusPillPresentations(root), 0);

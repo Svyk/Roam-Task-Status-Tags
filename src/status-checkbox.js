@@ -1,5 +1,6 @@
 export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
+export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 export const OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 export const MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
 export const HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
@@ -161,6 +162,8 @@ export function buildStatusCheckboxColors({
     darkAccentCss: rgbCss(darkAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16),
+    lightBeaconCss: rgbaCss(lightAccent, 0.52),
+    darkBeaconCss: rgbaCss(darkAccent, 0.68),
   });
 }
 
@@ -275,6 +278,7 @@ export function clearStatusCheckboxAnnotation(checkbox) {
   if (!checkbox?.removeAttribute) return;
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
+  checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
 }
 
 export function applyStatusCheckboxAnnotation(checkbox, decision) {
@@ -325,6 +329,7 @@ export function clearStatusPillPresentation(statusPill) {
   if (!statusPill?.removeAttribute) return;
   statusPill.removeAttribute(MANAGED_STATUS_PILL_ATTRIBUTE);
   statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+  statusPill.removeAttribute(ALERT_BEACON_ATTRIBUTE);
 }
 
 export function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {}) {
@@ -393,14 +398,13 @@ export function isExactManagedStatusPill({
 export function syncStatusPresentationForPill({
   statusPill,
   hideManagedPill = false,
+  alertBeaconEnabled = false,
   ...checkboxOptions
 } = {}) {
   clearStatusPillPresentation(statusPill);
-  const checkboxResult = syncStatusCheckboxForPill({
-    statusPill,
-    ...checkboxOptions,
-  });
-  if (!checkboxResult.annotated) return checkboxResult;
+  if (!findSiblingTaskCheckbox(statusPill)) {
+    return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
+  }
   if (
     !isExactManagedStatusPill({
       statusPill,
@@ -409,18 +413,34 @@ export function syncStatusPresentationForPill({
     })
   ) {
     return Object.freeze({
-      ...checkboxResult,
+      annotated: false,
       managed: false,
       hidden: false,
       reason: "not-exact-managed-pill",
     });
   }
 
+  const checkboxResult = syncStatusCheckboxForPill({
+    statusPill,
+    ...checkboxOptions,
+  });
+  if (!checkboxResult.annotated) return checkboxResult;
+
   applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  const input = checkboxResult.checkbox?.querySelector?.('input[type="checkbox"]');
+  const shouldBeacon =
+    Boolean(alertBeaconEnabled) &&
+    checkboxResult.statusKey === "ALERT" &&
+    input?.checked === false;
+  if (shouldBeacon) {
+    checkboxResult.checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+    statusPill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+  }
   return Object.freeze({
     ...checkboxResult,
     managed: true,
     hidden: Boolean(hideManagedPill),
+    alertBeacon: shouldBeacon,
   });
 }
 

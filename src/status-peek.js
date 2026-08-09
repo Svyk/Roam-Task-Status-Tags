@@ -1,4 +1,5 @@
 import {
+  ALERT_BEACON_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
   OWNED_CHECKBOX_SELECTOR,
 } from "./status-checkbox.js";
@@ -93,6 +94,7 @@ export function createStatusPeekController({
   onError = () => {},
   showDelay = 210,
   hideDelay = 120,
+  alertBeaconEnabled: initialAlertBeaconEnabled = false,
 } = {}) {
   if (!documentLike?.createElement || !portalRoot?.appendChild) {
     throw new TypeError("Status peek requires a document and portal root");
@@ -114,6 +116,17 @@ export function createStatusPeekController({
   let helperEl = null;
   let chooserOpen = false;
   let activationRevision = 0;
+  let alertBeaconEnabled = Boolean(initialAlertBeaconEnabled);
+
+  function syncAlertBeacon(button, context) {
+    if (!button?.removeAttribute) return;
+    const shouldBeacon =
+      alertBeaconEnabled &&
+      context?.statusKey === "ALERT" &&
+      context?.input?.checked === false;
+    if (shouldBeacon) button.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+    else button.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+  }
 
   function report(error) {
     try {
@@ -299,6 +312,7 @@ export function createStatusPeekController({
       "aria-label",
       `Change task status from ${context.label}. Shift-click to remove.`
     );
+    syncAlertBeacon(button, context);
 
     const label = documentLike.createElement("span");
     label.className = "ts-status-peek-label";
@@ -353,6 +367,7 @@ export function createStatusPeekController({
         `Change task status from ${context.label}. Shift-click to remove.`
       );
       setButtonText(peekButton, context.label);
+      syncAlertBeacon(peekButton, context);
     }
     positionPeek(peekButton, context);
     return true;
@@ -497,6 +512,11 @@ export function createStatusPeekController({
     if (!enabled) hide();
   }
 
+  function setAlertBeaconEnabled(nextEnabled) {
+    alertBeaconEnabled = Boolean(nextEnabled);
+    if (peekButton && activeContext) syncAlertBeacon(peekButton, activeContext);
+  }
+
   function refresh() {
     if (!activeContext) return;
     if (!enabled) {
@@ -549,6 +569,7 @@ export function createStatusPeekController({
     refresh,
     chooserClosed,
     setEnabled,
+    setAlertBeaconEnabled,
     isEnabled: () => enabled,
     isVisible: () => Boolean(peekButton?.isConnected),
   });
