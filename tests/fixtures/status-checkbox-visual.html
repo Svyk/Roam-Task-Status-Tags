@@ -70,7 +70,12 @@
         <h2>Fail-visible safety</h2>
         <div class="safety-sample">
           <span class="label">Certified persistent Alert pill:</span>
-          <span class="rm-page-ref" data-tag="task-status/Alert" data-task-status-key="ALERT" data-task-status-label="Alert" data-ts-managed-status-pill="true" data-ts-alert-beacon="true">#[[task-status/Alert]]</span>
+          <span class="task-control">
+            <span class="rm-checkbox rm-todo" data-ts-checkbox-status="ALERT" data-ts-checkbox-shape="alert" data-ts-alert-beacon="true">
+              <label class="check-container"><input type="checkbox" aria-label="Alert fixture" /><span class="checkmark"></span></label>
+            </span>
+            <span class="rm-page-ref" data-tag="task-status/Alert" data-task-status-key="ALERT" data-task-status-label="Alert" data-ts-managed-status-pill="true" data-ts-alert-beacon="true">#[[task-status/Alert]]</span>
+          </span>
         </div>
         <div class="safety-sample">
           <span class="label">Query result without an exact checkbox:</span>
@@ -85,10 +90,6 @@
     <div class="ts-status-portal" data-task-status-portal="true"></div>
     <script type="module">
       import { createStatusPeekController } from "../../src/status-peek.js";
-      import {
-        OWNED_CHECKBOX_SELECTOR,
-        syncAlertBeaconForNativeCheckboxState,
-      } from "../../src/status-checkbox.js";
 
       const statuses = [
         ["ACTIVE", "active", "Active · play"],
@@ -104,7 +105,7 @@
         document.getElementById(target).innerHTML = statuses.map(([status, shape, label], index) => `
           <div class="row">
             <span class="task-control">
-              <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" ${status === "ALERT" && !checked ? 'data-ts-alert-beacon="true"' : ""} data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
+              <span class="rm-checkbox ${checked ? "rm-done" : "rm-todo"}" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" ${status === "ALERT" && !checked ? 'data-ts-alert-beacon="true"' : ""} data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
                 <label class="check-container">
                   <input type="checkbox" ${checked ? "checked" : ""} aria-label="${label}" />
                   <span class="checkmark"></span>
@@ -143,26 +144,9 @@
         onError: (error) => {
           log.textContent = `Fixture error: ${error.message}`;
         },
-        alertBeaconEnabled: true,
       });
       controller.start();
       controller.setEnabled(true);
-
-      window.addEventListener("change", (event) => {
-        const input = event.target;
-        if (!input?.matches?.('input[type="checkbox"]')) return;
-        const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
-        if (!checkbox) return;
-        const result = syncAlertBeaconForNativeCheckboxState({
-          checkbox,
-          input,
-          alertBeaconEnabled: true,
-        });
-        controller.syncNativeCheckboxState(input);
-        log.textContent = `${checkbox.getAttribute("data-fixture-label")}: ${
-          input.checked ? "completed" : "reopened"
-        } · lightweight=${result.handled}`;
-      });
 
       document.getElementById("theme-toggle").addEventListener("click", () => {
         const root = document.documentElement;

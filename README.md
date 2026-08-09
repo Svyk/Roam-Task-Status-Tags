@@ -67,16 +67,18 @@ hue used in light mode.
 Alert is intentionally more noticeable than the other workflow states without becoming
 a constant strobe. The exact unchecked Alert checkbox pulses twice during the first
 1.25 seconds of a 5.2-second cycle, then remains quiet. In persistent-pill mode the
-certified Alert pill repeats the same rhythm; in checkbox-only mode the hover/focus
-status control carries a soft expanding ring.
+certified Alert pill repeats the same rhythm. The hover/focus status control stays static
+so revealing or using it never starts another animation.
 
 The beacon is enabled by default under **Task Status Tags → Animate Alert status**.
 Turning it off changes presentation only and performs no graph writes. Checked tasks
 never pulse, and the animation is disabled automatically for `prefers-reduced-motion`,
 forced-colors mode, and print. Query results, later-prose Alert references, ambiguous
-renders, and other unowned tags never receive animation ownership. Native completion
-finishes before the plugin mirrors the checked state, with no graph read or write in that
-event path.
+renders, and other unowned tags never receive animation ownership. Roam's native
+`rm-todo` / `rm-done` state gates the pulse directly in CSS: Task Status Tags installs no
+checkbox completion listener and runs no JavaScript when the task is completed or reopened.
+Hover/focus reads only the already-certified checkbox annotation, never the graph; every
+eventual status write still performs its own fresh graph precondition.
 
 ### Quiet display without losing query power
 
@@ -205,7 +207,8 @@ npm run check
 
 The tests cover status text transforms, Better Tasks routing, certified writes, exact
 checkbox and hidden-pill ownership, reveal timing and keyboard semantics, ARIA cleanup,
-light/dark contrast derivation, CSS scoping and theme signals, lifecycle cleanup, build
+light/dark contrast derivation, graph-read-free hover, zero-JavaScript native completion,
+scoped observer behavior, CSS scoping and theme signals, lifecycle cleanup, build
 determinism, secret scanning, and multiselect target resolution.
 
 ## Troubleshooting

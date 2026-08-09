@@ -220,6 +220,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     ownedCheckbox.className = "rm-checkbox rm-todo";
     ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
     ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+    ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
     ownedCheckbox.setAttribute("data-foreign-owner", "keep");
     document.body.appendChild(ownedCheckbox);
 
@@ -229,9 +230,11 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(checkboxSetting.action.type, "switch");
     checkboxSetting.action.onChange(false);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
     assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
     ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
     ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+    ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
 
     const displaySetting = latestPanelConfig.settings.find(
       (entry) => entry.id === "task-status-label-display"
@@ -277,6 +280,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(slashCalls.removed.length, 6);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-alert-beacon"), null);
     assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
     assert.equal(ownedPill.getAttribute("data-ts-managed-status-pill"), null);

@@ -1,5 +1,6 @@
 export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
+export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 export const OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 export const MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
@@ -278,10 +279,11 @@ export function clearStatusCheckboxAnnotation(checkbox) {
   if (!checkbox?.removeAttribute) return;
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
 }
 
-export function applyStatusCheckboxAnnotation(checkbox, decision) {
+export function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
   if (!checkbox?.setAttribute || !decision?.statusKey) {
     clearStatusCheckboxAnnotation(checkbox);
     return false;
@@ -292,6 +294,9 @@ export function applyStatusCheckboxAnnotation(checkbox, decision) {
     CHECKBOX_SHAPE_ATTRIBUTE,
     decision.shape || getStatusCheckboxShape(decision.statusKey)
   );
+  const certifiedUid = String(blockUid || "").trim();
+  if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
+  else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   return true;
 }
 
@@ -301,6 +306,7 @@ export function syncStatusCheckboxForPill({
   tagTitle,
   statusTagToKey,
   blockString,
+  blockUid,
   textHelpers,
 } = {}) {
   const checkbox = findSiblingTaskCheckbox(statusPill);
@@ -316,7 +322,7 @@ export function syncStatusCheckboxForPill({
   });
   if (!decision) return Object.freeze({ annotated: false, reason: "not-managed" });
 
-  applyStatusCheckboxAnnotation(checkbox, decision);
+  applyStatusCheckboxAnnotation(checkbox, decision, blockUid);
   return Object.freeze({
     annotated: true,
     checkbox,
@@ -342,51 +348,6 @@ export function applyManagedStatusPillPresentation(statusPill, { hidden = false 
   if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
   else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
   return true;
-}
-
-/**
- * Mirror the native checked state into the already-certified Alert presentation.
- * This deliberately performs no graph read, ownership re-classification, or
- * broad DOM refresh: it runs on Roam's native completion path, where doing any
- * of those synchronously can interfere with the host's own event transaction.
- */
-export function syncAlertBeaconForNativeCheckboxState({
-  checkbox,
-  input,
-  alertBeaconEnabled = false,
-} = {}) {
-  if (
-    !checkbox?.getAttribute ||
-    !checkbox?.setAttribute ||
-    !checkbox?.removeAttribute ||
-    !input ||
-    checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE) === null
-  ) {
-    return Object.freeze({ handled: false, reason: "not-owned-checkbox" });
-  }
-
-  const statusKey = checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE);
-  const shouldBeacon =
-    Boolean(alertBeaconEnabled) && statusKey === "ALERT" && input.checked === false;
-
-  if (shouldBeacon) checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-  else checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
-
-  const ownedPills = Array.from(checkbox.parentElement?.children || []).filter(
-    (candidate) => candidate?.getAttribute?.(MANAGED_STATUS_PILL_ATTRIBUTE) === "true"
-  );
-  ownedPills.forEach((pill) => {
-    const ownsSameAlert = pill.getAttribute?.("data-task-status-key") === "ALERT";
-    if (shouldBeacon && ownsSameAlert) pill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-    else pill.removeAttribute?.(ALERT_BEACON_ATTRIBUTE);
-  });
-
-  return Object.freeze({
-    handled: true,
-    statusKey,
-    alertBeacon: shouldBeacon,
-    pillCount: ownedPills.length,
-  });
 }
 
 function escapeRegex(text) {

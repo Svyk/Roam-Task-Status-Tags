@@ -140,18 +140,23 @@ test("focus, target size, reduced motion, and forced colors are explicit", () =>
 test("Alert attention is a scoped two-beat beacon with a long quiet interval", () => {
   assert.match(
     css,
-    /\.rm-checkbox\[data-ts-alert-beacon="true"\]\[data-ts-checkbox-status="ALERT"\][\s\S]*input:not\(:checked\)[\s\S]*animation: ts-alert-outline-beacon 5\.2s/
+    /\.rm-checkbox\.rm-todo\[data-ts-alert-beacon="true"\]\[data-ts-checkbox-status="ALERT"\][\s\S]*\.check-container::before[\s\S]*animation: ts-alert-ring-beacon 5\.2s/
   );
   assert.match(
     css,
-    /rm-page-ref\[data-ts-managed-status-pill="true"\]\[data-ts-alert-beacon="true"\]\[data-task-status-key="ALERT"\]/
+    /\.rm-checkbox\.rm-todo\[data-ts-alert-beacon="true"\]\[data-ts-checkbox-status="ALERT"\][\s\S]*~ span\.rm-page-ref\[data-ts-managed-status-pill="true"\]\[data-ts-alert-beacon="true"\]\[data-task-status-key="ALERT"\]/
   );
-  assert.match(
+  assert.doesNotMatch(
     css,
-    /\.ts-status-peek\[data-ts-alert-beacon="true"\]\[data-task-status-key="ALERT"\]::after/
+    /ts-alert-peek-beacon|\.ts-status-peek\[data-ts-alert-beacon/
   );
-  assert.match(css, /@keyframes ts-alert-outline-beacon[\s\S]*5%,[\s\S]*17%/);
+  assert.match(css, /@keyframes ts-alert-ring-beacon[\s\S]*5%,[\s\S]*17%/);
   assert.match(css, /24%,[\s\S]*100%/);
+  assert.match(css, /will-change: opacity, transform/);
+  assert.doesNotMatch(
+    css,
+    /\.rm-checkbox[^}]*animation:[^;]*(?:outline|box-shadow)/s
+  );
   assert.match(css, /@media print/);
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*animation: none !important/);
   assert.match(css, /forced-colors: active[\s\S]*data-ts-alert-beacon/);
@@ -161,23 +166,47 @@ test("Alert attention is a scoped two-beat beacon with a long quiet interval", (
   );
   assert.match(source, /Animate Alert status/);
   assert.match(source, /This is cosmetic, writes no task data/);
-  assert.match(source, /addEventListener\("change", handleNativeCheckboxChange\)/);
-  assert.match(source, /removeEventListener\("change", handleNativeCheckboxChange\)/);
-  assert.match(source, /syncAlertBeaconForNativeCheckboxState/);
-  assert.doesNotMatch(
-    source,
-    /function handleNativeCheckboxChange[\s\S]*?refreshStatusVisuals\(checkbox\)/
-  );
+  assert.doesNotMatch(source, /handleNativeCheckboxChange/);
+  assert.doesNotMatch(source, /window\.addEventListener\("change",/);
+  assert.doesNotMatch(checkboxSource, /syncAlertBeaconForNativeCheckboxState/);
+  assert.doesNotMatch(peekSource, /data-ts-alert-beacon|syncNativeCheckboxState/);
   assert.match(checkboxSource, /ALERT_BEACON_ATTRIBUTE/);
-  assert.match(peekSource, /setAlertBeaconEnabled/);
 });
 
-test("observer handles mutation scopes synchronously without a full-document debounce", () => {
+test("observer refreshes only status-bearing host mutations and ignores its own portal", () => {
   assert.match(source, /refreshMutationScopes\(mutations\)/);
   assert.match(source, /refreshStatusVisuals\(scope\)/);
+  assert.match(source, /EXTENSION_UI_SELECTOR = "\.ts-status-portal, \.ts-status-names-panel"/);
+  assert.match(source, /STATUS_MUTATION_SELECTOR/);
+  assert.match(source, /containsStatusVisual\(node\)/);
+  assert.match(source, /if \(isInsideExtensionUi\(mutation\.target\)\) continue/);
   assert.match(source, /for \(const node of mutation\.addedNodes/);
+  assert.match(source, /removedStatusVisual/);
+  assert.doesNotMatch(source, /handledAddedElement|!handledAddedElement/);
   assert.doesNotMatch(source, /PILL_REFRESH_THROTTLE_MS|pillRefreshTimer/);
   assert.doesNotMatch(source, /setTimeout\(\(\) => \{\s*refreshStatusVisuals\(document\)/s);
+});
+
+test("hover/focus context resolution is graph-read-free", () => {
+  const match = source.match(
+    /function resolveStatusPeekContext[\s\S]*?\n  function closeStatusChooser/
+  );
+  assert.ok(match, "missing status peek resolver");
+  assert.doesNotMatch(
+    match[0],
+    /getBlockString|getLiveBlockInputValue|parseManagedPrefix|roamAlphaAPI/
+  );
+  assert.match(match[0], /getBlockUidFromDomElement\(checkbox\)/);
+  assert.doesNotMatch(match[0], /getBlockUidFromElement\(checkbox\)/);
+  const domUidMatch = source.match(
+    /function getBlockUidFromDomElement[\s\S]*?\n  function getBlockUidFromElement/
+  );
+  assert.ok(domUidMatch, "missing DOM-only UID resolver");
+  assert.doesNotMatch(domUidMatch[0], /roamAlphaAPI|data\.pull|data\.q/);
+  assert.match(match[0], /already[\s\S]*certified[\s\S]*DOM-only/i);
+  assert.match(match[0], /CHECKBOX_UID_ATTRIBUTE/);
+  assert.match(match[0], /certifiedUid !== blockUid/);
+  assert.match(match[0], /certified write router/);
 });
 
 test("the setting describes a cosmetic boundary and no per-checkbox event is installed", () => {

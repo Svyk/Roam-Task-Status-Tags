@@ -7,12 +7,11 @@ import {
 import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  CHECKBOX_UID_ATTRIBUTE,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
-  OWNED_CHECKBOX_SELECTOR,
   relativeLuminance,
-  syncAlertBeaconForNativeCheckboxState,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
 import { createStatusPeekController } from "./status-peek.js";
@@ -418,6 +417,8 @@ function createTaskStatusExtension({ extensionAPI }) {
     "a.rm-page-ref[data-task-status-key]",
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel";
+  const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
 
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
@@ -1269,6 +1270,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
+        blockUid,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers,
       });
@@ -1310,12 +1312,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
-    statusPeekController?.setAlertBeaconEnabled?.(alertBeaconEnabled);
     refreshStatusVisuals(document);
   }
 
   function refreshMutationScopes(mutations) {
     const refreshed = new Set();
+    const isInsideExtensionUi = (node) =>
+      Boolean(
+        node?.nodeType === 1 &&
+          (node.matches?.(EXTENSION_UI_SELECTOR) || node.closest?.(EXTENSION_UI_SELECTOR))
+      );
+    const containsStatusVisual = (node) =>
+      Boolean(
+        node?.nodeType === 1 &&
+          !isInsideExtensionUi(node) &&
+          (node.matches?.(STATUS_MUTATION_SELECTOR) ||
+            node.querySelector?.(STATUS_MUTATION_SELECTOR))
+      );
     const refreshOnce = (node) => {
       if (!node) return;
       const scope = resolveRefreshScope(node);
@@ -1325,38 +1338,28 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     };
 
     for (const mutation of mutations || []) {
+      if (isInsideExtensionUi(mutation.target)) continue;
       if (mutation.type === "attributes") {
-        if (mutation.attributeName === "data-tag") refreshOnce(mutation.target);
+        if (
+          mutation.attributeName === "data-tag" &&
+          containsStatusVisual(mutation.target)
+        ) {
+          refreshOnce(mutation.target);
+        }
         continue;
       }
 
-      let handledAddedElement = false;
       for (const node of mutation.addedNodes || []) {
-        if (node?.nodeType !== 1) continue;
-        handledAddedElement = true;
-        refreshOnce(node);
+        if (containsStatusVisual(node)) refreshOnce(node);
       }
 
-      if ((mutation.removedNodes?.length || 0) > 0 || !handledAddedElement) {
+      const removedStatusVisual = Array.from(mutation.removedNodes || []).some(
+        containsStatusVisual
+      );
+      if (removedStatusVisual) {
         refreshOnce(mutation.target);
       }
     }
-  }
-
-  function handleNativeCheckboxChange(event) {
-    const input = event?.target;
-    if (!input?.matches?.('input[type="checkbox"]')) return;
-    const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
-    if (!checkbox) return;
-    // This listener runs at window bubble, after Roam's completion handler.
-    // Only mirror the native checked state into markers that were already
-    // certified; never pull graph data or rebuild DOM inside the host event.
-    const result = syncAlertBeaconForNativeCheckboxState({
-      checkbox,
-      input,
-      alertBeaconEnabled,
-    });
-    if (result.handled) statusPeekController?.syncNativeCheckboxState?.(input);
   }
 
   function startStatusPillObserver() {
@@ -1630,16 +1633,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return match ? match[1] : null;
   }
 
-  function getBlockUidFromElement(element) {
+  function getBlockUidFromDomElement(element) {
     if (!element) return null;
-
-    const domUtil = window.roamAlphaAPI?.util?.dom;
-    if (domUtil?.blockUidFromTarget) {
-      try {
-        const uid = domUtil.blockUidFromTarget(element);
-        if (uid) return uid;
-      } catch (_) {}
-    }
 
     const withDataUid = element.closest?.("[data-uid]");
     if (withDataUid) {
@@ -1663,6 +1658,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
 
     return null;
+  }
+
+  function getBlockUidFromElement(element) {
+    if (!element) return null;
+
+    const domUtil = window.roamAlphaAPI?.util?.dom;
+    if (domUtil?.blockUidFromTarget) {
+      try {
+        const uid = domUtil.blockUidFromTarget(element);
+        if (uid) return uid;
+      } catch (_) {}
+    }
+
+    return getBlockUidFromDomElement(element);
   }
 
   function getStatusKeyFromElement(target) {
@@ -1729,23 +1738,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function resolveStatusPeekContext({ checkbox, input, statusKey }) {
     if (!checkbox || !input || !statusKey || !STATUSES[statusKey]?.active) return null;
 
-    const blockUid = getBlockUidFromElement(checkbox);
+    const blockUid = getBlockUidFromDomElement(checkbox);
     if (!blockUid) return null;
-    const liveValue = getLiveBlockInputValue(blockUid);
-    const blockString =
-      typeof liveValue === "string" ? liveValue : getBlockString(blockUid);
-    if (typeof blockString !== "string") return null;
+    const certifiedUid = checkbox.getAttribute?.(CHECKBOX_UID_ATTRIBUTE);
+    if (!certifiedUid || certifiedUid !== blockUid) return null;
 
-    const parsed = getTextHelpers().parseManagedPrefix(blockString);
-    if (
-      !parsed?.managed ||
-      !parsed?.hadStatus ||
-      parsed.currentStatus !== statusKey ||
-      (parsed.taskKind !== "todo" && parsed.taskKind !== "done")
-    ) {
-      return null;
-    }
-
+    // Hover/focus is presentation-only. The checkbox annotation was already
+    // certified from graph text by refreshStatusVisuals, so resolving the
+    // reveal control must stay DOM-only. Every eventual status write performs
+    // its own fresh graph precondition through the certified write router.
     return {
       blockUid,
       statusKey,
@@ -3296,11 +3297,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       onRemove: (context) => setStatusForTargets(context.blockUid, null),
       onAnchorInvalid: () => closeStatusChooser(),
       onError: (error) => log("Status peek error:", error),
-      alertBeaconEnabled,
     });
     statusPeekController.start();
     statusPeekController.setEnabled(isStatusPeekEnabled());
-    statusPeekController.setAlertBeaconEnabled(alertBeaconEnabled);
 
     // Apply persisted status color overrides (if any)
     clearStatusColorOverrides();
@@ -3321,7 +3320,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
-    window.addEventListener("change", handleNativeCheckboxChange);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
@@ -3342,7 +3340,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
-    window.removeEventListener("change", handleNativeCheckboxChange);
     pendingOperations.clear();
 
     await unregisterAllCommands();

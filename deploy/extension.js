@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.6.1 | generated; edit src/ */
+/* Roam Task Status Tags v0.6.2 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -308,6 +308,7 @@ function createCertifiedBlockStringWriter({
 // src/status-checkbox.js
 var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
+var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
@@ -537,9 +538,10 @@ function clearStatusCheckboxAnnotation(checkbox) {
   if (!checkbox?.removeAttribute) return;
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
 }
-function applyStatusCheckboxAnnotation(checkbox, decision) {
+function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
   if (!checkbox?.setAttribute || !decision?.statusKey) {
     clearStatusCheckboxAnnotation(checkbox);
     return false;
@@ -549,6 +551,9 @@ function applyStatusCheckboxAnnotation(checkbox, decision) {
     CHECKBOX_SHAPE_ATTRIBUTE,
     decision.shape || getStatusCheckboxShape(decision.statusKey)
   );
+  const certifiedUid = String(blockUid || "").trim();
+  if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
+  else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   return true;
 }
 function syncStatusCheckboxForPill({
@@ -557,6 +562,7 @@ function syncStatusCheckboxForPill({
   tagTitle,
   statusTagToKey,
   blockString,
+  blockUid,
   textHelpers
 } = {}) {
   const checkbox = findSiblingTaskCheckbox(statusPill);
@@ -570,7 +576,7 @@ function syncStatusCheckboxForPill({
     textHelpers
   });
   if (!decision) return Object.freeze({ annotated: false, reason: "not-managed" });
-  applyStatusCheckboxAnnotation(checkbox, decision);
+  applyStatusCheckboxAnnotation(checkbox, decision, blockUid);
   return Object.freeze({
     annotated: true,
     checkbox,
@@ -593,33 +599,6 @@ function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {})
   if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
   else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
   return true;
-}
-function syncAlertBeaconForNativeCheckboxState({
-  checkbox,
-  input,
-  alertBeaconEnabled = false
-} = {}) {
-  if (!checkbox?.getAttribute || !checkbox?.setAttribute || !checkbox?.removeAttribute || !input || checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE) === null) {
-    return Object.freeze({ handled: false, reason: "not-owned-checkbox" });
-  }
-  const statusKey = checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE);
-  const shouldBeacon = Boolean(alertBeaconEnabled) && statusKey === "ALERT" && input.checked === false;
-  if (shouldBeacon) checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-  else checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
-  const ownedPills = Array.from(checkbox.parentElement?.children || []).filter(
-    (candidate) => candidate?.getAttribute?.(MANAGED_STATUS_PILL_ATTRIBUTE) === "true"
-  );
-  ownedPills.forEach((pill) => {
-    const ownsSameAlert = pill.getAttribute?.("data-task-status-key") === "ALERT";
-    if (shouldBeacon && ownsSameAlert) pill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-    else pill.removeAttribute?.(ALERT_BEACON_ATTRIBUTE);
-  });
-  return Object.freeze({
-    handled: true,
-    statusKey,
-    alertBeacon: shouldBeacon,
-    pillCount: ownedPills.length
-  });
 }
 function escapeRegex(text) {
   return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -777,8 +756,7 @@ function createStatusPeekController({
   onError = () => {
   },
   showDelay = 210,
-  hideDelay = 120,
-  alertBeaconEnabled: initialAlertBeaconEnabled = false
+  hideDelay = 120
 } = {}) {
   if (!documentLike?.createElement || !portalRoot?.appendChild) {
     throw new TypeError("Status peek requires a document and portal root");
@@ -797,13 +775,6 @@ function createStatusPeekController({
   let helperEl = null;
   let chooserOpen = false;
   let activationRevision = 0;
-  let alertBeaconEnabled = Boolean(initialAlertBeaconEnabled);
-  function syncAlertBeacon(button, context) {
-    if (!button?.removeAttribute) return;
-    const shouldBeacon = alertBeaconEnabled && context?.statusKey === "ALERT" && context?.input?.checked === false;
-    if (shouldBeacon) button.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-    else button.removeAttribute(ALERT_BEACON_ATTRIBUTE);
-  }
   function report(error) {
     try {
       onError(error);
@@ -960,7 +931,6 @@ function createStatusPeekController({
       "aria-label",
       `Change task status from ${context.label}. Shift-click to remove.`
     );
-    syncAlertBeacon(button, context);
     const label = documentLike.createElement("span");
     label.className = "ts-status-peek-label";
     label.textContent = context.label;
@@ -1010,7 +980,6 @@ function createStatusPeekController({
         `Change task status from ${context.label}. Shift-click to remove.`
       );
       setButtonText(peekButton, context.label);
-      syncAlertBeacon(peekButton, context);
     }
     positionPeek(peekButton, context);
     return true;
@@ -1140,15 +1109,6 @@ function createStatusPeekController({
     enabled = Boolean(nextEnabled);
     if (!enabled) hide();
   }
-  function setAlertBeaconEnabled(nextEnabled) {
-    alertBeaconEnabled = Boolean(nextEnabled);
-    if (peekButton && activeContext) syncAlertBeacon(peekButton, activeContext);
-  }
-  function syncNativeCheckboxState(input) {
-    if (!peekButton || !activeContext || activeContext.input !== input) return false;
-    syncAlertBeacon(peekButton, activeContext);
-    return true;
-  }
   function refresh() {
     if (!activeContext) return;
     if (!enabled) {
@@ -1194,8 +1154,6 @@ function createStatusPeekController({
     refresh,
     chooserClosed,
     setEnabled,
-    setAlertBeaconEnabled,
-    syncNativeCheckboxState,
     isEnabled: () => enabled,
     isVisible: () => Boolean(peekButton?.isConnected)
   });
@@ -1203,7 +1161,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.6.1" : "development";
+var BUNDLED_VERSION = true ? "0.6.2" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -1527,6 +1485,8 @@ function createTaskStatusExtension({ extensionAPI }) {
     "a.rm-page-ref[data-task-status-key]"
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel";
+  const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
     cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
@@ -2232,6 +2192,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         hideManagedPill: statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
+        blockUid,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers
       });
@@ -2265,11 +2226,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
-    statusPeekController?.setAlertBeaconEnabled?.(alertBeaconEnabled);
     refreshStatusVisuals(document);
   }
   function refreshMutationScopes(mutations) {
     const refreshed = /* @__PURE__ */ new Set();
+    const isInsideExtensionUi = (node) => Boolean(
+      node?.nodeType === 1 && (node.matches?.(EXTENSION_UI_SELECTOR) || node.closest?.(EXTENSION_UI_SELECTOR))
+    );
+    const containsStatusVisual = (node) => Boolean(
+      node?.nodeType === 1 && !isInsideExtensionUi(node) && (node.matches?.(STATUS_MUTATION_SELECTOR) || node.querySelector?.(STATUS_MUTATION_SELECTOR))
+    );
     const refreshOnce = (node) => {
       if (!node) return;
       const scope = resolveRefreshScope(node);
@@ -2278,32 +2244,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       refreshStatusVisuals(scope);
     };
     for (const mutation of mutations || []) {
+      if (isInsideExtensionUi(mutation.target)) continue;
       if (mutation.type === "attributes") {
-        if (mutation.attributeName === "data-tag") refreshOnce(mutation.target);
+        if (mutation.attributeName === "data-tag" && containsStatusVisual(mutation.target)) {
+          refreshOnce(mutation.target);
+        }
         continue;
       }
-      let handledAddedElement = false;
       for (const node of mutation.addedNodes || []) {
-        if (node?.nodeType !== 1) continue;
-        handledAddedElement = true;
-        refreshOnce(node);
+        if (containsStatusVisual(node)) refreshOnce(node);
       }
-      if ((mutation.removedNodes?.length || 0) > 0 || !handledAddedElement) {
+      const removedStatusVisual = Array.from(mutation.removedNodes || []).some(
+        containsStatusVisual
+      );
+      if (removedStatusVisual) {
         refreshOnce(mutation.target);
       }
     }
-  }
-  function handleNativeCheckboxChange(event) {
-    const input = event?.target;
-    if (!input?.matches?.('input[type="checkbox"]')) return;
-    const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
-    if (!checkbox) return;
-    const result2 = syncAlertBeaconForNativeCheckboxState({
-      checkbox,
-      input,
-      alertBeaconEnabled
-    });
-    if (result2.handled) statusPeekController?.syncNativeCheckboxState?.(input);
   }
   function startStatusPillObserver() {
     if (pillObserver) return;
@@ -2532,16 +2489,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const match = idString.match(/([A-Za-z0-9_-]{9})$/);
     return match ? match[1] : null;
   }
-  function getBlockUidFromElement(element) {
+  function getBlockUidFromDomElement(element) {
     if (!element) return null;
-    const domUtil = window.roamAlphaAPI?.util?.dom;
-    if (domUtil?.blockUidFromTarget) {
-      try {
-        const uid = domUtil.blockUidFromTarget(element);
-        if (uid) return uid;
-      } catch (_) {
-      }
-    }
     const withDataUid = element.closest?.("[data-uid]");
     if (withDataUid) {
       const uid = withDataUid.getAttribute("data-uid");
@@ -2557,6 +2506,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return roamBlock.getAttribute("data-uid") || roamBlock.dataset?.uid || null;
     }
     return null;
+  }
+  function getBlockUidFromElement(element) {
+    if (!element) return null;
+    const domUtil = window.roamAlphaAPI?.util?.dom;
+    if (domUtil?.blockUidFromTarget) {
+      try {
+        const uid = domUtil.blockUidFromTarget(element);
+        if (uid) return uid;
+      } catch (_) {
+      }
+    }
+    return getBlockUidFromDomElement(element);
   }
   function getStatusKeyFromElement(target) {
     if (!target) return null;
@@ -2599,15 +2560,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   function resolveStatusPeekContext({ checkbox, input, statusKey }) {
     if (!checkbox || !input || !statusKey || !STATUSES[statusKey]?.active) return null;
-    const blockUid = getBlockUidFromElement(checkbox);
+    const blockUid = getBlockUidFromDomElement(checkbox);
     if (!blockUid) return null;
-    const liveValue = getLiveBlockInputValue(blockUid);
-    const blockString = typeof liveValue === "string" ? liveValue : getBlockString(blockUid);
-    if (typeof blockString !== "string") return null;
-    const parsed = getTextHelpers().parseManagedPrefix(blockString);
-    if (!parsed?.managed || !parsed?.hadStatus || parsed.currentStatus !== statusKey || parsed.taskKind !== "todo" && parsed.taskKind !== "done") {
-      return null;
-    }
+    const certifiedUid = checkbox.getAttribute?.(CHECKBOX_UID_ATTRIBUTE);
+    if (!certifiedUid || certifiedUid !== blockUid) return null;
     return {
       blockUid,
       statusKey,
@@ -3944,12 +3900,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       onOpen: (context) => openStatusChooser(context),
       onRemove: (context) => setStatusForTargets(context.blockUid, null),
       onAnchorInvalid: () => closeStatusChooser(),
-      onError: (error) => log("Status peek error:", error),
-      alertBeaconEnabled
+      onError: (error) => log("Status peek error:", error)
     });
     statusPeekController.start();
     statusPeekController.setEnabled(isStatusPeekEnabled());
-    statusPeekController.setAlertBeaconEnabled(alertBeaconEnabled);
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
     if (!isActive()) return false;
@@ -3963,7 +3917,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
-    window.addEventListener("change", handleNativeCheckboxChange);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
@@ -3980,7 +3933,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
-    window.removeEventListener("change", handleNativeCheckboxChange);
     pendingOperations.clear();
     await unregisterAllCommands();
     console.log("[TaskStatus] Unloaded.");

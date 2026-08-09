@@ -170,6 +170,7 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
 }
 
 .rm-checkbox[data-ts-checkbox-status] > .check-container {
+  position: relative;
   overflow: visible !important;
 }
 
@@ -307,32 +308,40 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
 }
 
 /*
- * Alert uses a short two-beat outline followed by a long quiet interval. The
- * selector requires both exact JS ownership and an unchecked native input, so
- * completion immediately returns all visual authority to Roam/the theme.
+ * Alert uses a separate compositor-friendly ring. Only opacity and transform
+ * animate; the native checkbox itself never enters a per-frame paint cycle.
+ * The selector requires both exact JS ownership and Roam's native rm-todo
+ * state, so completion immediately returns all visual authority to the host.
  */
-.rm-checkbox[data-ts-alert-beacon="true"][data-ts-checkbox-status="ALERT"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  outline: 2px solid transparent;
-  outline-offset: 0;
-  animation: ts-alert-outline-beacon 5.2s cubic-bezier(0.2, 0, 0, 1) infinite;
+.rm-checkbox.rm-todo[data-ts-alert-beacon="true"][data-ts-checkbox-status="ALERT"]
+  > .check-container::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  box-sizing: border-box;
+  border: 2px solid var(--ts-checkbox-beacon, rgba(244, 63, 94, 0.58));
+  border-radius: 7px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  transform-origin: center;
+  will-change: opacity, transform;
+  animation: ts-alert-ring-beacon 5.2s cubic-bezier(0.2, 0, 0, 1) infinite;
 }
 
-@keyframes ts-alert-outline-beacon {
+@keyframes ts-alert-ring-beacon {
   0%,
   10%,
   24%,
   100% {
-    outline-color: transparent;
-    outline-offset: 0;
+    opacity: 0;
+    transform: scale(0.82);
   }
 
   5%,
   17% {
-    outline-color: var(--ts-checkbox-beacon, rgba(244, 63, 94, 0.58));
-    outline-offset: 4px;
+    opacity: 0.72;
+    transform: scale(1.18);
   }
 }
 
@@ -373,11 +382,9 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   }
 
   .rm-checkbox[data-ts-alert-beacon="true"]
-    > .check-container
-    > input:not(:checked)
-    ~ .checkmark {
+    > .check-container::before {
     animation: none !important;
-    outline-color: transparent !important;
+    opacity: 0 !important;
   }
 }
 
@@ -399,11 +406,9 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   }
 
   .rm-checkbox[data-ts-alert-beacon="true"]
-    > .check-container
-    > input:not(:checked)
-    ~ .checkmark {
+    > .check-container::before {
     animation: none !important;
-    outline-color: transparent !important;
+    opacity: 0 !important;
   }
 
   .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
@@ -421,14 +426,9 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   }
 
   span.rm-page-ref[data-ts-alert-beacon="true"],
-  a.rm-page-ref[data-ts-alert-beacon="true"],
-  .ts-status-peek[data-ts-alert-beacon="true"]::after {
+  a.rm-page-ref[data-ts-alert-beacon="true"] {
     animation: none !important;
     outline-color: transparent !important;
-  }
-
-  .ts-status-peek[data-ts-alert-beacon="true"]::after {
-    opacity: 0 !important;
   }
 }
 
@@ -565,8 +565,10 @@ a.rm-page-ref[data-task-status-key]::before {
 
 /* Only the exact managed Alert prefix certified by JS may pulse. Query
    results and later-prose Alert references never receive this ownership bit. */
-span.rm-page-ref[data-ts-managed-status-pill="true"][data-ts-alert-beacon="true"][data-task-status-key="ALERT"],
-a.rm-page-ref[data-ts-managed-status-pill="true"][data-ts-alert-beacon="true"][data-task-status-key="ALERT"] {
+.rm-checkbox.rm-todo[data-ts-alert-beacon="true"][data-ts-checkbox-status="ALERT"]
+  ~ span.rm-page-ref[data-ts-managed-status-pill="true"][data-ts-alert-beacon="true"][data-task-status-key="ALERT"],
+.rm-checkbox.rm-todo[data-ts-alert-beacon="true"][data-ts-checkbox-status="ALERT"]
+  ~ a.rm-page-ref[data-ts-managed-status-pill="true"][data-ts-alert-beacon="true"][data-task-status-key="ALERT"] {
   --ts-alert-beacon-ring: rgba(244, 63, 94, 0.58);
   --ts-alert-beacon-ring: color-mix(in srgb, currentColor 62%, transparent);
   outline: 2px solid transparent;
@@ -678,36 +680,6 @@ a.rm-page-ref[data-task-status-key]:hover {
   clip-path: var(--ts-pill-marker-clip, none);
   opacity: var(--ts-pill-marker-opacity, 0.9);
   transform: var(--ts-pill-marker-transform, none);
-}
-
-.ts-status-portal
-  > .ts-status-peek[data-ts-alert-beacon="true"][data-task-status-key="ALERT"]::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  box-sizing: border-box;
-  border: 2px solid currentColor;
-  border-radius: calc(var(--ts-pill-radius, 5px) + 3px);
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.94);
-  animation: ts-alert-peek-beacon 5.2s cubic-bezier(0.2, 0, 0, 1) infinite;
-}
-
-@keyframes ts-alert-peek-beacon {
-  0%,
-  10%,
-  24%,
-  100% {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-
-  5%,
-  17% {
-    opacity: 0.64;
-    transform: scale(1.06);
-  }
 }
 
 .ts-status-portal > .ts-status-peek[data-task-status-key]:hover {
@@ -946,22 +918,14 @@ body.roam-body.dark .ts-status-portal > .ts-status-peek {
   a.rm-page-ref[data-task-status-key]:hover {
     text-decoration: none !important;
   }
-  .ts-status-peek[data-ts-alert-beacon="true"]::after {
-    animation: none !important;
-    opacity: 0 !important;
-  }
 }
 
 @media print {
   span.rm-page-ref[data-ts-alert-beacon="true"],
   a.rm-page-ref[data-ts-alert-beacon="true"],
-  .rm-checkbox[data-ts-alert-beacon="true"] .checkmark,
-  .ts-status-peek[data-ts-alert-beacon="true"]::after {
+  .rm-checkbox[data-ts-alert-beacon="true"] > .check-container::before {
     animation: none !important;
     outline-color: transparent !important;
-  }
-
-  .ts-status-peek[data-ts-alert-beacon="true"]::after {
     opacity: 0 !important;
   }
 }

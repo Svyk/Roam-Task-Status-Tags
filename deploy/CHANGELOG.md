@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.2 — 2026-08-09
+
+- Fix the remaining graph freeze when hovering or completing an Alert task.
+- Make hover/focus resolution DOM-only by binding every certified checkbox annotation to its block UID; status writes still revalidate from fresh graph state.
+- Ignore Task Status Tags' own portal and unrelated body mutations instead of re-entering status refresh when the hover control is created or removed.
+- Remove the native checkbox `change` bridge entirely. Roam's `rm-todo` / `rm-done` state now gates the Alert animation directly in CSS, so completion runs zero Task Status Tags JavaScript.
+- Move the checkbox halo from paint-heavy animated outlines to an opacity/transform-only ring, and keep the portaled hover control static.
+- Add regression gates for zero completion listeners, graph-read-free hover, UID-bound annotations, scoped observer refresh, and browser stress across 2,000 completion transitions and 2,000 hover crossings.
+
 ## 0.6.1 — 2026-08-09
 
 - Fix Roam freezing when an Alert checkbox is completed or reopened.
