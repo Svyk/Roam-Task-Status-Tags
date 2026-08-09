@@ -8,34 +8,52 @@
   .ts-status-portal,
   .ts-status-names-panel
 ) {
-  --ts-active-bg: rgba(20, 184, 166, 0.08);
-  --ts-active-fg: #0f766e;
-  --ts-active-border: rgba(20, 184, 166, 0.2);
+  --ts-active-bg-light: rgba(20, 184, 166, 0.1);
+  --ts-active-fg-light: rgb(13, 116, 104);
+  --ts-active-border-light: rgba(17, 155, 139, 0.48);
+  --ts-active-bg-dark: rgba(20, 184, 166, 0.2);
+  --ts-active-fg-dark: rgb(68, 198, 184);
+  --ts-active-border-dark: rgba(20, 184, 166, 0.62);
 
-  --ts-waiting-bg: rgba(234, 179, 8, 0.08);
-  --ts-waiting-fg: #a16207;
-  --ts-waiting-border: rgba(234, 179, 8, 0.2);
+  --ts-waiting-bg-light: rgba(234, 179, 8, 0.1);
+  --ts-waiting-fg-light: rgb(131, 100, 4);
+  --ts-waiting-border-light: rgba(172, 132, 6, 0.48);
+  --ts-waiting-bg-dark: rgba(234, 179, 8, 0.2);
+  --ts-waiting-fg-dark: rgb(234, 179, 8);
+  --ts-waiting-border-dark: rgba(234, 179, 8, 0.62);
 
-  --ts-holding-bg: rgba(148, 163, 184, 0.1);
-  --ts-holding-fg: #475569;
-  --ts-holding-border: rgba(148, 163, 184, 0.24);
+  --ts-holding-bg-light: rgba(148, 163, 184, 0.1);
+  --ts-holding-fg-light: rgb(95, 104, 118);
+  --ts-holding-border-light: rgba(126, 139, 157, 0.48);
+  --ts-holding-bg-dark: rgba(148, 163, 184, 0.2);
+  --ts-holding-fg-dark: rgb(169, 181, 198);
+  --ts-holding-border-dark: rgba(148, 163, 184, 0.62);
 
-  --ts-incubating-bg: rgba(99, 102, 241, 0.08);
-  --ts-incubating-fg: #4338ca;
-  --ts-incubating-border: rgba(99, 102, 241, 0.2);
+  --ts-incubating-bg-light: rgba(99, 102, 241, 0.1);
+  --ts-incubating-fg-light: rgb(84, 86, 203);
+  --ts-incubating-border-light: rgba(99, 102, 241, 0.48);
+  --ts-incubating-bg-dark: rgba(99, 102, 241, 0.2);
+  --ts-incubating-fg-dark: rgb(158, 160, 246);
+  --ts-incubating-border-dark: rgba(100, 103, 241, 0.62);
 
-  --ts-alert-bg: rgba(244, 63, 94, 0.08);
-  --ts-alert-fg: #be123c;
-  --ts-alert-border: rgba(244, 63, 94, 0.2);
+  --ts-alert-bg-light: rgba(244, 63, 94, 0.1);
+  --ts-alert-fg-light: rgb(184, 48, 71);
+  --ts-alert-border-light: rgba(244, 63, 94, 0.48);
+  --ts-alert-bg-dark: rgba(244, 63, 94, 0.2);
+  --ts-alert-fg-dark: rgb(248, 130, 150);
+  --ts-alert-border-dark: rgba(244, 63, 94, 0.62);
 
-  --ts-cancelled-bg: rgba(30, 41, 59, 0.06);
-  --ts-cancelled-fg: #0f172a;
-  --ts-cancelled-border: rgba(30, 41, 59, 0.16);
+  --ts-cancelled-bg-light: rgba(30, 41, 59, 0.1);
+  --ts-cancelled-fg-light: rgb(30, 41, 59);
+  --ts-cancelled-border-light: rgba(30, 41, 59, 0.48);
+  --ts-cancelled-bg-dark: rgba(30, 41, 59, 0.2);
+  --ts-cancelled-fg-dark: rgb(145, 150, 159);
+  --ts-cancelled-border-dark: rgba(113, 120, 131, 0.62);
 
-  --ts-pill-radius: 4px;
-  --ts-pill-font-size: 11px;
-  --ts-pill-pad-y: 0px;
-  --ts-pill-pad-x: 4px;
+  --ts-pill-radius: var(--svy-tag-radius, 5px);
+  --ts-pill-font-size: 12px;
+  --ts-pill-pad-y: 1px;
+  --ts-pill-pad-x: 5px;
   --ts-pill-dot: 4px;
   --ts-transition: 150ms ease;
 
@@ -43,10 +61,19 @@
   --ts-preview-surface-border: rgba(0, 0, 0, 0.08);
 }
 
-:is(body.bp3-dark, body.bp4-dark, body.bp5-dark, body.bt-theme-dark)
-  :where(.ts-status-portal, .ts-status-names-panel) {
+:root.bp3-dark :where(.ts-status-portal, .ts-status-names-panel),
+body.bt-theme-dark :where(.ts-status-portal, .ts-status-names-panel),
+.rm-dark-theme :where(.ts-status-portal, .ts-status-names-panel),
+body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel) {
   --ts-preview-surface-bg: #1f2428;
   --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.bp3-light) :where(.ts-status-portal, .ts-status-names-panel) {
+    --ts-preview-surface-bg: #1f2428;
+    --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
+  }
 }
 
 /*
@@ -302,6 +329,86 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   }
 }
 
+/*
+ * Paired light/dark status colors. Magic Tags demonstrated the value of a
+ * distinct dark semantic palette; Task Status Tags derives these variables
+ * from every configured hue and certifies the small label text against the
+ * actual pill wash. Svy Theme remains an optional token provider.
+ */
+:where(
+  span.rm-page-ref[data-task-status-key],
+  a.rm-page-ref[data-task-status-key],
+  .bt-pill[data-task-status-title^="task-status/"],
+  .ts-status-pill-preview[data-task-status-key],
+  .ts-status-choice-dot[data-task-status-key]
+) {
+  --ts-status-bg: var(--ts-status-bg-light, rgba(100, 116, 139, 0.1));
+  --ts-status-fg: var(--ts-status-fg-light, rgb(71, 85, 105));
+  --ts-status-border: var(--ts-status-border-light, rgba(100, 116, 139, 0.48));
+}
+
+span.rm-page-ref[data-task-status-key],
+a.rm-page-ref[data-task-status-key],
+.bt-pill[data-task-status-title^="task-status/"],
+.ts-status-pill-preview[data-task-status-key],
+.ts-status-choice-dot[data-task-status-key] {
+  background-color: var(--ts-status-bg) !important;
+  color: var(--ts-status-fg) !important;
+  border-color: var(--ts-status-border) !important;
+}
+
+:root.bp3-dark
+  :where(
+    span.rm-page-ref[data-task-status-key],
+    a.rm-page-ref[data-task-status-key],
+    .bt-pill[data-task-status-title^="task-status/"],
+    .ts-status-pill-preview[data-task-status-key],
+    .ts-status-choice-dot[data-task-status-key]
+  ),
+body.bt-theme-dark
+  :where(
+    span.rm-page-ref[data-task-status-key],
+    a.rm-page-ref[data-task-status-key],
+    .bt-pill[data-task-status-title^="task-status/"],
+    .ts-status-pill-preview[data-task-status-key],
+    .ts-status-choice-dot[data-task-status-key]
+  ),
+.rm-dark-theme
+  :where(
+    span.rm-page-ref[data-task-status-key],
+    a.rm-page-ref[data-task-status-key],
+    .bt-pill[data-task-status-title^="task-status/"],
+    .ts-status-pill-preview[data-task-status-key],
+    .ts-status-choice-dot[data-task-status-key]
+  ),
+body.roam-body.dark
+  :where(
+    span.rm-page-ref[data-task-status-key],
+    a.rm-page-ref[data-task-status-key],
+    .bt-pill[data-task-status-title^="task-status/"],
+    .ts-status-pill-preview[data-task-status-key],
+    .ts-status-choice-dot[data-task-status-key]
+  ) {
+  --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
+  --ts-status-fg: var(--ts-status-fg-dark, rgb(184, 194, 207));
+  --ts-status-border: var(--ts-status-border-dark, rgba(105, 121, 143, 0.62));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.bp3-light)
+    :where(
+      span.rm-page-ref[data-task-status-key],
+      a.rm-page-ref[data-task-status-key],
+      .bt-pill[data-task-status-title^="task-status/"],
+      .ts-status-pill-preview[data-task-status-key],
+      .ts-status-choice-dot[data-task-status-key]
+    ) {
+    --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
+    --ts-status-fg: var(--ts-status-fg-dark, rgb(184, 194, 207));
+    --ts-status-border: var(--ts-status-border-dark, rgba(105, 121, 143, 0.62));
+  }
+}
+
 /* Base pill styling (JS annotates matching refs with data-task-status-key/label) */
 span.rm-page-ref[data-task-status-key],
 a.rm-page-ref[data-task-status-key] {
@@ -310,7 +417,7 @@ a.rm-page-ref[data-task-status-key] {
   box-sizing: border-box !important;
   padding: var(--ts-pill-pad-y) var(--ts-pill-pad-x) !important;
   border-radius: var(--ts-pill-radius) !important;
-  border: 1px solid transparent !important;
+  border: 1px solid var(--ts-status-border, transparent) !important;
   /* Hide Roam's rendered "#..." text; we re-render label via ::after */
   font-size: 0 !important;
   font-weight: 500 !important;
@@ -334,11 +441,14 @@ a.rm-page-ref[data-task-status-key]::after {
 span.rm-page-ref[data-task-status-key]::before,
 a.rm-page-ref[data-task-status-key]::before {
   content: "" !important;
-  width: var(--ts-pill-dot) !important;
-  height: var(--ts-pill-dot) !important;
-  border-radius: 999px !important;
-  background-color: currentColor !important;
-  opacity: 0.72 !important;
+  width: var(--ts-pill-marker-width, var(--ts-pill-dot)) !important;
+  height: var(--ts-pill-marker-height, var(--ts-pill-dot)) !important;
+  box-sizing: border-box !important;
+  border: var(--ts-pill-marker-border, 0 solid transparent) !important;
+  border-radius: var(--ts-pill-marker-radius, 999px) !important;
+  background: var(--ts-pill-marker-background, currentColor) !important;
+  opacity: var(--ts-pill-marker-opacity, 0.72) !important;
+  transform: var(--ts-pill-marker-transform, none) !important;
   margin-right: 4px !important;
 }
 
@@ -401,7 +511,7 @@ a.rm-page-ref[data-task-status-key]:hover {
   box-sizing: border-box;
   padding: var(--ts-pill-pad-y) var(--ts-pill-pad-x);
   border-radius: var(--ts-pill-radius);
-  border: 1px solid transparent;
+  border: 1px solid var(--ts-status-border, transparent);
   font-size: var(--ts-pill-font-size);
   font-weight: 500;
   line-height: 1.4;
@@ -414,12 +524,98 @@ a.rm-page-ref[data-task-status-key]:hover {
 
 .ts-status-pill-preview[data-task-status-key]::before {
   content: "";
-  width: var(--ts-pill-dot);
-  height: var(--ts-pill-dot);
-  border-radius: 999px;
-  background-color: currentColor;
-  opacity: 0.72;
+  width: var(--ts-pill-marker-width, var(--ts-pill-dot));
+  height: var(--ts-pill-marker-height, var(--ts-pill-dot));
+  box-sizing: border-box;
+  border: var(--ts-pill-marker-border, 0 solid transparent);
+  border-radius: var(--ts-pill-marker-radius, 999px);
+  background: var(--ts-pill-marker-background, currentColor);
+  opacity: var(--ts-pill-marker-opacity, 0.72);
+  transform: var(--ts-pill-marker-transform, none);
   margin-right: 4px;
+}
+
+/* Repeat the checkbox's non-color status cue inside the compact pill marker. */
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="WAITING"] {
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-background: linear-gradient(
+    90deg,
+    currentColor 0 2px,
+    transparent 2px 4px,
+    currentColor 4px 6px
+  );
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="HOLDING"] {
+  --ts-pill-marker-width: 7px;
+  --ts-pill-marker-height: 2px;
+  --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="INCUBATING"] {
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-border: 1.5px solid currentColor;
+  --ts-pill-marker-background: transparent;
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="ALERT"] {
+  --ts-pill-marker-width: 5px;
+  --ts-pill-marker-height: 5px;
+  --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-transform: rotate(45deg);
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key="CANCELLED"] {
+  --ts-pill-marker-width: 7px;
+  --ts-pill-marker-height: 2px;
+  --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-transform: rotate(-45deg);
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview
+)[data-task-status-key]:not(
+    [data-task-status-key="ACTIVE"],
+    [data-task-status-key="WAITING"],
+    [data-task-status-key="HOLDING"],
+    [data-task-status-key="INCUBATING"],
+    [data-task-status-key="ALERT"],
+    [data-task-status-key="CANCELLED"]
+  ) {
+  --ts-pill-marker-width: 5px;
+  --ts-pill-marker-height: 5px;
+  --ts-pill-marker-radius: 1px;
+  --ts-pill-marker-opacity: 0.9;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -437,49 +633,67 @@ a.rm-page-ref[data-task-status-key]:hover {
 span.rm-page-ref[data-task-status-key="ACTIVE"],
 a.rm-page-ref[data-task-status-key="ACTIVE"],
 .ts-status-pill-preview[data-task-status-key="ACTIVE"] {
-  background-color: var(--ts-active-bg) !important;
-  color: var(--ts-active-fg) !important;
-  border-color: var(--ts-active-border) !important;
+  --ts-status-bg-light: var(--ts-active-bg-light);
+  --ts-status-fg-light: var(--ts-active-fg-light);
+  --ts-status-border-light: var(--ts-active-border-light);
+  --ts-status-bg-dark: var(--ts-active-bg-dark);
+  --ts-status-fg-dark: var(--ts-active-fg-dark);
+  --ts-status-border-dark: var(--ts-active-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="WAITING"],
 a.rm-page-ref[data-task-status-key="WAITING"],
 .ts-status-pill-preview[data-task-status-key="WAITING"] {
-  background-color: var(--ts-waiting-bg) !important;
-  color: var(--ts-waiting-fg) !important;
-  border-color: var(--ts-waiting-border) !important;
+  --ts-status-bg-light: var(--ts-waiting-bg-light);
+  --ts-status-fg-light: var(--ts-waiting-fg-light);
+  --ts-status-border-light: var(--ts-waiting-border-light);
+  --ts-status-bg-dark: var(--ts-waiting-bg-dark);
+  --ts-status-fg-dark: var(--ts-waiting-fg-dark);
+  --ts-status-border-dark: var(--ts-waiting-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="HOLDING"],
 a.rm-page-ref[data-task-status-key="HOLDING"],
 .ts-status-pill-preview[data-task-status-key="HOLDING"] {
-  background-color: var(--ts-holding-bg) !important;
-  color: var(--ts-holding-fg) !important;
-  border-color: var(--ts-holding-border) !important;
+  --ts-status-bg-light: var(--ts-holding-bg-light);
+  --ts-status-fg-light: var(--ts-holding-fg-light);
+  --ts-status-border-light: var(--ts-holding-border-light);
+  --ts-status-bg-dark: var(--ts-holding-bg-dark);
+  --ts-status-fg-dark: var(--ts-holding-fg-dark);
+  --ts-status-border-dark: var(--ts-holding-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="INCUBATING"],
 a.rm-page-ref[data-task-status-key="INCUBATING"],
 .ts-status-pill-preview[data-task-status-key="INCUBATING"] {
-  background-color: var(--ts-incubating-bg) !important;
-  color: var(--ts-incubating-fg) !important;
-  border-color: var(--ts-incubating-border) !important;
+  --ts-status-bg-light: var(--ts-incubating-bg-light);
+  --ts-status-fg-light: var(--ts-incubating-fg-light);
+  --ts-status-border-light: var(--ts-incubating-border-light);
+  --ts-status-bg-dark: var(--ts-incubating-bg-dark);
+  --ts-status-fg-dark: var(--ts-incubating-fg-dark);
+  --ts-status-border-dark: var(--ts-incubating-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="ALERT"],
 a.rm-page-ref[data-task-status-key="ALERT"],
 .ts-status-pill-preview[data-task-status-key="ALERT"] {
-  background-color: var(--ts-alert-bg) !important;
-  color: var(--ts-alert-fg) !important;
-  border-color: var(--ts-alert-border) !important;
+  --ts-status-bg-light: var(--ts-alert-bg-light);
+  --ts-status-fg-light: var(--ts-alert-fg-light);
+  --ts-status-border-light: var(--ts-alert-border-light);
+  --ts-status-bg-dark: var(--ts-alert-bg-dark);
+  --ts-status-fg-dark: var(--ts-alert-fg-dark);
+  --ts-status-border-dark: var(--ts-alert-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="CANCELLED"],
 a.rm-page-ref[data-task-status-key="CANCELLED"],
 .ts-status-pill-preview[data-task-status-key="CANCELLED"] {
-  background-color: var(--ts-cancelled-bg) !important;
-  color: var(--ts-cancelled-fg) !important;
-  border-color: var(--ts-cancelled-border) !important;
+  --ts-status-bg-light: var(--ts-cancelled-bg-light);
+  --ts-status-fg-light: var(--ts-cancelled-fg-light);
+  --ts-status-border-light: var(--ts-cancelled-border-light);
+  --ts-status-bg-dark: var(--ts-cancelled-bg-dark);
+  --ts-status-fg-dark: var(--ts-cancelled-fg-dark);
+  --ts-status-border-dark: var(--ts-cancelled-border-dark);
 }
 
 .ts-status-names-panel {

@@ -69,6 +69,17 @@ export function mixRgb(from, to, amount) {
   };
 }
 
+export function compositeRgb(foreground, background, alpha) {
+  const front = normalizeRgb(foreground);
+  const back = normalizeRgb(background);
+  const opacity = clamp(Number(alpha) || 0, 0, 1);
+  return {
+    r: front.r * opacity + back.r * (1 - opacity),
+    g: front.g * opacity + back.g * (1 - opacity),
+    b: front.b * opacity + back.b * (1 - opacity),
+  };
+}
+
 function nearestPassingMix(base, surface, target, minimumContrast) {
   if (contrastRatio(target, surface) < minimumContrast) return null;
 
@@ -147,6 +158,54 @@ export function buildStatusCheckboxColors({
     darkAccentCss: rgbCss(darkAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16),
+  });
+}
+
+export function buildStatusPillColors({
+  baseRgb,
+  preferredTextRgb,
+  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
+  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
+  minimumTextContrast = 4.8,
+  lightBackgroundAlpha = 0.1,
+  darkBackgroundAlpha = 0.2,
+} = {}) {
+  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
+  const preferredText = normalizeRgb(preferredTextRgb, base);
+  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
+  const lightBackground = compositeRgb(base, lightSurface, lightBackgroundAlpha);
+  const darkBackground = compositeRgb(base, darkSurface, darkBackgroundAlpha);
+  // The extra margin keeps rounded integer CSS values above the small-text
+  // contrast target instead of landing a few thousandths below it.
+  const certificationContrast = Math.max(1, Number(minimumTextContrast) || 4.8) + 0.08;
+  const lightText = deriveAccessibleAccent(
+    preferredText,
+    lightBackground,
+    certificationContrast
+  );
+  const darkText = deriveAccessibleAccent(
+    preferredText,
+    darkBackground,
+    certificationContrast
+  );
+  const lightBorder = deriveAccessibleAccent(base, lightSurface, 3.25);
+  const darkBorder = deriveAccessibleAccent(base, darkSurface, 3.25);
+
+  return Object.freeze({
+    base: roundedRgb(base),
+    lightSurface: roundedRgb(lightSurface),
+    darkSurface: roundedRgb(darkSurface),
+    lightBackground: roundedRgb(lightBackground),
+    darkBackground: roundedRgb(darkBackground),
+    lightText: roundedRgb(lightText),
+    darkText: roundedRgb(darkText),
+    lightBackgroundCss: rgbaCss(base, lightBackgroundAlpha),
+    darkBackgroundCss: rgbaCss(base, darkBackgroundAlpha),
+    lightTextCss: rgbCss(lightText),
+    darkTextCss: rgbCss(darkText),
+    lightBorderCss: rgbaCss(lightBorder, 0.48),
+    darkBorderCss: rgbaCss(darkBorder, 0.62),
   });
 }
 

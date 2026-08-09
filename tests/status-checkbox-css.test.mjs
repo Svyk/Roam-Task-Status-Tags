@@ -29,6 +29,49 @@ test("all built-in shapes and the custom fallback have explicit treatments", () 
   }
 });
 
+test("pill markers repeat every checkbox shape instead of using color alone", () => {
+  for (const status of [
+    "WAITING",
+    "HOLDING",
+    "INCUBATING",
+    "ALERT",
+    "CANCELLED",
+  ]) {
+    assert.match(
+      css,
+      new RegExp(`data-task-status-key="${status}"\\]`),
+      `missing pill marker treatment for ${status}`
+    );
+  }
+  assert.match(css, /linear-gradient\([\s\S]*currentColor 4px 6px/);
+  assert.match(
+    css,
+    /data-task-status-key="CANCELLED"\][\s\S]*--ts-pill-marker-transform: rotate\(-45deg\)/
+  );
+  assert.match(css, /width: var\(--ts-pill-marker-width/);
+  assert.match(css, /border: var\(--ts-pill-marker-border/);
+});
+
+test("status pills expose paired light and dark variables with a visible Cancelled fallback", () => {
+  for (const variable of [
+    "--ts-status-bg-light",
+    "--ts-status-fg-light",
+    "--ts-status-border-light",
+    "--ts-status-bg-dark",
+    "--ts-status-fg-dark",
+    "--ts-status-border-dark",
+  ]) {
+    assert.match(source, new RegExp(variable));
+    assert.match(css, new RegExp(variable));
+  }
+  assert.match(css, /--ts-cancelled-fg-dark: rgb\(145, 150, 159\)/);
+  assert.match(css, /\.bt-pill\[data-task-status-title\^="task-status\/"\]/);
+  assert.match(css, /border: 1px solid var\(--ts-status-border, transparent\)/);
+  assert.match(source, /buildStatusPillColors/);
+  assert.match(source, /background-color: var\(--ts-status-bg\) !important/);
+  assert.match(source, /border-color: var\(--ts-status-border\) !important/);
+});
+
 test("checked fill remains host-owned and only the secondary ornament changes", () => {
   assert.doesNotMatch(css, /input:checked\s*~\s*\.checkmark\s*\{/);
   assert.match(css, /input:checked\s*\n\s*~ \.checkmark::before/);

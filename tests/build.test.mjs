@@ -37,12 +37,12 @@ test("build emits deterministic, matching browser ESM artifacts with a default e
   assert.doesNotMatch(rootJs, /sourceMappingURL/);
   assert.doesNotMatch(rootJs, /^import\s/m);
   assert.match(rootJs, /export\s*\{[\s\S]*default/);
-  assert.match(rootJs, /BUNDLED_VERSION = (?:true \? )?"0\.3\.0"/);
+  assert.match(rootJs, /BUNDLED_VERSION = (?:true \? )?"0\.3\.1"/);
   assert.doesNotMatch(rootJs, /__TASK_STATUS_VERSION__/);
   const rebuilt = await bundleEntry({
     rootDirectory: rootPath,
-    banner: "/* Roam Task Status Tags v0.3.0 | generated; edit src/ */",
-    version: "0.3.0",
+    banner: "/* Roam Task Status Tags v0.3.1 | generated; edit src/ */",
+    version: "0.3.1",
   });
   assert.equal(rebuilt, rootJs);
 

@@ -51,6 +51,12 @@ Checkbox accents are derived separately for light and dark surfaces with a minim
 Roam and other themes use safe fallbacks. Reduced-motion and forced-colors modes are
 supported.
 
+Status pills use their own paired light/dark palette with at least 4.8:1 text contrast.
+The small pill marker repeats the checkbox cue (dot, bars, tab, ring, diamond, or slash),
+making statuses readable by shape as well as color. Dark base colors such as Cancelled
+are automatically lightened on Svy Theme's dark canvas without changing the configured
+hue used in light mode.
+
 ## Default Statuses
 
 - Active

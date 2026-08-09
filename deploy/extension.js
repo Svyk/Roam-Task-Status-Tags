@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.3.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.3.1 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -361,6 +361,16 @@ function mixRgb(from, to, amount) {
     b: start.b + (end.b - start.b) * ratio
   };
 }
+function compositeRgb(foreground, background, alpha) {
+  const front = normalizeRgb(foreground);
+  const back = normalizeRgb(background);
+  const opacity = clamp(Number(alpha) || 0, 0, 1);
+  return {
+    r: front.r * opacity + back.r * (1 - opacity),
+    g: front.g * opacity + back.g * (1 - opacity),
+    b: front.b * opacity + back.b * (1 - opacity)
+  };
+}
 function nearestPassingMix(base, surface, target, minimumContrast) {
   if (contrastRatio(target, surface) < minimumContrast) return null;
   let low = 0;
@@ -427,6 +437,50 @@ function buildStatusCheckboxColors({
     darkAccentCss: rgbCss(darkAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16)
+  });
+}
+function buildStatusPillColors({
+  baseRgb,
+  preferredTextRgb,
+  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
+  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
+  minimumTextContrast = 4.8,
+  lightBackgroundAlpha = 0.1,
+  darkBackgroundAlpha = 0.2
+} = {}) {
+  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
+  const preferredText = normalizeRgb(preferredTextRgb, base);
+  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
+  const lightBackground = compositeRgb(base, lightSurface, lightBackgroundAlpha);
+  const darkBackground = compositeRgb(base, darkSurface, darkBackgroundAlpha);
+  const certificationContrast = Math.max(1, Number(minimumTextContrast) || 4.8) + 0.08;
+  const lightText = deriveAccessibleAccent(
+    preferredText,
+    lightBackground,
+    certificationContrast
+  );
+  const darkText = deriveAccessibleAccent(
+    preferredText,
+    darkBackground,
+    certificationContrast
+  );
+  const lightBorder = deriveAccessibleAccent(base, lightSurface, 3.25);
+  const darkBorder = deriveAccessibleAccent(base, darkSurface, 3.25);
+  return Object.freeze({
+    base: roundedRgb(base),
+    lightSurface: roundedRgb(lightSurface),
+    darkSurface: roundedRgb(darkSurface),
+    lightBackground: roundedRgb(lightBackground),
+    darkBackground: roundedRgb(darkBackground),
+    lightText: roundedRgb(lightText),
+    darkText: roundedRgb(darkText),
+    lightBackgroundCss: rgbaCss(base, lightBackgroundAlpha),
+    darkBackgroundCss: rgbaCss(base, darkBackgroundAlpha),
+    lightTextCss: rgbCss(lightText),
+    darkTextCss: rgbCss(darkText),
+    lightBorderCss: rgbaCss(lightBorder, 0.48),
+    darkBorderCss: rgbaCss(darkBorder, 0.62)
   });
 }
 function getStatusCheckboxShape(statusKey) {
@@ -531,7 +585,7 @@ function clearOwnedStatusCheckboxes(root) {
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.3.0" : "development";
+var BUNDLED_VERSION = true ? "0.3.1" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -905,14 +959,6 @@ function createTaskStatusExtension({ extensionAPI }) {
     { name: "Slate", value: "#64748b" },
     { name: "Dark", value: "#1e293b" }
   ];
-  const STATUS_COLOR_DERIVE_ALPHA = {
-    ACTIVE: { bg: 0.08, border: 0.2 },
-    WAITING: { bg: 0.08, border: 0.2 },
-    HOLDING: { bg: 0.1, border: 0.24 },
-    INCUBATING: { bg: 0.08, border: 0.2 },
-    ALERT: { bg: 0.08, border: 0.2 },
-    CANCELLED: { bg: 0.06, border: 0.16 }
-  };
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
@@ -999,7 +1045,7 @@ function createTaskStatusExtension({ extensionAPI }) {
       return null;
     }
   }
-  function resolveCheckboxSurfaces() {
+  function resolveStatusSurfaces() {
     const lightFallback = { r: 245, g: 248, b: 250 };
     const darkFallback = { r: 32, g: 43, b: 51 };
     let lightSurface = lightFallback;
@@ -1024,14 +1070,6 @@ function createTaskStatusExtension({ extensionAPI }) {
     darkSurface = candidates.find((candidate) => relativeLuminance(candidate) < 0.45) || darkSurface;
     return { lightSurface, darkSurface };
   }
-  function getStatusCssVarNames(statusKey) {
-    const slug = String(statusKey || "").toLowerCase();
-    return {
-      bg: `--ts-${slug}-bg`,
-      fg: `--ts-${slug}-fg`,
-      border: `--ts-${slug}-border`
-    };
-  }
   function cssString(value) {
     return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
@@ -1044,27 +1082,19 @@ function createTaskStatusExtension({ extensionAPI }) {
   function getDefaultStatusColor(statusKey) {
     return DEFAULT_STATUS_BASE_COLORS[statusKey] || DEFAULT_CUSTOM_STATUS_BASE_COLOR;
   }
-  function getStatusColorAlpha(statusKey) {
-    return STATUS_COLOR_DERIVE_ALPHA[statusKey] || { bg: 0.08, border: 0.2 };
-  }
-  function deriveStatusColorValues(statusKey, entry) {
+  function deriveStatusPillColorValues(statusKey, entry, surfaces) {
     const base = normalizeCssColorValue(entry?.base) || getDefaultStatusColor(statusKey);
     const text = normalizeCssColorValue(entry?.text);
-    const hasBase = base && cssColorIsSupported(base);
-    const hasText = text && cssColorIsSupported(text);
-    const values = {};
-    if (hasBase) {
-      const rgb = parseCssColorToRgb(base);
-      if (rgb) {
-        const alpha = getStatusColorAlpha(statusKey);
-        values.bg = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.bg})`;
-        values.border = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.border})`;
-      }
-      values.fg = hasText ? text : base;
-    } else if (hasText) {
-      values.fg = text;
-    }
-    return values;
+    const defaultBase = getDefaultStatusColor(statusKey);
+    const parsedBase = parseCssColorToRgb(base) || parseCssColorToRgb(defaultBase);
+    const parsedText = parseCssColorToRgb(text) || parsedBase;
+    return buildStatusPillColors({
+      baseRgb: parsedBase || { r: 100, g: 116, b: 139 },
+      preferredTextRgb: parsedText || parsedBase,
+      lightSurfaceRgb: surfaces?.lightSurface,
+      darkSurfaceRgb: surfaces?.darkSurface,
+      minimumTextContrast: 4.8
+    });
   }
   function deriveStatusCheckboxColorValues(statusKey, entry, surfaces) {
     const base = normalizeCssColorValue(entry?.base) || getDefaultStatusColor(statusKey);
@@ -1109,15 +1139,14 @@ function createTaskStatusExtension({ extensionAPI }) {
   function applyStatusColorOverrides(overrides) {
     clearStatusColorOverrides();
     const dynamicRules = [];
-    const checkboxSurfaces = resolveCheckboxSurfaces();
+    const statusSurfaces = resolveStatusSurfaces();
     getRenderableStatusKeys().forEach((statusKey) => {
       const entry = overrides?.[statusKey];
-      const vars = getStatusCssVarNames(statusKey);
-      const values = deriveStatusColorValues(statusKey, entry);
+      const pillValues = deriveStatusPillColorValues(statusKey, entry, statusSurfaces);
       const checkboxValues = deriveStatusCheckboxColorValues(
         statusKey,
         entry,
-        checkboxSurfaces
+        statusSurfaces
       );
       const keySelector = cssStatusKeySelector(statusKey);
       dynamicRules.push(`
@@ -1126,9 +1155,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 .bt-pill[data-task-status-title="task-status/${cssString(STATUSES[statusKey]?.name || "")}"],
 .ts-status-pill-preview[data-task-status-key="${keySelector}"],
 .ts-status-choice-dot[data-task-status-key="${keySelector}"] {
-  background-color: ${values.bg || `var(${vars.bg})`} !important;
-  color: ${values.fg || `var(${vars.fg})`} !important;
-  border-color: ${values.border || `var(${vars.border})`} !important;
+  --ts-status-bg-light: ${pillValues.lightBackgroundCss};
+  --ts-status-fg-light: ${pillValues.lightTextCss};
+  --ts-status-border-light: ${pillValues.lightBorderCss};
+  --ts-status-bg-dark: ${pillValues.darkBackgroundCss};
+  --ts-status-fg-dark: ${pillValues.darkTextCss};
+  --ts-status-border-dark: ${pillValues.darkBorderCss};
+  background-color: var(--ts-status-bg) !important;
+  color: var(--ts-status-fg) !important;
+  border-color: var(--ts-status-border) !important;
 }
 
 .rm-checkbox[data-ts-checkbox-status="${keySelector}"] {
@@ -2766,18 +2801,22 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         const draftText = normalizeCssColorValue(draft.text);
         const dirty = savedBase !== draftBase || savedText !== draftText;
         const validation = dirty ? validateColorEntry({ base: draftBase, text: draftText }) : null;
-        const vars = getStatusCssVarNames(k);
         const effectiveDefault = getDefaultStatusColor(k);
         const baseSwatchSource = draftBase || effectiveDefault;
         const textSwatchSource = draftText || draftBase || effectiveDefault;
-        const previewValues = deriveStatusColorValues(k, {
-          base: draftBase,
-          text: draftText
-        });
-        const previewStyle = {};
-        if (previewValues.bg) previewStyle[vars.bg] = previewValues.bg;
-        if (previewValues.border) previewStyle[vars.border] = previewValues.border;
-        if (previewValues.fg) previewStyle[vars.fg] = previewValues.fg;
+        const previewValues = deriveStatusPillColorValues(
+          k,
+          { base: draftBase, text: draftText },
+          resolveStatusSurfaces()
+        );
+        const previewStyle = {
+          "--ts-status-bg-light": previewValues.lightBackgroundCss,
+          "--ts-status-fg-light": previewValues.lightTextCss,
+          "--ts-status-border-light": previewValues.lightBorderCss,
+          "--ts-status-bg-dark": previewValues.darkBackgroundCss,
+          "--ts-status-fg-dark": previewValues.darkTextCss,
+          "--ts-status-border-dark": previewValues.darkBorderCss
+        };
         return {
           savedBase,
           savedText,

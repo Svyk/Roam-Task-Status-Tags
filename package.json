@@ -1,6 +1,6 @@
 {
   "name": "roam-task-status-tags",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Roam task workflow tags with a fail-closed Better Tasks compatibility boundary",
   "type": "module",

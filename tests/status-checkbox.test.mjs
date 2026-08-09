@@ -7,6 +7,7 @@ import {
   CHECKBOX_STATUS_ATTRIBUTE,
   applyStatusCheckboxAnnotation,
   buildStatusCheckboxColors,
+  buildStatusPillColors,
   clearOwnedStatusCheckboxes,
   clearStatusCheckboxAnnotation,
   contrastRatio,
@@ -132,6 +133,44 @@ test("every default status derives contrast-safe integer light and dark accents"
       `${statusKey} dark accent did not reach 3.2:1`
     );
   }
+});
+
+test("every default status derives small-text-safe light and dark pill colors", () => {
+  for (const [statusKey, color] of Object.entries(DEFAULT_COLORS)) {
+    const palette = buildStatusPillColors({ baseRgb: hexRgb(color) });
+    assert.ok(
+      contrastRatio(palette.lightText, palette.lightBackground) >= 4.8,
+      `${statusKey} light pill text did not reach 4.8:1`
+    );
+    assert.ok(
+      contrastRatio(palette.darkText, palette.darkBackground) >= 4.8,
+      `${statusKey} dark pill text did not reach 4.8:1`
+    );
+  }
+});
+
+test("dark Cancelled pill text is lightened while its light-mode ink is preserved", () => {
+  const base = hexRgb(DEFAULT_COLORS.CANCELLED);
+  const palette = buildStatusPillColors({ baseRgb: base });
+
+  assert.deepEqual(palette.lightText, base);
+  assert.ok(palette.darkText.r > base.r);
+  assert.ok(palette.darkText.g > base.g);
+  assert.ok(palette.darkText.b > base.b);
+  assert.ok(contrastRatio(palette.darkText, palette.darkBackground) >= 4.8);
+});
+
+test("a configured text hue stays unchanged in each mode when it already passes", () => {
+  const preferred = { r: 0, g: 72, b: 64 };
+  const palette = buildStatusPillColors({
+    baseRgb: { r: 20, g: 184, b: 166 },
+    preferredTextRgb: preferred,
+    lightSurfaceRgb: { r: 255, g: 255, b: 255 },
+    darkSurfaceRgb: { r: 255, g: 255, b: 255 },
+  });
+
+  assert.deepEqual(palette.lightText, preferred);
+  assert.deepEqual(palette.darkText, preferred);
 });
 
 test("custom colors are adjusted toward the nearest passing contrast endpoint", () => {

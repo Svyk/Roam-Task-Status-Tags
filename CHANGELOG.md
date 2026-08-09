@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-08-08
+
+- Add paired, contrast-certified light and dark colors for status pills, including custom colors and text overrides.
+- Fix Cancelled and other dark base hues disappearing against Svy Theme's dark canvas.
+- Repeat each checkbox's shape cue in the adjacent status pill for clearer, color-independent scanning.
+- Use Svy Theme's public tag geometry and surface tokens when present while retaining bare-Roam fallbacks.
+
 ## 0.3.0 — 2026-08-08
 
 - Add status-aware styling to the exact native TODO/DONE checkbox.
