@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   createTaskStatusTextHelpers,
   resolveTaskStatusTargetUids,
-} from "../extension.js";
+} from "../src/extension.js";
 
 const helpers = createTaskStatusTextHelpers();
 
@@ -158,9 +158,9 @@ test("reordered cycle order changes next status", () => {
   assert.equal(reorderedHelpers.getNextStatus("ACTIVE"), null);
 });
 
-test("applying status to DONE reopens the block as TODO", () => {
+test("applying status to DONE preserves Better Tasks completion state", () => {
   const input = "{{[[DONE]]}} Finished item";
-  const expected = "{{[[TODO]]}} #[[task-status/Active]] Finished item";
+  const expected = "{{[[DONE]]}} #[[task-status/Active]] Finished item";
 
   assert.equal(helpers.applyStatusToText(input, "ACTIVE"), expected);
 });
@@ -173,7 +173,7 @@ test("bulk text transforms apply status to each selected text", () => {
 
   assert.deepEqual(helpers.applyStatusToTexts(inputs, "ALERT"), [
     "{{[[TODO]]}} #[[task-status/Alert]] First",
-    "{{[[TODO]]}} #[[task-status/Alert]] Second",
+    "{{[[DONE]]}} #[[task-status/Alert]] Second",
   ]);
 });
 

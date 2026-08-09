@@ -1,313 +1,22 @@
-/* Roam Task Status Tags v0.2.0 | generated; edit src/ */
+import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
+import { createLifecycle } from "./lifecycle.js";
+import {
+  createCertifiedBlockStringWriter,
+  createFreshBlockStringReader,
+} from "./status-write.js";
 
-// src/better-tasks-bridge.js
-function callable(value, name) {
-  return value && typeof value[name] === "function";
-}
-function resolveBetterTasksProvider(windowLike) {
-  const namespace = windowLike?.betterTasks;
-  const v2 = namespace?.v2;
-  if (callable(v2, "classifyBlock") && callable(v2, "requestStatusTag")) {
-    return { kind: "v2", capability: v2 };
-  }
-  const v1 = namespace?.v1;
-  if (callable(v1, "classifyBlock")) {
-    return { kind: "v1", capability: v1 };
-  }
-  const legacy = windowLike?.RoamExtensionTools?.["better-tasks"];
-  if (namespace != null || legacy != null) return { kind: "legacy", capability: null };
-  return { kind: "absent", capability: null };
-}
-function routed(status, fields = {}) {
-  return { status, didWrite: status === "updated", ...fields };
-}
-function createBetterTasksStatusRouter({ windowLike, directWriter }) {
-  if (!directWriter || typeof directWriter.apply !== "function") {
-    throw new TypeError("directWriter.apply is required");
-  }
-  return Object.freeze({
-    async apply({
-      uid,
-      expectedString,
-      nextString,
-      statusTagTitle,
-      expectedLiveEditorString,
-      editorString
-    }) {
-      const editorOptions = expectedLiveEditorString === void 0 && editorString === void 0 ? {} : { expectedLiveEditorString, editorString };
-      const provider = resolveBetterTasksProvider(windowLike);
-      if (provider.kind === "absent") {
-        return directWriter.apply({
-          uid,
-          expectedString,
-          nextString,
-          ...editorOptions
-        });
-      }
-      if (provider.kind === "legacy") {
-        return routed("rejected", { reason: "better-tasks-capability-unavailable" });
-      }
-      let classification;
-      try {
-        classification = await provider.capability.classifyBlock(uid);
-        if (classification?.kind === "ordinary") {
-          classification = await provider.capability.classifyBlock(uid, {
-            includeDescendants: true
-          });
-        }
-      } catch (error) {
-        return routed("unknown", { reason: "better-tasks-classification-failed", error });
-      }
-      if (!classification || classification.kind === "unknown") {
-        return routed("unknown", {
-          reason: classification?.reason || "better-tasks-classification-unknown",
-          classification
-        });
-      }
-      if (classification.kind === "task-owned") {
-        return routed("rejected", { reason: "better-tasks-owned-child", classification });
-      }
-      if (classification.kind === "ordinary") {
-        if (classification.containsManagedTasks) {
-          return routed("rejected", {
-            reason: "contains-better-tasks-descendants",
-            classification
-          });
-        }
-        return directWriter.apply({
-          uid,
-          expectedString,
-          nextString,
-          ...editorOptions
-        });
-      }
-      if (classification.kind !== "task") {
-        return routed("unknown", { reason: "unsupported-classification", classification });
-      }
-      if (provider.kind !== "v2") {
-        return routed("rejected", {
-          reason: "better-tasks-v2-required",
-          classification
-        });
-      }
-      try {
-        return await provider.capability.requestStatusTag(uid, {
-          expectedString,
-          statusTagTitle,
-          source: "task-status-tags",
-          ...editorOptions
-        });
-      } catch (error) {
-        return routed("unknown", { reason: "better-tasks-status-request-failed", error });
-      }
-    }
-  });
-}
+// Task Status Tags (Roam Depot dev extension)
+//
+// Stores task status as an inline tag on the same line as TODO:
+//   {{[[TODO]]}} #[[task-status/Active]] Do the thing
+//
+// Interaction:
+// - Click the status tag to choose a status
+// - Shift+click the status tag to remove the status
 
-// src/lifecycle.js
-function isPromiseLike(value) {
-  return value != null && typeof value.then === "function";
-}
-async function callSafely(disposer) {
-  const result2 = disposer();
-  if (isPromiseLike(result2)) await result2;
-}
-function createLifecycle() {
-  let disposed = false;
-  const disposers = [];
-  const add = (disposer) => {
-    if (typeof disposer !== "function") throw new TypeError("A disposer must be a function");
-    if (disposed) {
-      void callSafely(disposer).catch((error) => console.error("[TaskStatus] Late cleanup failed", error));
-      return disposer;
-    }
-    disposers.push(disposer);
-    return disposer;
-  };
-  return {
-    get disposed() {
-      return disposed;
-    },
-    add,
-    async command(commandApi, config) {
-      if (!commandApi?.addCommand || !commandApi?.removeCommand) {
-        throw new TypeError("A command API with addCommand/removeCommand is required");
-      }
-      await commandApi.addCommand(config);
-      add(() => commandApi.removeCommand({ label: config.label }));
-    },
-    event(target, type, listener, options) {
-      target.addEventListener(type, listener, options);
-      add(() => target.removeEventListener(type, listener, options));
-      return listener;
-    },
-    interval(callback, delay, ...args) {
-      const id = globalThis.setInterval(callback, delay, ...args);
-      add(() => globalThis.clearInterval(id));
-      return id;
-    },
-    timeout(callback, delay, ...args) {
-      const id = globalThis.setTimeout(callback, delay, ...args);
-      add(() => globalThis.clearTimeout(id));
-      return id;
-    },
-    observer(observer, target, options) {
-      observer.observe(target, options);
-      add(() => observer.disconnect());
-      return observer;
-    },
-    node(node, parent = globalThis.document?.body) {
-      if (!parent) throw new Error("A parent node is required outside the browser");
-      parent.append(node);
-      add(() => node.remove());
-      return node;
-    },
-    pullWatch(dataApi, pattern, entity, callback) {
-      if (!dataApi?.addPullWatch || !dataApi?.removePullWatch) {
-        throw new TypeError("A Roam data API with addPullWatch/removePullWatch is required");
-      }
-      dataApi.addPullWatch(pattern, entity, callback);
-      add(() => dataApi.removePullWatch(pattern, entity, callback));
-      return callback;
-    },
-    async settingsPanel(extensionAPI, config) {
-      await extensionAPI.settings.panel.create(config);
-    },
-    async dispose() {
-      if (disposed) return;
-      disposed = true;
-      const errors = [];
-      for (const disposer of disposers.splice(0).reverse()) {
-        try {
-          await callSafely(disposer);
-        } catch (error) {
-          errors.push(error);
-        }
-      }
-      if (errors.length) throw new AggregateError(errors, "One or more extension cleanups failed");
-    }
-  };
-}
+const GLOBAL_KEY = "__svyk_roamTaskStatusTags";
 
-// src/status-write.js
-var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
-function valueAt(value, keyword, fallback = null) {
-  if (!value || typeof value !== "object") return fallback;
-  const plain = keyword.replace(/^:/, "");
-  return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
-}
-function createFreshBlockStringReader(roamAlphaAPI) {
-  const pull = roamAlphaAPI?.data?.async?.pull;
-  if (typeof pull !== "function") {
-    throw new TypeError("roamAlphaAPI.data.async.pull is required");
-  }
-  return async (uid) => {
-    const value = await pull.call(
-      roamAlphaAPI.data.async,
-      BLOCK_STRING_PULL_PATTERN,
-      [":block/uid", uid]
-    );
-    const pulledUid = valueAt(value, ":block/uid", null);
-    const string = valueAt(value, ":block/string", null);
-    if (pulledUid !== uid || typeof string !== "string") return null;
-    return string;
-  };
-}
-function result(status, fields = {}) {
-  return { status, didWrite: status === "updated", ...fields };
-}
-async function certify({ uid, expectedString, nextString, readFresh, writeError = null }) {
-  let observed;
-  try {
-    observed = await readFresh(uid);
-  } catch (error) {
-    return result("unknown", {
-      reason: "post-write-read-failed",
-      error: writeError || error
-    });
-  }
-  if (observed === nextString) {
-    return result("updated", {
-      reason: writeError ? "write-threw-after-commit" : "certified",
-      string: observed
-    });
-  }
-  if (observed === expectedString) {
-    return result("not-updated", {
-      reason: writeError ? "write-failed-before-commit" : "write-not-observed",
-      error: writeError || void 0,
-      string: observed
-    });
-  }
-  return result("conflict", {
-    reason: observed == null ? "block-missing-after-write" : "third-state-after-write",
-    error: writeError || void 0,
-    string: observed
-  });
-}
-function createCertifiedBlockStringWriter({
-  readFresh,
-  updateBlock,
-  getLiveEditorString = () => null
-}) {
-  if (typeof readFresh !== "function") throw new TypeError("readFresh must be a function");
-  if (typeof updateBlock !== "function") throw new TypeError("updateBlock must be a function");
-  if (typeof getLiveEditorString !== "function") {
-    throw new TypeError("getLiveEditorString must be a function");
-  }
-  return Object.freeze({
-    async apply({
-      uid,
-      expectedString,
-      nextString,
-      expectedLiveEditorString,
-      editorString
-    }) {
-      if (typeof uid !== "string" || !uid.trim()) {
-        return result("rejected", { reason: "invalid-uid" });
-      }
-      if (typeof expectedString !== "string" || typeof nextString !== "string") {
-        return result("rejected", { reason: "invalid-string" });
-      }
-      let before;
-      try {
-        before = await readFresh(uid);
-      } catch (error) {
-        return result("unknown", { reason: "pre-write-read-failed", error });
-      }
-      if (before == null) return result("rejected", { reason: "block-not-found" });
-      if (before !== expectedString) {
-        return result("conflict", { reason: "stale-expected-string", string: before });
-      }
-      const hasEditorHandoff = expectedLiveEditorString !== void 0 || editorString !== void 0;
-      if (hasEditorHandoff && (typeof expectedLiveEditorString !== "string" || typeof editorString !== "string")) {
-        return result("rejected", { reason: "invalid-editor-handoff" });
-      }
-      if (hasEditorHandoff) {
-        const live = getLiveEditorString(uid);
-        if (live !== expectedLiveEditorString && live !== editorString) {
-          return result("conflict", {
-            reason: "active-editor-diverged",
-            string: typeof live === "string" ? live : null
-          });
-        }
-      }
-      if (nextString === expectedString) {
-        return result("unchanged", { reason: "already-current", string: before });
-      }
-      try {
-        await updateBlock(uid, nextString);
-      } catch (error) {
-        return certify({ uid, expectedString, nextString, readFresh, writeError: error });
-      }
-      return certify({ uid, expectedString, nextString, readFresh });
-    }
-  });
-}
-
-// src/extension.js
-var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var TEXT_HELPER_DEFAULTS = {
+const TEXT_HELPER_DEFAULTS = {
   cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
   todoPatterns: ["{{[[TODO]]}}", "{{TODO}}"],
   donePatterns: ["{{[[DONE]]}}", "{{DONE}}"],
@@ -319,9 +28,10 @@ var TEXT_HELPER_DEFAULTS = {
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
-    CANCELLED: "Cancelled"
-  }
+    CANCELLED: "Cancelled",
+  },
 };
+
 function buildDefaultTextStatuses() {
   const statuses = {};
   TEXT_HELPER_DEFAULTS.cycleOrder.forEach((key) => {
@@ -331,25 +41,27 @@ function buildDefaultTextStatuses() {
       name,
       label: name,
       tagTitle,
-      tagTitles: [tagTitle]
+      tagTitles: [tagTitle],
     };
   });
   return statuses;
 }
-function createTaskStatusTextHelpers(options = {}) {
+
+export function createTaskStatusTextHelpers(options = {}) {
   const cycleOrder = options.cycleOrder || TEXT_HELPER_DEFAULTS.cycleOrder;
   const statusKeys = uniqueTextHelperStrings([
     ...cycleOrder,
     ...Object.keys(options.statuses || {}),
-    ...options.statusKeys || []
+    ...(options.statusKeys || []),
   ]);
   const todoPatterns = options.todoPatterns || TEXT_HELPER_DEFAULTS.todoPatterns;
   const donePatterns = options.donePatterns || TEXT_HELPER_DEFAULTS.donePatterns;
   const todoCanonical = options.todoCanonical || TEXT_HELPER_DEFAULTS.todoCanonical;
   const statuses = options.statuses || buildDefaultTextStatuses();
+
   function uniqueTextHelperStrings(list) {
     const out = [];
-    const seen = /* @__PURE__ */ new Set();
+    const seen = new Set();
     (list || []).forEach((v) => {
       const s = String(v || "").trim();
       if (!s) return;
@@ -359,28 +71,34 @@ function createTaskStatusTextHelpers(options = {}) {
     });
     return out;
   }
+
   function escapeRegex(text) {
     return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
+
   function containsAny(text, patterns) {
     if (!text || typeof text !== "string") return false;
     return patterns.some((p) => text.includes(p));
   }
+
   function isBoundaryChar(ch) {
     return !ch || /\s|[\.,;:!\?\)\]\}]/.test(ch);
   }
+
   function getStatusTagTitles(statusKey) {
     const status = statuses?.[statusKey];
     if (!status) return [];
     if (Array.isArray(status.tagTitles)) return status.tagTitles;
     return status.tagTitle ? [status.tagTitle] : [];
   }
+
   function hasPlainHashtagToken(text, tagTitle) {
     if (!text || typeof text !== "string") return false;
     const t = escapeRegex(tagTitle);
     const re = new RegExp(`(^|\\s)#${t}(?=\\s|$|[\\.,;:!\\?\\)\\]\\}])`, "g");
     return re.test(text);
   }
+
   function matchAnyPatternAt(text, index, patterns) {
     for (const token of patterns || []) {
       if (text.startsWith(token, index)) {
@@ -389,14 +107,17 @@ function createTaskStatusTextHelpers(options = {}) {
     }
     return null;
   }
+
   function skipHorizontalWhitespace(text, index) {
     let i = index;
-    while (text[i] === " " || text[i] === "	") i += 1;
+    while (text[i] === " " || text[i] === "\t") i += 1;
     return i;
   }
+
   function stripPrefixSeparator(text) {
     return String(text || "").replace(/^[ \t]+/, "");
   }
+
   function matchStatusTagAt(text, index) {
     for (const statusKey of statusKeys) {
       for (const tagTitle of getStatusTagTitles(statusKey)) {
@@ -407,9 +128,10 @@ function createTaskStatusTextHelpers(options = {}) {
             statusKey,
             start: index,
             end: index + bracket.length,
-            kind: "tag"
+            kind: "tag",
           };
         }
+
         const plain = `#${tagTitle}`;
         if (text.startsWith(plain, index) && isBoundaryChar(text[index + plain.length])) {
           return {
@@ -417,24 +139,32 @@ function createTaskStatusTextHelpers(options = {}) {
             statusKey,
             start: index,
             end: index + plain.length,
-            kind: "tag"
+            kind: "tag",
           };
         }
       }
     }
     return null;
   }
+
   function matchManagedStatusAt(text, index) {
     return matchStatusTagAt(text, index);
   }
+
   function parseManagedPrefix(text) {
     const original = String(text || "");
     const leadingMatch = original.match(/^[ \t]*/);
     const leading = leadingMatch ? leadingMatch[0] : "";
     let index = leading.length;
+
     const todo = matchAnyPatternAt(original, index, todoPatterns);
     const done = matchAnyPatternAt(original, index, donePatterns);
-    const task = todo ? { ...todo, kind: "todo" } : done ? { ...done, kind: "done" } : null;
+    const task = todo
+      ? { ...todo, kind: "todo" }
+      : done
+        ? { ...done, kind: "done" }
+        : null;
+
     if (!task) {
       return {
         managed: false,
@@ -445,13 +175,15 @@ function createTaskStatusTextHelpers(options = {}) {
         taskToken: null,
         currentStatus: null,
         hadStatus: false,
-        hadTaskToken: false
+        hadTaskToken: false,
       };
     }
+
     const afterTask = task.end;
     const statusStart = skipHorizontalWhitespace(original, afterTask);
     const status = matchManagedStatusAt(original, statusStart);
     const bodyStart = status ? status.end : afterTask;
+
     return {
       managed: true,
       original,
@@ -461,9 +193,10 @@ function createTaskStatusTextHelpers(options = {}) {
       taskToken: task.token,
       currentStatus: status?.statusKey || null,
       hadStatus: Boolean(status),
-      hadTaskToken: true
+      hadTaskToken: true,
     };
   }
+
   function joinManagedPrefix({ leading = "", taskToken, statusTag, body }) {
     const prefix = [taskToken, statusTag].filter(Boolean).join(" ");
     const bodyText = String(body || "");
@@ -471,6 +204,7 @@ function createTaskStatusTextHelpers(options = {}) {
     if (/^[\r\n]/.test(bodyText)) return `${leading}${prefix}${bodyText}`;
     return `${leading}${prefix} ${bodyText}`;
   }
+
   function hasStatusTagAnywhere(text, statusKey) {
     const s = String(text || "");
     for (const tagTitle of getStatusTagTitles(statusKey)) {
@@ -480,16 +214,20 @@ function createTaskStatusTextHelpers(options = {}) {
     }
     return parseManagedPrefix(s).currentStatus === statusKey;
   }
+
   function hasManagedStatusTag(text, statusKey) {
     const parsed = parseManagedPrefix(text);
     return parsed.hadStatus && parsed.currentStatus === statusKey;
   }
+
   function hasAnyManagedStatusTag(text) {
     return parseManagedPrefix(text).hadStatus;
   }
+
   function getCurrentStatus(text) {
     return parseManagedPrefix(text).currentStatus;
   }
+
   function getNextStatus(currentStatus) {
     if (!currentStatus) return cycleOrder[0] || null;
     const idx = cycleOrder.indexOf(currentStatus);
@@ -497,58 +235,83 @@ function createTaskStatusTextHelpers(options = {}) {
     const next = idx + 1;
     return next >= cycleOrder.length ? null : cycleOrder[next];
   }
+
   function isDoneTask(text) {
     return containsAny(text, donePatterns);
   }
+
   function isTaskLike(text) {
     const s = String(text || "");
     const parsed = parseManagedPrefix(s);
-    return parsed.managed || containsAny(s, todoPatterns) || containsAny(s, donePatterns);
+    return (
+      parsed.managed ||
+      containsAny(s, todoPatterns) ||
+      containsAny(s, donePatterns)
+    );
   }
+
   function applyStatusToText(text, statusKey) {
     const original = String(text || "");
     const parsed = parseManagedPrefix(original);
+
     const status = statuses?.[statusKey];
     const statusTag = status ? `#[[${status.tagTitle}]]` : "";
     const body = parsed.managed ? parsed.body : original;
     const leading = parsed.managed ? parsed.leading : "";
+
     return joinManagedPrefix({
       leading,
       taskToken: parsed.managed && parsed.taskToken ? parsed.taskToken : todoCanonical,
       statusTag,
-      body
+      body,
     });
   }
+
   function applyStatusToTexts(texts, statusKey) {
-    return (Array.isArray(texts) ? texts : []).map(
-      (text) => applyStatusToText(text, statusKey)
+    return (Array.isArray(texts) ? texts : []).map((text) =>
+      applyStatusToText(text, statusKey)
     );
   }
+
   function removeStatusFromText(text) {
     const original = String(text || "");
     const parsed = parseManagedPrefix(original);
     if (!parsed.managed || !parsed.hadStatus) return original;
-    const taskToken = parsed.taskKind === "done" && parsed.taskToken ? parsed.taskToken : todoCanonical;
+
+    const taskToken =
+      parsed.taskKind === "done" && parsed.taskToken ? parsed.taskToken : todoCanonical;
+
     return joinManagedPrefix({
       leading: parsed.leading,
       taskToken,
       statusTag: "",
-      body: parsed.body
+      body: parsed.body,
     });
   }
+
   function removeSlashCommandFragment(blockString, indexes) {
     let text = String(blockString || "");
     if (!Array.isArray(indexes) || indexes.length !== 2) return text;
+
     const [start, end] = indexes;
-    if (typeof start !== "number" || typeof end !== "number" || start < 0 || end < start || end > text.length) {
+    if (
+      typeof start !== "number" ||
+      typeof end !== "number" ||
+      start < 0 ||
+      end < start ||
+      end > text.length
+    ) {
       return text;
     }
+
     let removeStart = start;
     if (removeStart > 0 && text[removeStart - 1] === "/") {
       removeStart -= 1;
     }
+
     return text.slice(0, removeStart) + text.slice(end);
   }
+
   return {
     applyStatusToText,
     applyStatusToTexts,
@@ -561,12 +324,13 @@ function createTaskStatusTextHelpers(options = {}) {
     isTaskLike,
     parseManagedPrefix,
     removeSlashCommandFragment,
-    removeStatusFromText
+    removeStatusFromText,
   };
 }
+
 function uniqueUidStrings(list) {
   const out = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen = new Set();
   (list || []).forEach((v) => {
     const s = String(v || "").trim();
     if (!s) return;
@@ -576,40 +340,46 @@ function uniqueUidStrings(list) {
   });
   return out;
 }
+
 function normalizeTargetUid(entry) {
   if (typeof entry === "string") return entry;
   if (!entry || typeof entry !== "object") return null;
   return entry["block-uid"] || entry.uid || entry["uid"] || null;
 }
-async function resolveTaskStatusTargetUids({
+
+export async function resolveTaskStatusTargetUids({
   roamAlphaAPI,
   context = null,
   primaryUid = null,
-  fallbackToFocused = true
+  fallbackToFocused = true,
 } = {}) {
   const contextBlocks = Array.isArray(context?.blocks) ? context.blocks : [];
   const contextBlockUids = uniqueUidStrings(contextBlocks.map(normalizeTargetUid));
   if (contextBlockUids.length) return contextBlockUids;
+
   const ui = roamAlphaAPI?.ui;
+
   try {
     const individual = await ui?.individualMultiselect?.getSelectedUids?.();
     const individualUids = uniqueUidStrings(
       (Array.isArray(individual) ? individual : []).map(normalizeTargetUid)
     );
     if (individualUids.length) return individualUids;
-  } catch (_) {
-  }
+  } catch (_) {}
+
   try {
     const dragSelected = await ui?.multiselect?.getSelected?.();
     const dragUids = uniqueUidStrings(
       (Array.isArray(dragSelected) ? dragSelected : []).map(normalizeTargetUid)
     );
     if (dragUids.length) return dragUids;
-  } catch (_) {
-  }
+  } catch (_) {}
+
   const explicitUid = primaryUid || context?.["block-uid"] || context?.uid || null;
   if (explicitUid) return uniqueUidStrings([explicitUid]);
+
   if (!fallbackToFocused) return [];
+
   try {
     const focused = await ui?.getFocusedBlock?.();
     return uniqueUidStrings([normalizeTargetUid(focused)]);
@@ -617,48 +387,58 @@ async function resolveTaskStatusTargetUids({
     return [];
   }
 }
+
 function createTaskStatusExtension({ extensionAPI }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const PILL_REFRESH_THROTTLE_MS = 80;
+
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
     cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
     shiftClickRemoves: true,
-    debug: false
+    debug: false,
   };
+
   const TODO_PATTERNS = ["{{[[TODO]]}}", "{{TODO}}"];
   const DONE_PATTERNS = ["{{[[DONE]]}}", "{{DONE}}"];
   const TODO_CANONICAL = "{{[[TODO]]}}";
+
   const STATUS_TAG_PREFIX = "task-status/";
+
   const SETTINGS_KEYS = {
     statusList: "status-list",
-    statusColorOverrides: "status-color-overrides"
+    statusColorOverrides: "status-color-overrides",
   };
+
   const DEFAULT_STATUS_NAMES = {
     ACTIVE: "Active",
     WAITING: "Waiting",
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
-    CANCELLED: "Cancelled"
+    CANCELLED: "Cancelled",
   };
+
   const DEFAULT_STATUS_LIST = [
     { key: "ACTIVE", name: "Active" },
     { key: "WAITING", name: "Waiting" },
     { key: "HOLDING", name: "Holding" },
     { key: "INCUBATING", name: "Incubating" },
     { key: "ALERT", name: "Alert" },
-    { key: "CANCELLED", name: "Cancelled" }
+    { key: "CANCELLED", name: "Cancelled" },
   ];
+
   const DEFAULT_STATUS_BASE_COLORS = {
     ACTIVE: "#14b8a6",
     WAITING: "#eab308",
     HOLDING: "#94a3b8",
     INCUBATING: "#6366f1",
     ALERT: "#f43f5e",
-    CANCELLED: "#1e293b"
+    CANCELLED: "#1e293b",
   };
+
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
+
   const STATUS_COLOR_PRESETS = [
     { name: "Teal", value: "#14b8a6" },
     { name: "Rose", value: "#f43f5e" },
@@ -667,20 +447,23 @@ function createTaskStatusExtension({ extensionAPI }) {
     { name: "Indigo", value: "#6366f1" },
     { name: "Violet", value: "#8b5cf6" },
     { name: "Slate", value: "#64748b" },
-    { name: "Dark", value: "#1e293b" }
+    { name: "Dark", value: "#1e293b" },
   ];
+
   const STATUS_COLOR_DERIVE_ALPHA = {
     ACTIVE: { bg: 0.08, border: 0.2 },
     WAITING: { bg: 0.08, border: 0.2 },
     HOLDING: { bg: 0.1, border: 0.24 },
     INCUBATING: { bg: 0.08, border: 0.2 },
     ALERT: { bg: 0.08, border: 0.2 },
-    CANCELLED: { bg: 0.06, border: 0.16 }
+    CANCELLED: { bg: 0.06, border: 0.16 },
   };
+
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
+
   function ensureColorProbeElement() {
     if (colorProbeEl && colorProbeEl.isConnected) return colorProbeEl;
     try {
@@ -703,17 +486,19 @@ function createTaskStatusExtension({ extensionAPI }) {
       return null;
     }
   }
+
   function normalizeCssColorValue(value) {
     const v = String(value || "").trim();
     return v;
   }
+
   function cssColorIsSupported(value) {
     const v = normalizeCssColorValue(value);
     if (!v) return false;
     try {
       if (window.CSS?.supports) return window.CSS.supports("color", v);
-    } catch (_) {
-    }
+    } catch (_) {}
+
     const probe = ensureColorProbeElement();
     if (!probe) return false;
     try {
@@ -724,59 +509,73 @@ function createTaskStatusExtension({ extensionAPI }) {
       return false;
     }
   }
+
   function parseCssColorToRgb(value) {
     const v = normalizeCssColorValue(value);
     if (!v) return null;
+
     const probe = ensureColorProbeElement();
     if (!probe) return null;
+
     try {
       probe.style.color = "";
       probe.style.color = v;
       if (!probe.style.color) return null;
+
       const computed = window.getComputedStyle(probe).color;
       const match = computed.match(
         /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/
       );
       if (!match) return null;
+
       const r = Number(match[1]);
       const g = Number(match[2]);
       const b = Number(match[3]);
       const a = typeof match[4] === "string" ? Number(match[4]) : 1;
       if (![r, g, b, a].every((n) => Number.isFinite(n))) return null;
+
       return { r, g, b, a };
     } catch (_) {
       return null;
     }
   }
+
   function getStatusCssVarNames(statusKey) {
     const slug = String(statusKey || "").toLowerCase();
     return {
       bg: `--ts-${slug}-bg`,
       fg: `--ts-${slug}-fg`,
-      border: `--ts-${slug}-border`
+      border: `--ts-${slug}-border`,
     };
   }
+
   function cssString(value) {
     return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
+
   function cssStatusKeySelector(statusKey) {
     return cssString(statusKey);
   }
+
   function getRenderableStatusKeys() {
     return uniqueStrings(Object.keys(STATUSES || {}));
   }
+
   function getDefaultStatusColor(statusKey) {
     return DEFAULT_STATUS_BASE_COLORS[statusKey] || DEFAULT_CUSTOM_STATUS_BASE_COLOR;
   }
+
   function getStatusColorAlpha(statusKey) {
     return STATUS_COLOR_DERIVE_ALPHA[statusKey] || { bg: 0.08, border: 0.2 };
   }
+
   function deriveStatusColorValues(statusKey, entry) {
     const base = normalizeCssColorValue(entry?.base) || getDefaultStatusColor(statusKey);
     const text = normalizeCssColorValue(entry?.text);
     const hasBase = base && cssColorIsSupported(base);
     const hasText = text && cssColorIsSupported(text);
     const values = {};
+
     if (hasBase) {
       const rgb = parseCssColorToRgb(base);
       if (rgb) {
@@ -788,8 +587,10 @@ function createTaskStatusExtension({ extensionAPI }) {
     } else if (hasText) {
       values.fg = text;
     }
+
     return values;
   }
+
   function ensureStatusColorStyleElement() {
     if (statusColorStyleEl && statusColorStyleEl.isConnected) return statusColorStyleEl;
     try {
@@ -802,29 +603,33 @@ function createTaskStatusExtension({ extensionAPI }) {
       return null;
     }
   }
+
   function clearStatusColorOverrides() {
     if (colorProbeEl?.remove) {
       try {
         colorProbeEl.remove();
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     colorProbeEl = null;
+
     if (statusColorStyleEl?.remove) {
       try {
         statusColorStyleEl.remove();
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     statusColorStyleEl = null;
   }
+
   function applyStatusColorOverrides(overrides) {
     clearStatusColorOverrides();
+
     const dynamicRules = [];
+
     getRenderableStatusKeys().forEach((statusKey) => {
       const entry = overrides?.[statusKey];
       const vars = getStatusCssVarNames(statusKey);
       const values = deriveStatusColorValues(statusKey, entry);
+
       const keySelector = cssStatusKeySelector(statusKey);
       dynamicRules.push(`
 span.rm-page-ref[data-task-status-key="${keySelector}"],
@@ -837,12 +642,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   border-color: ${values.border || `var(${vars.border})`} !important;
 }`);
     });
+
     const styleEl = ensureStatusColorStyleElement();
     if (styleEl) styleEl.textContent = dynamicRules.join("\n");
   }
+
   function isPlainObject(value) {
     return Boolean(value) && typeof value === "object" && !Array.isArray(value);
   }
+
   function parseMaybeJson(value) {
     if (typeof value !== "string") return value;
     try {
@@ -851,6 +659,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return value;
     }
   }
+
   function loadObjectSetting(key, fallback) {
     if (!extensionAPI?.settings?.get) return fallback;
     const raw = extensionAPI.settings.get(key);
@@ -858,6 +667,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const parsed = parseMaybeJson(raw);
     return isPlainObject(parsed) ? parsed : fallback;
   }
+
   function saveSetting(key, value) {
     if (!extensionAPI?.settings?.set) return;
     try {
@@ -866,9 +676,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       log("Failed saving setting", key, err);
     }
   }
+
   function isThenable(value) {
     return Boolean(value) && typeof value.then === "function";
   }
+
   async function saveSettingAsync(key, value) {
     if (!extensionAPI?.settings?.set) return;
     try {
@@ -878,9 +690,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       log("Failed saving setting", key, err);
     }
   }
+
   function normalizeStatusName(name) {
     return String(name || "").replace(/\s{2,}/g, " ").trim();
   }
+
   function validateStatusName(name) {
     const normalized = normalizeStatusName(name);
     if (!normalized) return "Name cannot be empty";
@@ -892,9 +706,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (normalized.includes("#")) return "Name cannot include '#'.";
     return null;
   }
+
   function uniqueStrings(list) {
     const out = [];
-    const seen = /* @__PURE__ */ new Set();
+    const seen = new Set();
     (list || []).forEach((v) => {
       const s = String(v || "").trim();
       if (!s) return;
@@ -904,9 +719,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     return out;
   }
+
   function normalizeStatusKey(key) {
-    return String(key || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+    return String(key || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
   }
+
   function normalizeStatusEntry(entry, fallback = {}) {
     const key = normalizeStatusKey(entry?.key ?? fallback.key);
     const fallbackName = fallback.name || DEFAULT_STATUS_NAMES[key] || key;
@@ -914,9 +736,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!key || !name) return null;
     return { key, name };
   }
+
   function normalizeStatusList(list, fallbackList = DEFAULT_STATUS_LIST) {
     const out = [];
-    const seen = /* @__PURE__ */ new Set();
+    const seen = new Set();
     const source = Array.isArray(list) && list.length ? list : fallbackList;
     (source || []).forEach((entry, index) => {
       const fallback = fallbackList?.[index] || {};
@@ -927,20 +750,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     return out.length ? out : DEFAULT_STATUS_LIST.map((entry) => ({ ...entry }));
   }
+
   function loadStatusList() {
     const stored = parseMaybeJson(extensionAPI?.settings?.get?.(SETTINGS_KEYS.statusList));
     if (Array.isArray(stored) && stored.length) {
       return normalizeStatusList(stored);
     }
+
     const defaults = normalizeStatusList(DEFAULT_STATUS_LIST);
     saveSetting(SETTINGS_KEYS.statusList, defaults);
     return defaults;
   }
+
   function generateStatusKey(name) {
-    const base = normalizeStatusKey(name).replace(/^CUSTOM_/, "").slice(0, 30) || "STATUS";
-    const existing = /* @__PURE__ */ new Set([
+    const base =
+      normalizeStatusKey(name)
+        .replace(/^CUSTOM_/, "")
+        .slice(0, 30) || "STATUS";
+    const existing = new Set([
       ...statusList.map((entry) => entry.key),
-      ...Object.keys(DEFAULT_STATUS_NAMES)
+      ...Object.keys(DEFAULT_STATUS_NAMES),
     ]);
     let key = `CUSTOM_${base}`;
     let i = 2;
@@ -950,12 +779,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     return key;
   }
+
   function syncCycleOrderFromStatusList() {
     CONFIG.cycleOrder = statusList.map((entry) => entry.key);
   }
+
   function getActiveStatusEntry(statusKey) {
     return statusList.find((entry) => entry.key === statusKey) || null;
   }
+
   function buildStatuses({ list }) {
     const statuses = {};
     (list || []).forEach((entry) => {
@@ -968,46 +800,56 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         name,
         label: name,
         tagTitle,
-        tagTitles: [tagTitle]
+        tagTitles: [tagTitle],
       };
     });
+
     return statuses;
   }
+
   function buildTagTitleIndex(statuses) {
-    const idx = /* @__PURE__ */ new Map();
+    const idx = new Map();
     Object.entries(statuses || {}).forEach(([statusKey, status]) => {
       (status.tagTitles || []).forEach((t) => idx.set(t, statusKey));
     });
     return idx;
   }
+
   let statusList = loadStatusList();
   syncCycleOrderFromStatusList();
   let STATUSES = buildStatuses({
-    list: statusList
+    list: statusList,
   });
+
   let statusTagToKey = buildTagTitleIndex(STATUSES);
+
   function rebuildStatusIndexes() {
     statusList = loadStatusList();
     syncCycleOrderFromStatusList();
     STATUSES = buildStatuses({
-      list: statusList
+      list: statusList,
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     scheduleStatusPillRefresh();
   }
+
   function rebuildStatusIndexesFromMemory() {
     syncCycleOrderFromStatusList();
     STATUSES = buildStatuses({
-      list: statusList
+      list: statusList,
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     scheduleStatusPillRefresh();
   }
+
   function escapeDatalogString(text) {
-    return String(text || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return String(text || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, "\\\"");
   }
+
   function getPageUidByTitle(title) {
     try {
       const t = escapeDatalogString(title);
@@ -1022,45 +864,60 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return null;
     }
   }
+
   async function renamePageTitle(oldTitle, newTitle) {
     const oldUid = getPageUidByTitle(oldTitle);
     if (!oldUid) return { renamed: false, reason: "missing-old" };
+
     const newUid = getPageUidByTitle(newTitle);
     if (newUid && newUid !== oldUid) {
       throw new Error(`Page already exists: ${newTitle}`);
     }
+
     await window.roamAlphaAPI.data.page.update({
-      page: { uid: oldUid, title: newTitle }
+      page: { uid: oldUid, title: newTitle },
     });
+
     return { renamed: true };
   }
+
   async function setStatusName(statusKey, nextName, { renameExisting } = {}) {
     if (!getActiveStatusEntry(statusKey)) {
       throw new Error(`Unknown status key: ${statusKey}`);
     }
+
     const error = validateStatusName(nextName);
     if (error) throw new Error(error);
+
     const desired = normalizeStatusName(nextName);
     const current = STATUSES[statusKey].name;
     if (desired === current) return { changed: false };
+
     const oldTagTitle = `${STATUS_TAG_PREFIX}${current}`;
     const newTagTitle = `${STATUS_TAG_PREFIX}${desired}`;
+
     const owner = statusTagToKey.get(newTagTitle);
     if (owner && owner !== statusKey) {
       throw new Error(`Conflicts with existing status: ${newTagTitle}`);
     }
+
     if (renameExisting) {
       await renamePageTitle(oldTagTitle, newTagTitle);
     }
-    statusList = statusList.map(
-      (entry) => entry.key === statusKey ? { ...entry, name: desired } : entry
+
+    statusList = statusList.map((entry) =>
+      entry.key === statusKey ? { ...entry, name: desired } : entry
     );
+
     await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
+
     await unregisterAllCommands();
     rebuildStatusIndexesFromMemory();
     await registerAllCommands();
+
     return { changed: true, oldTagTitle, newTagTitle };
   }
+
   function validateNewStatusName(name, currentStatusKey = null) {
     const error = validateStatusName(name);
     if (error) return error;
@@ -1072,87 +929,114 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     return null;
   }
+
   async function addStatus(nextName) {
     const error = validateNewStatusName(nextName);
     if (error) throw new Error(error);
+
     const name = normalizeStatusName(nextName);
     const key = generateStatusKey(name);
     statusList = [...statusList, { key, name }];
+
     await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
     await unregisterAllCommands();
     rebuildStatusIndexesFromMemory();
     await registerAllCommands();
+
     return { key, name };
   }
+
   async function reorderStatus(statusKey, targetKey, placement = "before") {
-    const idx = statusList.findIndex((entry2) => entry2.key === statusKey);
+    const idx = statusList.findIndex((entry) => entry.key === statusKey);
     if (idx === -1) throw new Error(`Unknown status key: ${statusKey}`);
-    const targetIdx = statusList.findIndex((entry2) => entry2.key === targetKey);
+
+    const targetIdx = statusList.findIndex((entry) => entry.key === targetKey);
     if (targetIdx === -1) throw new Error(`Unknown target status key: ${targetKey}`);
     if (statusKey === targetKey) return { changed: false };
+
     const next = [...statusList];
     const [entry] = next.splice(idx, 1);
     const remainingTargetIdx = next.findIndex((candidate) => candidate.key === targetKey);
-    const insertIdx = placement === "after" ? remainingTargetIdx + 1 : remainingTargetIdx;
+    const insertIdx =
+      placement === "after" ? remainingTargetIdx + 1 : remainingTargetIdx;
     next.splice(insertIdx, 0, entry);
+
     const changed = next.some((candidate, index) => candidate.key !== statusList[index]?.key);
     if (!changed) return { changed: false };
+
     statusList = next;
+
     await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
     await unregisterAllCommands();
     rebuildStatusIndexesFromMemory();
     await registerAllCommands();
+
     return { changed: true };
   }
+
   async function deleteStatus(statusKey) {
     if (statusList.length <= 1) {
       throw new Error("At least one status is required.");
     }
+
     const activeEntry = getActiveStatusEntry(statusKey);
     if (!activeEntry) throw new Error(`Unknown status key: ${statusKey}`);
+
     statusList = statusList.filter((entry) => entry.key !== statusKey);
+
     await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
     await unregisterAllCommands();
     rebuildStatusIndexesFromMemory();
     await registerAllCommands();
+
     return { deleted: true };
   }
+
   const registeredCommands = {
     slash: [],
     contextMenu: [],
     msContextMenu: [],
-    palette: []
+    palette: [],
   };
-  const pendingOperations = /* @__PURE__ */ new Set();
+
+  const pendingOperations = new Set();
+
   let pillObserver = null;
   let pillRefreshTimer = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
+
   function log(...args) {
     if (CONFIG.debug) console.log("[TaskStatus]", ...args);
   }
+
   function getTextHelpers() {
     return createTaskStatusTextHelpers({
       statuses: STATUSES,
       cycleOrder: CONFIG.cycleOrder,
       todoPatterns: TODO_PATTERNS,
       donePatterns: DONE_PATTERNS,
-      todoCanonical: TODO_CANONICAL
+      todoCanonical: TODO_CANONICAL,
     });
   }
+
   function containsAny(text, patterns) {
     if (!text || typeof text !== "string") return false;
     return patterns.some((p) => text.includes(p));
   }
+
   function hasStatusTag(text, statusKey) {
     return getTextHelpers().hasStatusTagAnywhere(text, statusKey);
   }
+
   function hasManagedStatusTag(text, statusKey) {
     return getTextHelpers().hasManagedStatusTag(text, statusKey);
   }
+
   function hasAnyStatusTag(text) {
     return getTextHelpers().hasAnyManagedStatusTag(text);
   }
+
   function getStatusDisplayLabelFromTagTitle(tagTitle) {
     if (!tagTitle || typeof tagTitle !== "string") return "";
     if (tagTitle.startsWith(STATUS_TAG_PREFIX)) {
@@ -1160,6 +1044,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     return tagTitle;
   }
+
   function annotateStatusPillElement(el) {
     if (!el?.getAttribute) return;
     const tagTitle = el.getAttribute("data-tag");
@@ -1172,6 +1057,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       el.removeAttribute("data-task-status-label");
     }
   }
+
   function refreshStatusPills(root = document) {
     const scope = root && root.querySelectorAll ? root : document;
     const nodes = scope.querySelectorAll(
@@ -1179,6 +1065,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     );
     nodes.forEach(annotateStatusPillElement);
   }
+
   function scheduleStatusPillRefresh() {
     if (pillRefreshTimer) return;
     pillRefreshTimer = window.setTimeout(() => {
@@ -1190,12 +1077,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }, PILL_REFRESH_THROTTLE_MS);
   }
+
   function startStatusPillObserver() {
     if (pillObserver) return;
     if (!document?.body) return;
+
     pillObserver = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.type === "attributes") {
+          // Roam can reuse elements and set data-tag after render.
           if (m.attributeName === "data-tag") {
             scheduleStatusPillRefresh();
           }
@@ -1209,20 +1099,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         }
       }
     });
+
     pillObserver.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-tag"]
+      attributeFilter: ["data-tag"],
     });
     scheduleStatusPillRefresh();
   }
+
   function stopStatusPillObserver() {
     if (pillObserver) {
       try {
         pillObserver.disconnect();
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     pillObserver = null;
     if (pillRefreshTimer) {
@@ -1230,6 +1121,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     pillRefreshTimer = null;
   }
+
   function getBlockString(blockUid) {
     try {
       const blockData = window.roamAlphaAPI.data.pull(
@@ -1242,6 +1134,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return null;
     }
   }
+
   function getLiveBlockInputValue(blockUid) {
     try {
       const active = document.activeElement;
@@ -1249,55 +1142,71 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         const id = active.id || "";
         if (id.endsWith(blockUid)) return active.value;
       }
+
       const byId = document.getElementById(`block-input-${blockUid}`);
       if (byId && typeof byId.value === "string") return byId.value;
+
       const bySuffix = document.querySelector(`textarea[id$="${blockUid}"]`);
       if (bySuffix && typeof bySuffix.value === "string") return bySuffix.value;
-    } catch (_) {
-    }
+    } catch (_) {}
+
     return null;
   }
+
   async function updateBlock(blockUid, newText) {
     await window.roamAlphaAPI.data.block.update({
-      block: { uid: blockUid, string: newText }
+      block: { uid: blockUid, string: newText },
     });
   }
+
   const readBlockStringFresh = createFreshBlockStringReader(window.roamAlphaAPI);
   const certifiedBlockWriter = createCertifiedBlockStringWriter({
     readFresh: readBlockStringFresh,
     updateBlock,
-    getLiveEditorString: getLiveBlockInputValue
+    getLiveEditorString: getLiveBlockInputValue,
   });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
-    directWriter: certifiedBlockWriter
+    directWriter: certifiedBlockWriter,
   });
+
   function getCurrentStatus(text) {
     return getTextHelpers().getCurrentStatus(text);
   }
+
   function getNextStatus(currentStatus) {
     return getTextHelpers().getNextStatus(currentStatus);
   }
+
   function isDoneTask(text) {
     return getTextHelpers().isDoneTask(text);
   }
+
   function isTaskLike(text) {
     return getTextHelpers().isTaskLike(text);
   }
+
   function applyStatusToText(text, statusKey) {
     return getTextHelpers().applyStatusToText(text, statusKey);
   }
+
   function removeStatusFromText(text) {
     return getTextHelpers().removeStatusFromText(text);
   }
+
   async function getOperationTargetUids({ primaryUid = null, context = null } = {}) {
     return await resolveTaskStatusTargetUids({
       roamAlphaAPI: window.roamAlphaAPI,
       context,
-      primaryUid
+      primaryUid,
     });
   }
-  async function setBlockStatus(blockUid, statusKey, { editorString, expectedLiveEditorString } = {}) {
+
+  async function setBlockStatus(
+    blockUid,
+    statusKey,
+    { editorString, expectedLiveEditorString } = {}
+  ) {
     if (!blockUid) return { status: "rejected", didWrite: false, reason: "missing-uid" };
     if (statusKey != null && !STATUSES[statusKey]?.active) {
       return { status: "rejected", didWrite: false, reason: "inactive-status" };
@@ -1305,6 +1214,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (pendingOperations.has(blockUid)) {
       return { status: "rejected", didWrite: false, reason: "operation-pending" };
     }
+
     let expectedString;
     try {
       expectedString = await readBlockStringFresh(blockUid);
@@ -1314,15 +1224,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (expectedString === null) {
       return { status: "rejected", didWrite: false, reason: "block-not-found" };
     }
-    const hasEditorHandoff = editorString !== void 0 || expectedLiveEditorString !== void 0;
-    if (hasEditorHandoff && (typeof editorString !== "string" || typeof expectedLiveEditorString !== "string")) {
+
+    const hasEditorHandoff =
+      editorString !== undefined || expectedLiveEditorString !== undefined;
+    if (
+      hasEditorHandoff &&
+      (typeof editorString !== "string" || typeof expectedLiveEditorString !== "string")
+    ) {
       return { status: "rejected", didWrite: false, reason: "invalid-editor-handoff" };
     }
     const sourceString = hasEditorHandoff ? editorString : expectedString;
-    const newText = statusKey === null ? removeStatusFromText(sourceString) : applyStatusToText(sourceString, statusKey);
+
+    const newText =
+      statusKey === null
+        ? removeStatusFromText(sourceString)
+        : applyStatusToText(sourceString, statusKey);
+
     if (newText === expectedString) {
       return { status: "unchanged", didWrite: false, reason: "already-current", string: expectedString };
     }
+
     pendingOperations.add(blockUid);
     try {
       const outcome = await statusWriteRouter.apply({
@@ -1331,12 +1252,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         nextString: newText,
         statusTagTitle: statusKey === null ? null : STATUSES[statusKey].tagTitle,
         expectedLiveEditorString,
-        editorString
+        editorString,
       });
       if (!["updated", "unchanged"].includes(outcome?.status)) {
         console.warn("[TaskStatus] Status edit refused", {
           uid: blockUid,
-          reason: outcome?.reason || "unknown"
+          reason: outcome?.reason || "unknown",
         });
       }
       return outcome;
@@ -1344,21 +1265,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       pendingOperations.delete(blockUid);
     }
   }
+
   async function setStatusForTargets(primaryUid, statusKey, context = null) {
     const targets = await getOperationTargetUids({ primaryUid, context });
     await setStatusForBlockUids(targets, statusKey);
   }
+
   async function setStatusForBlockUids(targets, statusKey) {
     const blockUids = uniqueStrings(targets || []);
     for (const blockUid of blockUids) {
       await setBlockStatus(blockUid, statusKey);
     }
   }
+
   async function cycleBlockStatus(blockUid) {
     try {
       const blockString = await readBlockStringFresh(blockUid);
       if (blockString === null) return { status: "rejected", didWrite: false, reason: "block-not-found" };
+
       if (isDoneTask(blockString)) return;
+
       const current = getCurrentStatus(blockString);
       const next = getNextStatus(current);
       return await setBlockStatus(blockUid, next);
@@ -1366,45 +1292,59 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return { status: "unknown", didWrite: false, reason: "fresh-read-failed", error };
     }
   }
+
   async function cycleStatusForTargets(primaryUid, context = null) {
     const targets = await getOperationTargetUids({ primaryUid, context });
     for (const blockUid of targets) {
       await cycleBlockStatus(blockUid);
     }
   }
+
   function extractUid(idString) {
     if (!idString) return null;
     const match = idString.match(/([A-Za-z0-9_-]{9})$/);
     return match ? match[1] : null;
   }
+
   function getBlockUidFromElement(element) {
     if (!element) return null;
+
     const domUtil = window.roamAlphaAPI?.util?.dom;
     if (domUtil?.blockUidFromTarget) {
       try {
         const uid = domUtil.blockUidFromTarget(element);
         if (uid) return uid;
-      } catch (_) {
-      }
+      } catch (_) {}
     }
+
     const withDataUid = element.closest?.("[data-uid]");
     if (withDataUid) {
       const uid = withDataUid.getAttribute("data-uid");
       if (uid) return uid;
     }
-    const blockInput = element.closest?.("[id^='block-input-']") || element.closest?.(".roam-block-container")?.querySelector("[id^='block-input-']");
+
+    const blockInput =
+      element.closest?.("[id^='block-input-']") ||
+      element
+        .closest?.(".roam-block-container")
+        ?.querySelector("[id^='block-input-']");
     if (blockInput) {
       const uid = extractUid(blockInput.id);
       if (uid) return uid;
     }
+
     const roamBlock = element.closest?.(".roam-block");
     if (roamBlock) {
       return roamBlock.getAttribute("data-uid") || roamBlock.dataset?.uid || null;
     }
+
     return null;
   }
+
   function getStatusKeyFromElement(target) {
     if (!target) return null;
+
+    // New: status tag element
     const tagEl = getStatusPillElement(target);
     if (tagEl) {
       const tagTitle = tagEl.getAttribute("data-tag");
@@ -1414,12 +1354,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const annotatedKey = tagEl.getAttribute("data-task-status-key");
       if (annotatedKey && STATUSES[annotatedKey]) return annotatedKey;
     }
+
     return null;
   }
+
   function getStatusPillElement(target) {
     if (!target?.closest) return null;
-    return target.closest("span.rm-page-ref[data-tag]") || target.closest("a.rm-page-ref[data-tag]") || target.closest("span.rm-page-ref[data-task-status-key]") || target.closest("a.rm-page-ref[data-task-status-key]");
+    return (
+      target.closest("span.rm-page-ref[data-tag]") ||
+      target.closest("a.rm-page-ref[data-tag]") ||
+      target.closest("span.rm-page-ref[data-task-status-key]") ||
+      target.closest("a.rm-page-ref[data-task-status-key]")
+    );
   }
+
   function stopRoamNavigation(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -1427,37 +1375,49 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       event.stopImmediatePropagation();
     }
   }
+
   function getStatusEventContext(event) {
     const target = event.target;
     const statusKey = getStatusKeyFromElement(target);
     if (!statusKey) return null;
+
     const anchorEl = getStatusPillElement(target);
+
     const blockUid = getBlockUidFromElement(target);
     if (!blockUid) return null;
+
     const blockString = getBlockString(blockUid);
     if (blockString === null) return null;
+
+    // Guard: only intercept the managed status slot. A later task-status tag in
+    // prose should stay navigable and should not be treated as a task control.
     const isManagedStatus = hasManagedStatusTag(blockString, statusKey);
     if (!isManagedStatus) return null;
+
+    // Guard: only treat status tags as task controls when the block is actually a task.
+    // Prevents cycling on unrelated blocks that happen to use these tags.
     const hasTodo = containsAny(blockString, TODO_PATTERNS);
     if (!hasTodo && !isTaskLike(blockString)) return null;
+
     return { statusKey, blockUid, anchorEl };
   }
+
   function closeStatusChooser() {
     if (statusChooserTeardown) {
       try {
         statusChooserTeardown();
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     statusChooserTeardown = null;
+
     if (statusChooserEl?.remove) {
       try {
         statusChooserEl.remove();
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     statusChooserEl = null;
   }
+
   function positionStatusChooser(el, anchorEl) {
     if (!el || !anchorEl?.getBoundingClientRect) return;
     const rect = anchorEl.getBoundingClientRect();
@@ -1466,9 +1426,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const margin = 8;
     const arrow = el.querySelector(".bp3-popover-arrow");
     const arrowSvg = arrow?.querySelector("svg");
+
     el.style.visibility = "hidden";
     el.style.left = "0px";
     el.style.top = "0px";
+
     window.requestAnimationFrame(() => {
       if (!el.isConnected) return;
       const chooserRect = el.getBoundingClientRect();
@@ -1484,9 +1446,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         4,
         Math.min(rect.left + rect.width / 2 - left - 15, chooserRect.width - 34)
       );
+
       el.style.left = `${Math.round(left)}px`;
       el.style.top = `${Math.round(top)}px`;
-      el.style.transformOrigin = `${Math.round(arrowLeft + 15)}px ${opensBelow ? "top" : "bottom"}`;
+      el.style.transformOrigin = `${Math.round(arrowLeft + 15)}px ${
+        opensBelow ? "top" : "bottom"
+      }`;
       el.classList.toggle("ts-status-chooser-above", !opensBelow);
       if (arrow) {
         arrow.style.left = `${Math.round(arrowLeft)}px`;
@@ -1497,30 +1462,37 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       el.style.visibility = "visible";
     });
   }
+
   function makeBlueprintPopoverArrow() {
     const arrow = document.createElement("div");
     arrow.className = "bp3-popover-arrow";
+
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 30 30");
     svg.style.transform = "rotate(90deg)";
+
     const border = document.createElementNS("http://www.w3.org/2000/svg", "path");
     border.setAttribute("class", "bp3-popover-arrow-border");
     border.setAttribute(
       "d",
       "M8.11 6.302c1.015-.936 1.887-2.922 1.887-4.297v26c0-1.378-.868-3.357-1.888-4.297L.925 17.09c-1.237-1.14-1.233-3.034 0-4.17L8.11 6.302z"
     );
+
     const fill = document.createElementNS("http://www.w3.org/2000/svg", "path");
     fill.setAttribute("class", "bp3-popover-arrow-fill");
     fill.setAttribute(
       "d",
       "M8.787 7.036c1.22-1.125 2.21-3.376 2.21-5.03V0v30-2.005c0-1.654-.983-3.9-2.21-5.03l-7.183-6.616c-.81-.746-.802-1.96 0-2.7l7.183-6.614z"
     );
+
     svg.append(border, fill);
     arrow.append(svg);
     return arrow;
   }
+
   function makeStatusMenuItem({ label, className = "", ariaCurrent = false, onChoose }) {
     const li = document.createElement("li");
+
     const item = document.createElement("a");
     item.className = `ts-status-choice bp3-menu-item bp3-popover-dismiss ${className}`.trim();
     item.setAttribute("role", "menuitem");
@@ -1529,9 +1501,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       item.setAttribute("aria-current", "true");
       item.classList.add("bp3-active", "bp3-intent-primary");
     }
+
     const text = document.createElement("div");
     text.className = "ts-status-choice-label bp3-fill bp3-text-overflow-ellipsis";
     text.textContent = label;
+
     item.append(text);
     item.addEventListener("mousedown", stopRoamNavigation);
     item.addEventListener("click", (event) => {
@@ -1543,30 +1517,40 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       stopRoamNavigation(event);
       onChoose();
     });
+
     li.append(item);
     return li;
   }
+
   function makeStatusChoiceButton({ statusKey, currentStatusKey, targetUids }) {
     const status = STATUSES[statusKey];
     const item = makeStatusMenuItem({
       label: status?.label || statusKey,
       ariaCurrent: statusKey === currentStatusKey,
       onChoose: () => {
-        void setStatusForBlockUids(targetUids, statusKey).catch((err) => log("Status chooser set error:", err)).finally(closeStatusChooser);
-      }
+        void setStatusForBlockUids(targetUids, statusKey)
+          .catch((err) => log("Status chooser set error:", err))
+          .finally(closeStatusChooser);
+      },
     });
     const choice = item.querySelector(".ts-status-choice");
     if (choice) choice.setAttribute("data-task-status-choice", statusKey);
+
     return item;
   }
+
   async function openStatusChooser({ blockUid, statusKey, anchorEl }) {
     closeStatusChooser();
+
     const targetUids = await getOperationTargetUids({ primaryUid: blockUid });
     if (!targetUids.length) return;
+
     const chooser = document.createElement("div");
     chooser.className = "ts-status-chooser bp3-popover";
+
     const content = document.createElement("div");
     content.className = "bp3-popover-content";
+
     const choices = document.createElement("ul");
     choices.className = "ts-status-choice-list bp3-menu";
     choices.setAttribute("role", "menu");
@@ -1578,33 +1562,39 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       count.append(countText);
       choices.append(count);
     }
+
     CONFIG.cycleOrder.forEach((key) => {
       if (!STATUSES[key]?.active) return;
       choices.append(
         makeStatusChoiceButton({
           statusKey: key,
           currentStatusKey: statusKey,
-          targetUids
+          targetUids,
         })
       );
     });
+
     choices.append(
       makeStatusMenuItem({
         label: "Remove status",
         className: "ts-status-choice-remove",
         onChoose: () => {
-          void setStatusForBlockUids(targetUids, null).catch((err) => log("Status chooser remove error:", err)).finally(closeStatusChooser);
-        }
+          void setStatusForBlockUids(targetUids, null)
+            .catch((err) => log("Status chooser remove error:", err))
+            .finally(closeStatusChooser);
+        },
       })
     );
     content.append(choices);
     chooser.append(makeBlueprintPopoverArrow(), content);
+
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
     positionStatusChooser(chooser, anchorEl);
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
-      preventScroll: true
+      preventScroll: true,
     });
+
     const closeOnOutsideMouseDown = (event) => {
       if (statusChooserEl?.contains(event.target)) return;
       closeStatusChooser();
@@ -1616,10 +1606,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     };
     const closeOnViewportChange = () => closeStatusChooser();
+
     document.addEventListener("mousedown", closeOnOutsideMouseDown, true);
     document.addEventListener("keydown", closeOnKeyDown, true);
     window.addEventListener("resize", closeOnViewportChange, true);
     window.addEventListener("scroll", closeOnViewportChange, true);
+
     statusChooserTeardown = () => {
       document.removeEventListener("mousedown", closeOnOutsideMouseDown, true);
       document.removeEventListener("keydown", closeOnKeyDown, true);
@@ -1627,53 +1619,73 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
   }
+
   function handleStatusMouseDown(event) {
+    // Only intercept primary button clicks
     if (typeof event.button === "number" && event.button !== 0) return;
+
     const ctx = getStatusEventContext(event);
     if (!ctx) return;
+
+    // Roam navigates tags/pages on mousedown; stop that before it reaches target handlers.
     stopRoamNavigation(event);
   }
+
   function handleStatusTouchStart(event) {
     const ctx = getStatusEventContext(event);
     if (!ctx) return;
+
     stopRoamNavigation(event);
   }
+
   async function handleStatusClick(event) {
     const ctx = getStatusEventContext(event);
     if (!ctx) return;
+
     stopRoamNavigation(event);
+
     if (CONFIG.shiftClickRemoves && event.shiftKey) {
       await setStatusForTargets(ctx.blockUid, null);
       return;
     }
+
     await openStatusChooser(ctx);
   }
+
   function registerSlashCommand(statusKey) {
     const status = STATUSES[statusKey];
     const label = `task status: ${status.label}`;
+
     window.roamAlphaAPI.ui.slashCommand.addCommand({
       label,
       callback: (context) => {
         void (async () => {
           const blockUid = context["block-uid"];
           const indexes = context["indexes"];
+
+          // Prefer live editor value (avoids clobbering unsaved text while typing)
           const liveEditorString = getLiveBlockInputValue(blockUid);
           let blockString = liveEditorString ?? getBlockString(blockUid);
           if (blockString === null) return;
+
           blockString = getTextHelpers().removeSlashCommandFragment(blockString, indexes);
+
           await setBlockStatus(blockUid, statusKey, {
-            editorString: liveEditorString === null ? void 0 : blockString,
-            expectedLiveEditorString: liveEditorString === null ? void 0 : liveEditorString
+            editorString: liveEditorString === null ? undefined : blockString,
+            expectedLiveEditorString: liveEditorString === null ? undefined : liveEditorString,
           });
         })().catch((err) => log("Slash command error:", err));
         return null;
-      }
+      },
     });
+
     registeredCommands.slash.push(label);
   }
+
   function registerContextMenu(statusKey) {
     const status = STATUSES[statusKey];
     const label = `Task Status: Set ${status.label}`;
+
     window.roamAlphaAPI.ui.blockContextMenu.addCommand({
       label,
       "display-conditional": (context) => {
@@ -1687,26 +1699,33 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         const blockUid = context?.["block-uid"];
         if (!blockUid) return;
         await setStatusForTargets(blockUid, statusKey, context);
-      }
+      },
     });
+
     registeredCommands.contextMenu.push(label);
   }
+
   function registerMultiSelectContextMenu(statusKey) {
     const api = window.roamAlphaAPI?.ui?.msContextMenu;
     if (!api?.addCommand) return;
+
     const status = STATUSES[statusKey];
     const label = `Task Status: Set ${status.label}`;
+
     api.addCommand({
       label,
       callback: async (context) => {
         await setStatusForTargets(null, statusKey, context);
-      }
+      },
     });
+
     registeredCommands.msContextMenu.push({ label, api });
   }
+
   async function registerPaletteCommand(statusKey) {
     const status = STATUSES[statusKey];
     const label = `Task Status: Set ${status.label}`;
+
     const api = extensionAPI?.ui?.commandPalette || window.roamAlphaAPI.ui.commandPalette;
     try {
       const res = api.addCommand({
@@ -1714,16 +1733,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         "disable-hotkey": false,
         callback: async () => {
           await setStatusForTargets(null, statusKey);
-        }
+        },
       });
       if (isThenable(res)) await res;
     } catch (err) {
       log("Failed to add palette command:", label, err);
     }
+
     registeredCommands.palette.push({ label, api });
   }
+
   async function registerUtilityPaletteCommands() {
     const api = extensionAPI?.ui?.commandPalette || window.roamAlphaAPI.ui.commandPalette;
+
     const cycleLabel = "Task Status: Cycle";
     try {
       const res = api.addCommand({
@@ -1731,13 +1753,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         "disable-hotkey": false,
         callback: async () => {
           await cycleStatusForTargets(null);
-        }
+        },
       });
       if (isThenable(res)) await res;
     } catch (err) {
       log("Failed to add palette command:", cycleLabel, err);
     }
     registeredCommands.palette.push({ label: cycleLabel, api });
+
     const msApi = window.roamAlphaAPI?.ui?.msContextMenu;
     if (msApi?.addCommand) {
       try {
@@ -1745,13 +1768,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           label: cycleLabel,
           callback: async (context) => {
             await cycleStatusForTargets(null, context);
-          }
+          },
         });
         registeredCommands.msContextMenu.push({ label: cycleLabel, api: msApi });
       } catch (err) {
         log("Failed to add multiselect context menu command:", cycleLabel, err);
       }
     }
+
     const removeLabel = "Task Status: Remove";
     try {
       const res = api.addCommand({
@@ -1759,20 +1783,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         "disable-hotkey": false,
         callback: async () => {
           await setStatusForTargets(null, null);
-        }
+        },
       });
       if (isThenable(res)) await res;
     } catch (err) {
       log("Failed to add palette command:", removeLabel, err);
     }
     registeredCommands.palette.push({ label: removeLabel, api });
+
     if (msApi?.addCommand) {
       try {
         msApi.addCommand({
           label: removeLabel,
           callback: async (context) => {
             await setStatusForTargets(null, null, context);
-          }
+          },
         });
         registeredCommands.msContextMenu.push({ label: removeLabel, api: msApi });
       } catch (err) {
@@ -1780,6 +1805,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }
   }
+
   async function registerAllCommands() {
     for (const statusKey of CONFIG.cycleOrder) {
       registerSlashCommand(statusKey);
@@ -1787,77 +1813,107 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       registerMultiSelectContextMenu(statusKey);
       await registerPaletteCommand(statusKey);
     }
+
     await registerUtilityPaletteCommands();
   }
+
   async function unregisterAllCommands() {
     registeredCommands.slash.forEach((label) => {
       try {
         window.roamAlphaAPI.ui.slashCommand.removeCommand({ label });
-      } catch (_) {
-      }
+      } catch (_) {}
     });
+
     registeredCommands.contextMenu.forEach((label) => {
       try {
         window.roamAlphaAPI.ui.blockContextMenu.removeCommand({ label });
-      } catch (_) {
-      }
+      } catch (_) {}
     });
+
     registeredCommands.msContextMenu.forEach((entry) => {
       try {
         entry.api.removeCommand({ label: entry.label });
-      } catch (_) {
-      }
+      } catch (_) {}
     });
+
     for (const entry of registeredCommands.palette) {
       try {
         const res = entry.api.removeCommand({ label: entry.label });
         if (isThenable(res)) await res;
-      } catch (_) {
-      }
+      } catch (_) {}
     }
+
     registeredCommands.slash = [];
     registeredCommands.contextMenu = [];
     registeredCommands.msContextMenu = [];
     registeredCommands.palette = [];
   }
+
   async function registerSettingsPanel() {
     if (!extensionAPI?.settings?.panel?.create) return;
+
     const React = window.React;
+
     const StatusNamesPanel = () => {
       if (!React?.useState || !React?.useEffect || !React?.useRef) {
-        return React?.createElement ? React.createElement(
-          "div",
-          { className: "bp3-text-small" },
-          "React not available."
-        ) : null;
+        return React?.createElement
+          ? React.createElement(
+              "div",
+              { className: "bp3-text-small" },
+              "React not available."
+            )
+          : null;
       }
+
       const rootRef = React.useRef(null);
+
       React.useEffect(() => {
         try {
           const root = rootRef.current;
           if (!root?.closest) return;
-          const formGroup = root.closest(".bp3-form-group") || root.closest(".bp4-form-group") || root.closest(".bp5-form-group") || root.parentElement;
+
+          const formGroup =
+            root.closest(".bp3-form-group") ||
+            root.closest(".bp4-form-group") ||
+            root.closest(".bp5-form-group") ||
+            root.parentElement;
           if (!formGroup?.querySelector) return;
-          const label = formGroup.querySelector("label.bp3-label") || formGroup.querySelector(".bp3-label") || formGroup.querySelector("label.bp4-label") || formGroup.querySelector(".bp4-label") || formGroup.querySelector("label.bp5-label") || formGroup.querySelector(".bp5-label");
+
+          const label =
+            formGroup.querySelector("label.bp3-label") ||
+            formGroup.querySelector(".bp3-label") ||
+            formGroup.querySelector("label.bp4-label") ||
+            formGroup.querySelector(".bp4-label") ||
+            formGroup.querySelector("label.bp5-label") ||
+            formGroup.querySelector(".bp5-label");
           const labelWidth = label ? label.getBoundingClientRect().width : 0;
           if (label) label.style.display = "none";
-          const content = formGroup.querySelector(".bp3-form-content") || formGroup.querySelector(".bp4-form-content") || formGroup.querySelector(".bp5-form-content");
+
+          const content =
+            formGroup.querySelector(".bp3-form-content") ||
+            formGroup.querySelector(".bp4-form-content") ||
+            formGroup.querySelector(".bp5-form-content");
           if (content) {
             content.style.marginLeft = "0";
             content.style.width = "100%";
           }
+
+          // Roam's extension settings layout is two-column (label + content). To avoid
+          // having this UI pinned to the far right, expand across the label column.
           if (labelWidth > 0) {
             root.style.position = "relative";
             root.style.left = `-${Math.round(labelWidth)}px`;
             root.style.width = `calc(100% + ${Math.round(labelWidth)}px)`;
           }
-        } catch (_) {
-        }
+        } catch (_) {}
       }, []);
-      const readStatusRows = () => statusList.map((entry) => ({
-        key: entry.key,
-        name: STATUSES?.[entry.key]?.name ?? entry.name
-      }));
+
+      const readStatusRows = () =>
+        statusList.map((entry) => ({
+          key: entry.key,
+          name: STATUSES?.[entry.key]?.name ?? entry.name,
+        }));
+
       const rowsToNameMap = (rows) => {
         const out = {};
         (rows || []).forEach((row) => {
@@ -1865,14 +1921,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         });
         return out;
       };
+
       const [statusRows, setStatusRows] = React.useState(() => readStatusRows());
       const order = statusRows.map((row) => row.key);
+
       const readSaved = () => rowsToNameMap(readStatusRows());
-      const [savedByKey, setSavedByKey] = React.useState(
-        () => rowsToNameMap(statusRows)
+
+      const [savedByKey, setSavedByKey] = React.useState(() =>
+        rowsToNameMap(statusRows)
       );
-      const [draftByKey, setDraftByKey] = React.useState(
-        () => rowsToNameMap(statusRows)
+      const [draftByKey, setDraftByKey] = React.useState(() =>
+        rowsToNameMap(statusRows)
       );
       const [workingKey, setWorkingKey] = React.useState(null);
       const [errorByKey, setErrorByKey] = React.useState({});
@@ -1884,9 +1943,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const [dragState, setDragState] = React.useState({
         key: null,
         targetKey: null,
-        placement: null
+        placement: null,
       });
       const [openColorPopover, setOpenColorPopover] = React.useState(null);
+
       React.useEffect(() => {
         const closePanels = (event) => {
           const root = rootRef.current;
@@ -1900,11 +1960,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setOpenStatusMenuKey(null);
           setOpenColorPopover(null);
         };
+
         const closeOnEscape = (event) => {
           if (event.key !== "Escape") return;
           setOpenStatusMenuKey(null);
           setOpenColorPopover(null);
         };
+
         document.addEventListener("mousedown", closePanels, true);
         document.addEventListener("keydown", closeOnEscape, true);
         return () => {
@@ -1912,6 +1974,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           document.removeEventListener("keydown", closeOnEscape, true);
         };
       }, []);
+
       const refreshStatusRows = () => {
         const rows = readStatusRows();
         const names = rowsToNameMap(rows);
@@ -1920,13 +1983,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         setDraftByKey(names);
         return { rows, names };
       };
+
       const setDraft = (k, v) => {
         setDraftByKey((prev) => ({ ...prev, [k]: v }));
       };
+
       const clearMessages = (k) => {
         setErrorByKey((prev) => ({ ...prev, [k]: null }));
         setInfoByKey((prev) => ({ ...prev, [k]: null }));
       };
+
       const apply = async (k, renameExisting) => {
         clearMessages(k);
         setWorkingKey(k);
@@ -1936,10 +2002,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
             setInfoByKey((prev) => ({ ...prev, [k]: "No change." }));
             return;
           }
+
           refreshStatusRows();
           setInfoByKey((prev) => ({
             ...prev,
-            [k]: renameExisting ? "Renamed tag page." : "Updated name."
+            [k]: renameExisting
+              ? "Renamed tag page."
+              : "Updated name.",
           }));
         } catch (e) {
           const msg = e?.message || String(e);
@@ -1948,11 +2017,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingKey(null);
         }
       };
+
       const addStatusFromDraft = async () => {
         const error = validateNewStatusName(newStatusName);
         setNewStatusError(error);
         setNewStatusInfo(null);
         if (error) return;
+
         setWorkingKey("__ADD__");
         try {
           const added = await addStatus(newStatusName);
@@ -1966,8 +2037,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingKey(null);
         }
       };
+
       const reorderStatusRow = async (k, targetKey, placement) => {
         if (!k || !targetKey || k === targetKey) return;
+
         clearMessages(k);
         setOpenStatusMenuKey(null);
         setWorkingKey(k);
@@ -1981,6 +2054,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setDragState({ key: null, targetKey: null, placement: null });
         }
       };
+
       const deleteStatusRow = async (k) => {
         setOpenStatusMenuKey(null);
         const label = savedByKey[k] || STATUSES?.[k]?.label || k;
@@ -1988,6 +2062,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           `Delete "${label}" from active statuses? Existing tags will remain in the graph but will no longer be managed by this extension.`
         );
         if (!ok) return;
+
         clearMessages(k);
         setWorkingKey(k);
         try {
@@ -2000,6 +2075,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingKey(null);
         }
       };
+
       const onStatusDragStart = (event, k) => {
         if (workingKey) {
           event.preventDefault();
@@ -2010,44 +2086,53 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         try {
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", k);
-        } catch (_) {
-        }
+        } catch (_) {}
       };
+
       const onStatusDragOver = (event, k) => {
         const draggedKey = dragState.key;
         if (!draggedKey || draggedKey === k || workingKey) return;
         event.preventDefault();
         try {
           event.dataTransfer.dropEffect = "move";
-        } catch (_) {
-        }
+        } catch (_) {}
+
         const rect = event.currentTarget.getBoundingClientRect();
         const placement = event.clientY > rect.top + rect.height / 2 ? "after" : "before";
         if (dragState.targetKey !== k || dragState.placement !== placement) {
           setDragState((prev) => ({ ...prev, targetKey: k, placement }));
         }
       };
+
       const onStatusDrop = (event, targetKey) => {
         event.preventDefault();
-        const draggedKey = dragState.key || (() => {
-          try {
-            return event.dataTransfer.getData("text/plain");
-          } catch (_) {
-            return null;
-          }
-        })();
-        const placement = dragState.targetKey === targetKey && dragState.placement ? dragState.placement : "before";
+        const draggedKey =
+          dragState.key ||
+          (() => {
+            try {
+              return event.dataTransfer.getData("text/plain");
+            } catch (_) {
+              return null;
+            }
+          })();
+        const placement =
+          dragState.targetKey === targetKey && dragState.placement
+            ? dragState.placement
+            : "before";
         void reorderStatusRow(draggedKey, targetKey, placement);
       };
+
       const onStatusDragEnd = () => {
         setDragState({ key: null, targetKey: null, placement: null });
       };
+
       const normalizeColorEntry = (entry) => {
         return {
           base: normalizeCssColorValue(entry?.base),
-          text: normalizeCssColorValue(entry?.text)
+          text: normalizeCssColorValue(entry?.text),
         };
       };
+
       const normalizeColorsState = (overrides) => {
         const out = {};
         order.forEach((k) => {
@@ -2055,28 +2140,34 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         });
         return out;
       };
+
       const readSavedColors = () => {
         const stored = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
         return normalizeColorsState(stored);
       };
+
       const [savedColorsByKey, setSavedColorsByKey] = React.useState(() => readSavedColors());
       const [draftColorsByKey, setDraftColorsByKey] = React.useState(() => readSavedColors());
       const [workingColorKey, setWorkingColorKey] = React.useState(null);
       const [colorErrorByKey, setColorErrorByKey] = React.useState({});
       const [colorInfoByKey, setColorInfoByKey] = React.useState({});
+
       const setDraftColors = (k, patch) => {
         setDraftColorsByKey((prev) => ({
           ...prev,
-          [k]: { ...prev[k] || {}, ...patch || {} }
+          [k]: { ...(prev[k] || {}), ...(patch || {}) },
         }));
       };
+
       const clearColorMessages = (k) => {
         setColorErrorByKey((prev) => ({ ...prev, [k]: null }));
         setColorInfoByKey((prev) => ({ ...prev, [k]: null }));
       };
+
       const validateColorEntry = (entry) => {
         const base = normalizeCssColorValue(entry?.base);
         const text = normalizeCssColorValue(entry?.text);
+
         if (base && !cssColorIsSupported(base)) {
           return "Base color must be a valid CSS color (e.g. #14b8a6, rgb(20,184,166)).";
         }
@@ -2088,9 +2179,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         }
         return null;
       };
+
       const applyColors = async (k, nextEntry) => {
         clearColorMessages(k);
         setWorkingColorKey(k);
+
         try {
           const normalized = normalizeColorEntry(nextEntry);
           const validation = validateColorEntry(normalized);
@@ -2098,19 +2191,24 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
             setColorErrorByKey((prev) => ({ ...prev, [k]: validation }));
             return;
           }
+
           const base = normalized.base;
           const text = normalized.text;
           const current = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
-          const nextOverrides = { ...current || {} };
+          const nextOverrides = { ...(current || {}) };
+
           if (!base && !text) {
             delete nextOverrides[k];
           } else {
             nextOverrides[k] = { base, text };
           }
+
           await saveSettingAsync(SETTINGS_KEYS.statusColorOverrides, nextOverrides);
           statusColorOverrides = nextOverrides;
+
           clearStatusColorOverrides();
           applyStatusColorOverrides(statusColorOverrides);
+
           const refreshed = normalizeColorsState(nextOverrides);
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
@@ -2122,6 +2220,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingColorKey(null);
         }
       };
+
       const resetAllColors = async () => {
         const key = "__ALL__";
         clearColorMessages(key);
@@ -2131,6 +2230,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           await saveSettingAsync(SETTINGS_KEYS.statusColorOverrides, nextOverrides);
           statusColorOverrides = nextOverrides;
           applyStatusColorOverrides(statusColorOverrides);
+
           const refreshed = normalizeColorsState(nextOverrides);
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
@@ -2142,6 +2242,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingColorKey(null);
         }
       };
+
       const clamp8 = (n) => {
         const v = Math.round(Number(n));
         if (!Number.isFinite(v)) return 0;
@@ -2149,6 +2250,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         if (v > 255) return 255;
         return v;
       };
+
       const rgbToHex = (rgb) => {
         const r = clamp8(rgb?.r);
         const g = clamp8(rgb?.g);
@@ -2156,66 +2258,77 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         const to2 = (x) => x.toString(16).padStart(2, "0");
         return `#${to2(r)}${to2(g)}${to2(b)}`;
       };
+
       const colorToHex = (value, fallback) => {
         const rgb = parseCssColorToRgb(value) || parseCssColorToRgb(fallback);
         return rgb ? rgbToHex(rgb) : "#000000";
       };
-      const makeRowMenuButton = ({ label, icon, disabled, intent, onClick }) => React.createElement(
-        "li",
-        null,
+
+      const makeRowMenuButton = ({ label, icon, disabled, intent, onClick }) =>
         React.createElement(
-          "button",
-          {
-            type: "button",
-            className: `bp3-menu-item ${icon ? `bp3-icon-${icon}` : ""} ${intent ? `bp3-intent-${intent}` : ""}`.trim(),
-            disabled: Boolean(disabled),
-            role: "menuitem",
-            onClick
-          },
-          React.createElement("div", { className: "bp3-fill" }, label)
-        )
-      );
-      const renderStatusRowMenu = (k, label) => React.createElement(
-        "div",
-        { className: "ts-status-row-menu-wrap" },
-        React.createElement("button", {
-          type: "button",
-          className: "bp3-button bp3-small bp3-minimal bp3-icon-more ts-status-row-menu-button",
-          disabled: Boolean(workingKey),
-          title: `Actions for ${label}`,
-          "aria-label": `Actions for ${label}`,
-          "aria-haspopup": "menu",
-          "aria-expanded": openStatusMenuKey === k ? "true" : "false",
-          onClick: (event) => {
-            event.preventDefault();
-            setOpenColorPopover(null);
-            setOpenStatusMenuKey((prev) => prev === k ? null : k);
-          }
-        }),
-        openStatusMenuKey === k ? React.createElement(
-          "div",
-          { className: "ts-status-row-menu bp3-popover" },
+          "li",
+          null,
           React.createElement(
-            "div",
-            { className: "bp3-popover-content" },
-            React.createElement(
-              "ul",
-              { className: "bp3-menu", role: "menu" },
-              makeRowMenuButton({
-                label: "Delete",
-                icon: "trash",
-                intent: "danger",
-                disabled: order.length <= 1,
-                onClick: () => void deleteStatusRow(k)
-              })
-            )
+            "button",
+            {
+              type: "button",
+              className: `bp3-menu-item ${
+                icon ? `bp3-icon-${icon}` : ""
+              } ${intent ? `bp3-intent-${intent}` : ""}`.trim(),
+              disabled: Boolean(disabled),
+              role: "menuitem",
+              onClick,
+            },
+            React.createElement("div", { className: "bp3-fill" }, label)
           )
-        ) : null
-      );
+        );
+
+      const renderStatusRowMenu = (k, label) =>
+        React.createElement(
+          "div",
+          { className: "ts-status-row-menu-wrap" },
+          React.createElement("button", {
+            type: "button",
+            className: "bp3-button bp3-small bp3-minimal bp3-icon-more ts-status-row-menu-button",
+            disabled: Boolean(workingKey),
+            title: `Actions for ${label}`,
+            "aria-label": `Actions for ${label}`,
+            "aria-haspopup": "menu",
+            "aria-expanded": openStatusMenuKey === k ? "true" : "false",
+            onClick: (event) => {
+              event.preventDefault();
+              setOpenColorPopover(null);
+              setOpenStatusMenuKey((prev) => (prev === k ? null : k));
+            },
+          }),
+          openStatusMenuKey === k
+            ? React.createElement(
+                "div",
+                { className: "ts-status-row-menu bp3-popover" },
+                React.createElement(
+                  "div",
+                  { className: "bp3-popover-content" },
+                  React.createElement(
+                    "ul",
+                    { className: "bp3-menu", role: "menu" },
+                    makeRowMenuButton({
+                      label: "Delete",
+                      icon: "trash",
+                      intent: "danger",
+                      disabled: order.length <= 1,
+                      onClick: () => void deleteStatusRow(k),
+                    })
+                  )
+                )
+              )
+            : null
+        );
+
       const setColorDraftValue = (k, channel, value) => {
         clearColorMessages(k);
         setDraftColors(k, { [channel]: value });
       };
+
       const renderColorPopover = ({
         k,
         channel,
@@ -2223,11 +2336,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         draftValue,
         hexValue,
         fallbackValue,
-        disabled
+        disabled,
       }) => {
         const popoverKey = `${k}:${channel}`;
         const isText = channel === "text";
         const isOpen = openColorPopover === popoverKey;
+
         return React.createElement(
           "div",
           { className: "ts-status-color-picker-wrap" },
@@ -2244,12 +2358,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               onClick: (event) => {
                 event.preventDefault();
                 setOpenStatusMenuKey(null);
-                setOpenColorPopover((prev) => prev === popoverKey ? null : popoverKey);
-              }
+                setOpenColorPopover((prev) => (prev === popoverKey ? null : popoverKey));
+              },
             },
             React.createElement("span", {
               className: "ts-status-color-swatch-dot",
-              style: { backgroundColor: hexValue }
+              style: { backgroundColor: hexValue },
             }),
             React.createElement(
               "span",
@@ -2257,95 +2371,103 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               label
             )
           ),
-          isOpen ? React.createElement(
-            "div",
-            { className: "ts-status-color-popover bp3-popover", role: "dialog" },
-            React.createElement(
-              "div",
-              { className: "bp3-popover-content" },
-              React.createElement(
+          isOpen
+            ? React.createElement(
                 "div",
-                { className: "ts-status-color-popover-inner" },
+                { className: "ts-status-color-popover bp3-popover", role: "dialog" },
                 React.createElement(
                   "div",
-                  { className: "ts-status-color-popover-title" },
-                  label
-                ),
-                React.createElement(
-                  "div",
-                  { className: "ts-status-color-preset-grid" },
-                  ...STATUS_COLOR_PRESETS.map(
-                    (preset) => React.createElement("button", {
-                      key: preset.value,
-                      type: "button",
-                      className: "ts-status-color-preset",
-                      style: { backgroundColor: preset.value },
-                      title: preset.name,
-                      "aria-label": `Use ${preset.name}`,
-                      onClick: () => setColorDraftValue(k, channel, preset.value)
-                    })
-                  )
-                ),
-                React.createElement(
-                  "div",
-                  { className: "ts-status-color-custom-row" },
-                  React.createElement("input", {
-                    type: "color",
-                    className: "ts-status-native-color-input",
-                    value: hexValue,
-                    disabled,
-                    onChange: (e) => setColorDraftValue(k, channel, e.target.value),
-                    "aria-label": `${label} native color picker`
-                  }),
-                  React.createElement("input", {
-                    className: "bp3-input bp3-small ts-status-color-input",
-                    value: draftValue,
-                    disabled,
-                    placeholder: isText ? "Optional text color" : fallbackValue || "#14b8a6",
-                    onChange: (e) => setColorDraftValue(k, channel, e.target.value),
-                    "aria-label": `${label} color value`
-                  })
-                ),
-                React.createElement(
-                  "div",
-                  { className: "ts-status-color-popover-actions" },
+                  { className: "bp3-popover-content" },
                   React.createElement(
-                    "button",
-                    {
-                      type: "button",
-                      className: "bp3-button bp3-small bp3-minimal",
-                      disabled,
-                      onClick: () => setColorDraftValue(k, channel, "")
-                    },
-                    isText ? "Clear Text" : "Clear Base"
+                    "div",
+                    { className: "ts-status-color-popover-inner" },
+                    React.createElement(
+                      "div",
+                      { className: "ts-status-color-popover-title" },
+                      label
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "ts-status-color-preset-grid" },
+                      ...STATUS_COLOR_PRESETS.map((preset) =>
+                        React.createElement("button", {
+                          key: preset.value,
+                          type: "button",
+                          className: "ts-status-color-preset",
+                          style: { backgroundColor: preset.value },
+                          title: preset.name,
+                          "aria-label": `Use ${preset.name}`,
+                          onClick: () => setColorDraftValue(k, channel, preset.value),
+                        })
+                      )
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "ts-status-color-custom-row" },
+                      React.createElement("input", {
+                        type: "color",
+                        className: "ts-status-native-color-input",
+                        value: hexValue,
+                        disabled,
+                        onChange: (e) => setColorDraftValue(k, channel, e.target.value),
+                        "aria-label": `${label} native color picker`,
+                      }),
+                      React.createElement("input", {
+                        className: "bp3-input bp3-small ts-status-color-input",
+                        value: draftValue,
+                        disabled,
+                        placeholder: isText ? "Optional text color" : fallbackValue || "#14b8a6",
+                        onChange: (e) => setColorDraftValue(k, channel, e.target.value),
+                        "aria-label": `${label} color value`,
+                      })
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "ts-status-color-popover-actions" },
+                      React.createElement(
+                        "button",
+                        {
+                          type: "button",
+                          className: "bp3-button bp3-small bp3-minimal",
+                          disabled,
+                          onClick: () => setColorDraftValue(k, channel, ""),
+                        },
+                        isText ? "Clear Text" : "Clear Base"
+                      )
+                    )
                   )
                 )
               )
-            )
-          ) : null
+            : null
         );
       };
+
       const getColorControlState = (k) => {
         const saved = savedColorsByKey[k] || { base: "", text: "" };
         const draft = draftColorsByKey[k] || { base: "", text: "" };
+
         const savedBase = normalizeCssColorValue(saved.base);
         const savedText = normalizeCssColorValue(saved.text);
         const draftBase = normalizeCssColorValue(draft.base);
         const draftText = normalizeCssColorValue(draft.text);
+
         const dirty = savedBase !== draftBase || savedText !== draftText;
-        const validation = dirty ? validateColorEntry({ base: draftBase, text: draftText }) : null;
+        const validation = dirty
+          ? validateColorEntry({ base: draftBase, text: draftText })
+          : null;
         const vars = getStatusCssVarNames(k);
         const effectiveDefault = getDefaultStatusColor(k);
         const baseSwatchSource = draftBase || effectiveDefault;
         const textSwatchSource = draftText || draftBase || effectiveDefault;
         const previewValues = deriveStatusColorValues(k, {
           base: draftBase,
-          text: draftText
+          text: draftText,
         });
         const previewStyle = {};
         if (previewValues.bg) previewStyle[vars.bg] = previewValues.bg;
         if (previewValues.border) previewStyle[vars.border] = previewValues.border;
         if (previewValues.fg) previewStyle[vars.fg] = previewValues.fg;
+
         return {
           savedBase,
           savedText,
@@ -2360,84 +2482,97 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           baseSwatchSource,
           baseHex: colorToHex(baseSwatchSource, "#000000"),
           textHex: colorToHex(textSwatchSource, baseSwatchSource || "#000000"),
-          previewStyle
+          previewStyle,
         };
       };
-      const renderInlineColorControls = (k, state) => React.createElement(
-        React.Fragment,
-        null,
+
+      const renderInlineColorControls = (k, state) =>
         React.createElement(
-          "div",
-          { className: "ts-status-inline-colors" },
-          renderColorPopover({
-            k,
-            channel: "base",
-            label: "Base",
-            draftValue: state.draftBase,
-            hexValue: state.baseHex,
-            fallbackValue: "#14b8a6",
-            disabled: state.isWorking
-          }),
-          renderColorPopover({
-            k,
-            channel: "text",
-            label: "Text",
-            draftValue: state.draftText,
-            hexValue: state.textHex,
-            fallbackValue: state.baseSwatchSource || "#000000",
-            disabled: state.isWorking
-          })
-        ),
-        state.dirty ? React.createElement(
-          "div",
-          { className: "bp3-button-group ts-status-inline-color-actions" },
+          React.Fragment,
+          null,
           React.createElement(
-            "button",
-            {
-              type: "button",
-              className: "bp3-button bp3-small bp3-intent-primary bp3-icon-tick ts-status-color-commit-button",
-              disabled: state.isWorking || Boolean(state.validation),
-              title: "Apply color changes",
-              "aria-label": "Apply color changes",
-              onClick: () => applyColors(k, {
-                base: state.draftBase,
-                text: state.draftText
-              })
-            }
-          ),
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: "bp3-button bp3-small bp3-minimal bp3-icon-cross ts-status-color-commit-button",
+            "div",
+            { className: "ts-status-inline-colors" },
+            renderColorPopover({
+              k,
+              channel: "base",
+              label: "Base",
+              draftValue: state.draftBase,
+              hexValue: state.baseHex,
+              fallbackValue: "#14b8a6",
               disabled: state.isWorking,
-              title: "Revert color changes",
-              "aria-label": "Revert color changes",
-              onClick: () => {
-                clearColorMessages(k);
-                setDraftColorsByKey((prev) => ({
-                  ...prev,
-                  [k]: { base: state.savedBase, text: state.savedText }
-                }));
-              }
-            }
-          )
-        ) : state.hasSavedOverride ? React.createElement(
-          "button",
-          {
-            type: "button",
-            className: "bp3-button bp3-small bp3-minimal ts-status-inline-color-actions",
-            disabled: state.isWorking,
-            onClick: () => applyColors(k, { base: "", text: "" })
-          },
-          "Clear"
-        ) : null,
-        state.isWorking && workingColorKey === k ? React.createElement(
-          "span",
-          { className: "bp3-text-small", style: { opacity: 0.7 } },
-          "Working..."
-        ) : null
-      );
+            }),
+            renderColorPopover({
+              k,
+              channel: "text",
+              label: "Text",
+              draftValue: state.draftText,
+              hexValue: state.textHex,
+              fallbackValue: state.baseSwatchSource || "#000000",
+              disabled: state.isWorking,
+            })
+          ),
+          state.dirty
+            ? React.createElement(
+                "div",
+                { className: "bp3-button-group ts-status-inline-color-actions" },
+                React.createElement(
+                  "button",
+                  {
+                    type: "button",
+                    className:
+                      "bp3-button bp3-small bp3-intent-primary bp3-icon-tick ts-status-color-commit-button",
+                    disabled: state.isWorking || Boolean(state.validation),
+                    title: "Apply color changes",
+                    "aria-label": "Apply color changes",
+                    onClick: () =>
+                      applyColors(k, {
+                        base: state.draftBase,
+                        text: state.draftText,
+                      }),
+                  }
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    type: "button",
+                    className:
+                      "bp3-button bp3-small bp3-minimal bp3-icon-cross ts-status-color-commit-button",
+                    disabled: state.isWorking,
+                    title: "Revert color changes",
+                    "aria-label": "Revert color changes",
+                    onClick: () => {
+                      clearColorMessages(k);
+                      setDraftColorsByKey((prev) => ({
+                        ...prev,
+                        [k]: { base: state.savedBase, text: state.savedText },
+                      }));
+                    },
+                  }
+                )
+              )
+            : state.hasSavedOverride
+              ? React.createElement(
+                  "button",
+                  {
+                    type: "button",
+                    className:
+                      "bp3-button bp3-small bp3-minimal ts-status-inline-color-actions",
+                    disabled: state.isWorking,
+                    onClick: () => applyColors(k, { base: "", text: "" }),
+                  },
+                  "Clear"
+                )
+              : null,
+          state.isWorking && workingColorKey === k
+            ? React.createElement(
+                "span",
+                { className: "bp3-text-small", style: { opacity: 0.7 } },
+                "Working..."
+              )
+            : null
+        );
+
       const addStatusRow = React.createElement(
         "div",
         { className: "ts-status-add-row", key: "add-status" },
@@ -2446,7 +2581,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           { className: "ts-status-row-main" },
           React.createElement("span", {
             className: "ts-status-add-spacer",
-            "aria-hidden": "true"
+            "aria-hidden": "true",
           }),
           React.createElement("input", {
             className: "bp3-input bp3-small ts-status-name-input",
@@ -2464,7 +2599,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                 void addStatusFromDraft();
               }
             },
-            "aria-label": "New status name"
+            "aria-label": "New status name",
           }),
           React.createElement(
             "button",
@@ -2472,22 +2607,27 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               type: "button",
               className: "bp3-button bp3-small bp3-intent-primary",
               disabled: Boolean(workingKey) || !normalizeStatusName(newStatusName),
-              onClick: () => addStatusFromDraft()
+              onClick: () => addStatusFromDraft(),
             },
             "Add Status"
           ),
-          newStatusError ? React.createElement(
-            "span",
-            { className: "bp3-text-small ts-status-row-error" },
-            newStatusError
-          ) : null,
-          !newStatusError && newStatusInfo ? React.createElement(
-            "span",
-            { className: "bp3-text-small ts-status-row-info" },
-            newStatusInfo
-          ) : null
+          newStatusError
+            ? React.createElement(
+                "span",
+                { className: "bp3-text-small ts-status-row-error" },
+                newStatusError
+              )
+            : null,
+          !newStatusError && newStatusInfo
+            ? React.createElement(
+                "span",
+                { className: "bp3-text-small ts-status-row-info" },
+                newStatusInfo
+              )
+            : null
         )
       );
+
       return React.createElement(
         "div",
         { className: "ts-status-names-panel", ref: rootRef },
@@ -2516,20 +2656,24 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                   type: "button",
                   className: "bp3-button bp3-small bp3-minimal",
                   disabled: workingColorKey != null,
-                  onClick: () => resetAllColors()
+                  onClick: () => resetAllColors(),
                 },
                 "Reset colors"
               ),
-              colorErrorByKey["__ALL__"] ? React.createElement(
-                "span",
-                { className: "bp3-text-small ts-status-colors-toolbar-error" },
-                colorErrorByKey["__ALL__"]
-              ) : null,
-              !colorErrorByKey["__ALL__"] && colorInfoByKey["__ALL__"] ? React.createElement(
-                "span",
-                { className: "bp3-text-small ts-status-colors-toolbar-info" },
-                colorInfoByKey["__ALL__"]
-              ) : null
+              colorErrorByKey["__ALL__"]
+                ? React.createElement(
+                    "span",
+                    { className: "bp3-text-small ts-status-colors-toolbar-error" },
+                    colorErrorByKey["__ALL__"]
+                  )
+                : null,
+              !colorErrorByKey["__ALL__"] && colorInfoByKey["__ALL__"]
+                ? React.createElement(
+                    "span",
+                    { className: "bp3-text-small ts-status-colors-toolbar-info" },
+                    colorInfoByKey["__ALL__"]
+                  )
+                : null
             )
           ),
           React.createElement(
@@ -2541,37 +2685,41 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               const dirty = normalizeStatusName(draft) !== normalizeStatusName(saved);
               const validation = dirty ? validateNewStatusName(draft, k) : null;
               const showPrompt = dirty && !validation && !workingKey;
-              const prompt = showPrompt ? React.createElement(
-                "div",
-                { className: "ts-rename-prompt" },
-                React.createElement(
-                  "span",
-                  { className: "bp3-text-small ts-rename-prompt-label" },
-                  "Rename tag page?"
-                ),
-                React.createElement(
-                  "div",
-                  { className: "bp3-button-group" },
-                  React.createElement(
-                    "button",
-                    {
-                      type: "button",
-                      className: "bp3-button bp3-small bp3-intent-primary",
-                      onClick: () => apply(k, true)
-                    },
-                    "Yes"
-                  ),
-                  React.createElement(
-                    "button",
-                    {
-                      type: "button",
-                      className: "bp3-button bp3-small",
-                      onClick: () => apply(k, false)
-                    },
-                    "No"
+
+              const prompt = showPrompt
+                ? React.createElement(
+                    "div",
+                    { className: "ts-rename-prompt" },
+                      React.createElement(
+                        "span",
+                        { className: "bp3-text-small ts-rename-prompt-label" },
+                      "Rename tag page?"
+                      ),
+                    React.createElement(
+                      "div",
+                      { className: "bp3-button-group" },
+                      React.createElement(
+                        "button",
+                        {
+                          type: "button",
+                          className: "bp3-button bp3-small bp3-intent-primary",
+                          onClick: () => apply(k, true),
+                        },
+                        "Yes"
+                      ),
+                      React.createElement(
+                        "button",
+                        {
+                          type: "button",
+                          className: "bp3-button bp3-small",
+                          onClick: () => apply(k, false),
+                        },
+                        "No"
+                      )
+                    )
                   )
-                )
-              ) : null;
+                : null;
+
               const error = validation || errorByKey[k];
               const info = infoByKey[k];
               const colorState = getColorControlState(k);
@@ -2582,8 +2730,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                 "ts-status-row",
                 "ts-status-edit-row",
                 dragState.key === k ? "ts-status-row-dragging" : "",
-                dragState.targetKey === k && dragState.placement ? `ts-status-row-drop-${dragState.placement}` : ""
-              ].filter(Boolean).join(" ");
+                dragState.targetKey === k && dragState.placement
+                  ? `ts-status-row-drop-${dragState.placement}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
               const row = React.createElement(
                 "div",
                 {
@@ -2596,23 +2749,24 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                       setDragState((prev) => ({
                         ...prev,
                         targetKey: null,
-                        placement: null
+                        placement: null,
                       }));
                     }
-                  }
+                  },
                 },
                 React.createElement(
                   "div",
                   { className: "ts-status-row-main" },
                   React.createElement("button", {
                     type: "button",
-                    className: "bp3-button bp3-small bp3-minimal bp3-icon-drag-handle-vertical ts-status-drag-handle",
+                    className:
+                      "bp3-button bp3-small bp3-minimal bp3-icon-drag-handle-vertical ts-status-drag-handle",
                     disabled: Boolean(workingKey),
                     draggable: !workingKey,
                     title: `Drag ${rowLabel} to reorder`,
                     "aria-label": `Drag ${rowLabel} to reorder`,
                     onDragStart: (event) => onStatusDragStart(event, k),
-                    onDragEnd: onStatusDragEnd
+                    onDragEnd: onStatusDragEnd,
                   }),
                   React.createElement("input", {
                     className: "bp3-input bp3-small ts-status-name-input",
@@ -2622,7 +2776,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                       clearMessages(k);
                       setDraft(k, e.target.value);
                     },
-                    "aria-label": `Status name for ${k}`
+                    "aria-label": `Status name for ${k}`,
                   }),
                   React.createElement(
                     "span",
@@ -2633,7 +2787,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                         className: "ts-status-pill-preview",
                         title: k,
                         "data-task-status-key": k,
-                        style: colorState.previewStyle
+                        style: colorState.previewStyle,
                       },
                       draft || rowLabel
                     )
@@ -2641,23 +2795,30 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                   renderInlineColorControls(k, colorState),
                   renderStatusRowMenu(k, rowLabel),
                   prompt,
-                  workingKey === k ? React.createElement(
-                    "span",
-                    { className: "bp3-text-small", style: { opacity: 0.7 } },
-                    "Working..."
-                  ) : null
+                  workingKey === k
+                    ? React.createElement(
+                        "span",
+                        { className: "bp3-text-small", style: { opacity: 0.7 } },
+                        "Working..."
+                      )
+                    : null
                 ),
-                rowError ? React.createElement(
-                  "div",
-                  { className: "bp3-text-small ts-status-row-error" },
-                  rowError
-                ) : null,
-                !rowError && rowInfo ? React.createElement(
-                  "div",
-                  { className: "bp3-text-small ts-status-row-info" },
-                  rowInfo
-                ) : null
+                rowError
+                  ? React.createElement(
+                      "div",
+                      { className: "bp3-text-small ts-status-row-error" },
+                      rowError
+                    )
+                  : null,
+                !rowError && rowInfo
+                  ? React.createElement(
+                      "div",
+                      { className: "bp3-text-small ts-status-row-info" },
+                      rowInfo
+                    )
+                  : null
               );
+
               return [row];
             }),
             addStatusRow
@@ -2665,6 +2826,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         )
       );
     };
+
     const panelConfig = {
       tabTitle: "Task Status Tags",
       settings: [
@@ -2672,18 +2834,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: "task-status-status-names",
           name: "",
           description: "",
-          action: { type: "reactComponent", component: StatusNamesPanel }
+          action: { type: "reactComponent", component: StatusNamesPanel },
         },
         {
           id: "task-status-help",
           name: "Help",
-          description: "Stores a workflow label as a task-status/<Name> tag after TODO/DONE. Status edits never complete or reopen a task. Click a tag to choose; Shift+click to remove.",
+          description:
+            "Stores a workflow label as a task-status/<Name> tag after TODO/DONE. Status edits never complete or reopen a task. Click a tag to choose; Shift+click to remove.",
           action: {
             type: "button",
             content: "Print Help",
             onClick: () => {
               const exampleKey = CONFIG.cycleOrder[0];
-              const exampleTagTitle = STATUSES?.[exampleKey]?.tagTitle || `${STATUS_TAG_PREFIX}${DEFAULT_STATUS_NAMES[exampleKey] || "Active"}`;
+              const exampleTagTitle =
+                STATUSES?.[exampleKey]?.tagTitle ||
+                `${STATUS_TAG_PREFIX}${DEFAULT_STATUS_NAMES[exampleKey] || "Active"}`;
               console.log("[TaskStatus] Usage:");
               console.log(
                 `  - Format: {{[[TODO]]}} #[[${exampleTagTitle}]] Task text`
@@ -2691,71 +2856,93 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               console.log("  - Click status tag: choose status");
               console.log("  - Shift+click status tag: remove status");
               console.log("  - Command palette: 'Task Status: ...'");
-            }
-          }
-        }
-      ]
+            },
+          },
+        },
+      ],
     };
+
     await extensionAPI.settings.panel.create(panelConfig);
   }
+
   async function init(isActive = () => true) {
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
     portalRoot.setAttribute("data-task-status-portal", "true");
     document.body.appendChild(portalRoot);
+
     await registerSettingsPanel();
     if (!isActive()) return false;
+
+    // Apply persisted status color overrides (if any)
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
     if (!isActive()) return false;
+
     await registerAllCommands();
     if (!isActive()) {
       await cleanup();
       return false;
     }
+
     startStatusPillObserver();
+
+    // Roam's page/tag navigation triggers on mouse down. We intercept mousedown/touchstart
+    // to prevent navigation, and use click to actually apply the cycle/remove behavior.
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
+
   async function cleanup() {
     closeStatusChooser();
     stopStatusPillObserver();
+
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;
+
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
     pendingOperations.clear();
+
     await unregisterAllCommands();
+
     console.log("[TaskStatus] Unloaded.");
   }
+
   return { init, cleanup };
 }
-var activeLifecycle = null;
-async function onload({ extensionAPI, extension }) {
+
+let activeLifecycle = null;
+
+export async function onload({ extensionAPI, extension }) {
   if (!extensionAPI) throw new TypeError("Roam did not provide extensionAPI");
   if (activeLifecycle) await activeLifecycle.dispose();
+
   const previousRuntime = window[GLOBAL_KEY];
   if (previousRuntime && typeof previousRuntime.dispose === "function") {
     await previousRuntime.dispose();
   }
+
   const lifecycle = createLifecycle();
   const instance = createTaskStatusExtension({ extensionAPI });
   const runtime = Object.freeze({
     version: extension?.version || "development",
-    dispose: () => lifecycle.dispose()
+    dispose: () => lifecycle.dispose(),
   });
   activeLifecycle = lifecycle;
   window[GLOBAL_KEY] = runtime;
+
   lifecycle.add(async () => {
     await instance.cleanup();
     if (window[GLOBAL_KEY] === runtime) delete window[GLOBAL_KEY];
     if (activeLifecycle === lifecycle) activeLifecycle = null;
   });
+
   try {
     const initialized = await instance.init(
       () => window[GLOBAL_KEY] === runtime && !lifecycle.disposed
@@ -2765,18 +2952,14 @@ async function onload({ extensionAPI, extension }) {
     await lifecycle.dispose().catch((cleanupError) => console.error(cleanupError));
     throw error;
   }
+
   return () => lifecycle.dispose();
 }
-async function onunload() {
+
+export async function onunload() {
   const lifecycle = activeLifecycle;
   activeLifecycle = null;
   if (lifecycle) await lifecycle.dispose();
 }
-var extension_default = { onload, onunload };
-export {
-  createTaskStatusTextHelpers,
-  extension_default as default,
-  onload,
-  onunload,
-  resolveTaskStatusTargetUids
-};
+
+export default { onload, onunload };

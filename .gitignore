@@ -1,2 +1,9 @@
 .DS_Store
 IMPLEMENTATION_PLAN.md
+node_modules/
+coverage/
+.tmp/
+.env
+.env.*
+!.env.example
+*.log
