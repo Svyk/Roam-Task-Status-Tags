@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.2.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.2.1 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -307,6 +307,11 @@ function createCertifiedBlockStringWriter({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
+var BUNDLED_VERSION = true ? "0.2.1" : "development";
+function resolveTaskStatusRuntimeVersion(extensionVersion) {
+  const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
+  return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
+}
 var TEXT_HELPER_DEFAULTS = {
   cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
   todoPatterns: ["{{[[TODO]]}}", "{{TODO}}"],
@@ -1648,10 +1653,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     await openStatusChooser(ctx);
   }
-  function registerSlashCommand(statusKey) {
+  async function registerSlashCommand(statusKey) {
     const status = STATUSES[statusKey];
     const label = `task status: ${status.label}`;
-    window.roamAlphaAPI.ui.slashCommand.addCommand({
+    const slashCommandApi = extensionAPI?.ui?.slashCommand;
+    if (!slashCommandApi?.addCommand || !slashCommandApi?.removeCommand) {
+      throw new Error("Roam did not provide extensionAPI.ui.slashCommand");
+    }
+    await slashCommandApi.addCommand({
       label,
       callback: (context) => {
         void (async () => {
@@ -1669,7 +1678,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         return null;
       }
     });
-    registeredCommands.slash.push(label);
+    registeredCommands.slash.push({ label, api: slashCommandApi });
   }
   function registerContextMenu(statusKey) {
     const status = STATUSES[statusKey];
@@ -1782,7 +1791,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   async function registerAllCommands() {
     for (const statusKey of CONFIG.cycleOrder) {
-      registerSlashCommand(statusKey);
+      await registerSlashCommand(statusKey);
       registerContextMenu(statusKey);
       registerMultiSelectContextMenu(statusKey);
       await registerPaletteCommand(statusKey);
@@ -1790,12 +1799,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     await registerUtilityPaletteCommands();
   }
   async function unregisterAllCommands() {
-    registeredCommands.slash.forEach((label) => {
+    for (const entry of registeredCommands.slash) {
       try {
-        window.roamAlphaAPI.ui.slashCommand.removeCommand({ label });
+        await entry.api.removeCommand({ label: entry.label });
       } catch (_) {
       }
-    });
+    }
     registeredCommands.contextMenu.forEach((label) => {
       try {
         window.roamAlphaAPI.ui.blockContextMenu.removeCommand({ label });
@@ -2746,7 +2755,7 @@ async function onload({ extensionAPI, extension }) {
   const lifecycle = createLifecycle();
   const instance = createTaskStatusExtension({ extensionAPI });
   const runtime = Object.freeze({
-    version: extension?.version || "development",
+    version: resolveTaskStatusRuntimeVersion(extension?.version),
     dispose: () => lifecycle.dispose()
   });
   activeLifecycle = lifecycle;
@@ -2778,5 +2787,6 @@ export {
   extension_default as default,
   onload,
   onunload,
+  resolveTaskStatusRuntimeVersion,
   resolveTaskStatusTargetUids
 };

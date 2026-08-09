@@ -19,6 +19,7 @@ export async function bundleEntry({
   rootDirectory = defaultRoot,
   entryPoint = "src/extension.js",
   banner = "",
+  version = "development",
 } = {}) {
   const result = await esbuild({
     absWorkingDir: resolve(rootDirectory),
@@ -36,6 +37,9 @@ export async function bundleEntry({
     treeShaking: true,
     logLevel: "silent",
     plugins: [rejectRemoteImports],
+    define: {
+      __TASK_STATUS_VERSION__: JSON.stringify(version),
+    },
     banner: banner ? { js: banner } : undefined,
   });
   const output = result.outputFiles.find((file) => file.path.endsWith("extension.js"));
@@ -47,7 +51,11 @@ export async function renderArtifacts(rootDirectory = defaultRoot) {
   const packageMetadata = JSON.parse(await readFile(resolve(rootDirectory, "package.json"), "utf8"));
   const banner = `/* Roam Task Status Tags v${packageMetadata.version} | generated; edit src/ */`;
   return {
-    javascript: await bundleEntry({ rootDirectory, banner }),
+    javascript: await bundleEntry({
+      rootDirectory,
+      banner,
+      version: packageMetadata.version,
+    }),
     css: await readFile(resolve(rootDirectory, "src/extension.css"), "utf8"),
   };
 }

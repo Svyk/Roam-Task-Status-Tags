@@ -65,10 +65,16 @@ class FakeDocument extends EventTarget {
   getElementById() { return null; }
 }
 
-function commandApi(active) {
+function commandApi(active, calls = null) {
   return {
-    addCommand: async ({ label }) => { active.add(label); },
-    removeCommand: async ({ label }) => { active.delete(label); },
+    addCommand: async ({ label }) => {
+      calls?.added.push(label);
+      active.add(label);
+    },
+    removeCommand: async ({ label }) => {
+      calls?.removed.push(label);
+      active.delete(label);
+    },
   };
 }
 
@@ -79,7 +85,12 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
   const document = new FakeDocument();
   const activeCommands = new Set();
   const palette = commandApi(activeCommands);
-  const slash = commandApi(activeCommands);
+  const slashCalls = { added: [], removed: [] };
+  const slash = commandApi(activeCommands, slashCalls);
+  const forbiddenGlobalSlash = {
+    addCommand: () => assert.fail("slash commands must use the extension-scoped API"),
+    removeCommand: () => assert.fail("slash commands must use the extension-scoped API"),
+  };
   const context = commandApi(activeCommands);
   const multi = commandApi(activeCommands);
   const windowLike = new EventTarget();
@@ -107,7 +118,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       },
       ui: {
         commandPalette: palette,
-        slashCommand: slash,
+        slashCommand: forbiddenGlobalSlash,
         blockContextMenu: context,
         msContextMenu: multi,
       },
@@ -135,7 +146,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
         },
       },
     },
-    ui: { commandPalette: palette },
+    ui: { commandPalette: palette, slashCommand: slash },
   };
 
   try {
@@ -157,6 +168,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.notEqual(secondRuntime, firstRuntime);
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
     assert.ok(activeCommands.size > 0);
+    assert.equal(slashCalls.added.length, 6);
 
     releaseFirstPanel();
     const cleanupFirst = await firstLoad;
@@ -169,6 +181,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
     assert.equal(activeCommands.size, 0);
+    assert.equal(slashCalls.removed.length, 6);
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;
