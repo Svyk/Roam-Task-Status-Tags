@@ -25,24 +25,30 @@ async function fixture(files) {
 
 test("build emits deterministic, matching browser ESM artifacts with a default export", async () => {
   await run(process.execPath, ["build.mjs"], { cwd: rootPath });
-  const [rootJs, pagesJs, rootCss, pagesCss] = await Promise.all([
+  const [rootJs, pagesJs, rootCss, pagesCss, packageJson] = await Promise.all([
     readFile(new URL("../extension.js", import.meta.url), "utf8"),
     readFile(new URL("../deploy/extension.js", import.meta.url), "utf8"),
     readFile(new URL("../extension.css", import.meta.url), "utf8"),
     readFile(new URL("../deploy/extension.css", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
+  const version = JSON.parse(packageJson).version;
+  const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   assert.equal(pagesJs, rootJs);
   assert.equal(pagesCss, rootCss);
   assert.doesNotMatch(rootJs, /sourceMappingURL/);
   assert.doesNotMatch(rootJs, /^import\s/m);
   assert.match(rootJs, /export\s*\{[\s\S]*default/);
-  assert.match(rootJs, /BUNDLED_VERSION = (?:true \? )?"0\.4\.0"/);
+  assert.match(
+    rootJs,
+    new RegExp(`BUNDLED_VERSION = (?:true \\? )?"${escapedVersion}"`)
+  );
   assert.doesNotMatch(rootJs, /__TASK_STATUS_VERSION__/);
   const rebuilt = await bundleEntry({
     rootDirectory: rootPath,
-    banner: "/* Roam Task Status Tags v0.4.0 | generated; edit src/ */",
-    version: "0.4.0",
+    banner: `/* Roam Task Status Tags v${version} | generated; edit src/ */`,
+    version,
   });
   assert.equal(rebuilt, rootJs);
 

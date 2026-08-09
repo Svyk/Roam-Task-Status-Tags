@@ -8,9 +8,12 @@ import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
   clearOwnedStatusCheckboxes,
+  clearOwnedStatusPillPresentations,
+  clearStatusPillPresentation,
   relativeLuminance,
-  syncStatusCheckboxForPill,
+  syncStatusPresentationForPill,
 } from "./status-checkbox.js";
+import { createStatusPeekController } from "./status-peek.js";
 
 // Task Status Tags (Roam Depot dev extension)
 //
@@ -431,7 +434,13 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusList: "status-list",
     statusColorOverrides: "status-color-overrides",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
+    statusLabelDisplay: "task-status-label-display",
   };
+
+  const STATUS_LABEL_DISPLAY = Object.freeze({
+    CHECKBOX_ONLY: "Checkbox only — reveal on intent",
+    CHECKBOX_AND_PILL: "Checkbox + status pill",
+  });
 
   const DEFAULT_STATUS_NAMES = {
     ACTIVE: "Active",
@@ -478,6 +487,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
   );
+  let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -702,6 +712,7 @@ span.rm-page-ref[data-task-status-key="${keySelector}"],
 a.rm-page-ref[data-task-status-key="${keySelector}"],
 .bt-pill[data-task-status-title="task-status/${cssString(STATUSES[statusKey]?.name || "")}"],
 .ts-status-pill-preview[data-task-status-key="${keySelector}"],
+.ts-status-peek[data-task-status-key="${keySelector}"],
 .ts-status-choice-dot[data-task-status-key="${keySelector}"] {
   --ts-status-bg-light: ${pillValues.lightBackgroundCss};
   --ts-status-fg-light: ${pillValues.lightTextCss};
@@ -768,6 +779,28 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeBooleanSetting(parseMaybeJson(raw), fallback);
+  }
+
+  function normalizeStatusLabelDisplay(value, fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY) {
+    const candidate =
+      value && typeof value === "object"
+        ? value.target?.value ?? value.currentTarget?.value ?? value.value
+        : value;
+    const normalized = String(candidate || "").trim();
+    return Object.values(STATUS_LABEL_DISPLAY).includes(normalized)
+      ? normalized
+      : fallback;
+  }
+
+  function loadStatusLabelDisplaySetting() {
+    const fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.statusLabelDisplay);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.statusLabelDisplay, fallback);
+      return fallback;
+    }
+    return normalizeStatusLabelDisplay(parseMaybeJson(raw), fallback);
   }
 
   function saveSetting(key, value) {
@@ -1110,6 +1143,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let themeRefreshFrame = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
+  let statusChooserReturnFocusEl = null;
+  let statusPeekController = null;
 
   function log(...args) {
     if (CONFIG.debug) console.log("[TaskStatus]", ...args);
@@ -1181,6 +1216,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       root,
       "span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]"
     ).forEach((pill) => {
+      clearStatusPillPresentation(pill);
       pill.removeAttribute("data-task-status-key");
       pill.removeAttribute("data-task-status-label");
     });
@@ -1190,10 +1226,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const scope = resolveRefreshScope(root);
     if (!scope?.querySelectorAll && !scope?.matches) return;
 
+    // Fail visibly while the current render is re-certified. A tag is hidden
+    // again only after its exact sibling checkbox is positively annotated.
+    clearOwnedStatusPillPresentations(scope);
     clearOwnedStatusCheckboxes(scope);
     const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
     pills.forEach(annotateStatusPillElement);
-    if (!checkboxStylingEnabled) return;
+    if (!checkboxStylingEnabled) {
+      statusPeekController?.refresh?.();
+      return;
+    }
 
     const blockStringsByUid = new Map();
     const textHelpers = getTextHelpers();
@@ -1213,21 +1255,50 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         );
       }
 
-      syncStatusCheckboxForPill({
+      syncStatusPresentationForPill({
         statusPill: pill,
         enabled: checkboxStylingEnabled,
+        hideManagedPill:
+          statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers,
       });
     });
+    statusPeekController?.refresh?.();
+  }
+
+  function isStatusPeekEnabled() {
+    return (
+      checkboxStylingEnabled &&
+      statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY
+    );
   }
 
   function setCheckboxStylingEnabled(nextValue) {
     checkboxStylingEnabled = normalizeBooleanSetting(nextValue, checkboxStylingEnabled);
-    if (checkboxStylingEnabled) refreshStatusVisuals(document);
-    else clearOwnedStatusCheckboxes(document);
+    if (checkboxStylingEnabled) {
+      refreshStatusVisuals(document);
+      statusPeekController?.setEnabled?.(isStatusPeekEnabled());
+    } else {
+      // Restore readable metadata before removing either alternate visual cue.
+      clearOwnedStatusPillPresentations(document);
+      statusPeekController?.setEnabled?.(false);
+      clearOwnedStatusCheckboxes(document);
+    }
+  }
+
+  function setStatusLabelDisplay(nextValue) {
+    statusLabelDisplay = normalizeStatusLabelDisplay(nextValue, statusLabelDisplay);
+    if (statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_AND_PILL) {
+      clearOwnedStatusPillPresentations(document);
+      statusPeekController?.setEnabled?.(false);
+      refreshStatusVisuals(document);
+    } else {
+      refreshStatusVisuals(document);
+      statusPeekController?.setEnabled?.(isStatusPeekEnabled());
+    }
   }
 
   function refreshMutationScopes(mutations) {
@@ -1281,6 +1352,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       } catch (_) {}
     }
     pillObserver = null;
+    clearOwnedStatusPillPresentations(document);
     clearOwnedStatusCheckboxes(document);
     clearStatusPillAnnotations(document);
   }
@@ -1622,10 +1694,41 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const hasTodo = containsAny(blockString, TODO_PATTERNS);
     if (!hasTodo && !isTaskLike(blockString)) return null;
 
-    return { statusKey, blockUid, anchorEl };
+    return { statusKey, blockUid, anchorEl, returnFocusEl: anchorEl };
   }
 
-  function closeStatusChooser() {
+  function resolveStatusPeekContext({ checkbox, input, statusKey }) {
+    if (!checkbox || !input || !statusKey || !STATUSES[statusKey]?.active) return null;
+
+    const blockUid = getBlockUidFromElement(checkbox);
+    if (!blockUid) return null;
+    const liveValue = getLiveBlockInputValue(blockUid);
+    const blockString =
+      typeof liveValue === "string" ? liveValue : getBlockString(blockUid);
+    if (typeof blockString !== "string") return null;
+
+    const parsed = getTextHelpers().parseManagedPrefix(blockString);
+    if (
+      !parsed?.managed ||
+      !parsed?.hadStatus ||
+      parsed.currentStatus !== statusKey ||
+      (parsed.taskKind !== "todo" && parsed.taskKind !== "done")
+    ) {
+      return null;
+    }
+
+    return {
+      blockUid,
+      statusKey,
+      label: STATUSES[statusKey].label || statusKey,
+      anchorEl: checkbox,
+      returnFocusEl: input,
+    };
+  }
+
+  function closeStatusChooser({ restoreFocus = false } = {}) {
+    const hadChooser = Boolean(statusChooserEl || statusChooserTeardown);
+    const returnFocusEl = statusChooserReturnFocusEl;
     if (statusChooserTeardown) {
       try {
         statusChooserTeardown();
@@ -1639,6 +1742,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       } catch (_) {}
     }
     statusChooserEl = null;
+    statusChooserReturnFocusEl = null;
+    if (hadChooser) statusPeekController?.chooserClosed?.();
+
+    if (restoreFocus && returnFocusEl?.isConnected) {
+      try {
+        returnFocusEl.focus?.({ preventScroll: true });
+      } catch (_) {}
+    }
   }
 
   function positionStatusChooser(el, anchorEl) {
@@ -1762,11 +1873,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return item;
   }
 
-  async function openStatusChooser({ blockUid, statusKey, anchorEl }) {
+  async function openStatusChooser({
+    blockUid,
+    statusKey,
+    anchorEl,
+    returnFocusEl = null,
+    isIntentCurrent = null,
+  }) {
     closeStatusChooser();
 
     const targetUids = await getOperationTargetUids({ primaryUid: blockUid });
-    if (!targetUids.length) return;
+    if (typeof isIntentCurrent === "function" && !isIntentCurrent()) return false;
+    if (!targetUids.length) return false;
 
     const chooser = document.createElement("div");
     chooser.className = "ts-status-chooser bp3-popover";
@@ -1813,6 +1931,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
+    statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
     positionStatusChooser(chooser, anchorEl);
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true,
@@ -1825,7 +1944,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const closeOnKeyDown = (event) => {
       if (event.key === "Escape") {
         stopRoamNavigation(event);
-        closeStatusChooser();
+        closeStatusChooser({ restoreFocus: true });
       }
     };
     const closeOnViewportChange = () => closeStatusChooser();
@@ -1841,6 +1960,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       window.removeEventListener("resize", closeOnViewportChange, true);
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
+    return true;
   }
 
   function handleStatusMouseDown(event) {
@@ -3072,6 +3192,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.statusLabelDisplay,
+          name: "Status label display",
+          description:
+            "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal the status control.",
+          action: {
+            type: "select",
+            items: Object.values(STATUS_LABEL_DISPLAY),
+            onChange: (value) => setStatusLabelDisplay(value),
+          },
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -3081,7 +3212,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: "task-status-help",
           name: "Help",
           description:
-            "Stores a workflow label as a task-status/<Name> tag after TODO/DONE. Status edits never complete or reopen a task. Click a tag to choose; Shift+click to remove.",
+            "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus the checkbox to reveal it; Enter or Alt+Down opens the chooser, Space remains native completion, and Shift+click removes.",
           action: {
             type: "button",
             content: "Print Help",
@@ -3096,6 +3227,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               );
               console.log("  - Click status tag: choose status");
               console.log("  - Shift+click status tag: remove status");
+              console.log("  - Checkbox-only mode: hover/focus checkbox to reveal status");
+              console.log("  - Enter or Alt+Down: choose status; Space: native completion");
               console.log("  - Command palette: 'Task Status: ...'");
             },
           },
@@ -3114,6 +3247,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
     await registerSettingsPanel();
     if (!isActive()) return false;
+
+    statusPeekController = createStatusPeekController({
+      document,
+      window,
+      portalRoot,
+      resolveContext: resolveStatusPeekContext,
+      onOpen: (context) => openStatusChooser(context),
+      onRemove: (context) => setStatusForTargets(context.blockUid, null),
+      onAnchorInvalid: () => closeStatusChooser(),
+      onError: (error) => log("Status peek error:", error),
+    });
+    statusPeekController.start();
+    statusPeekController.setEnabled(isStatusPeekEnabled());
 
     // Apply persisted status color overrides (if any)
     clearStatusColorOverrides();
@@ -3139,7 +3285,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   async function cleanup() {
+    // The readable tag is restored before any alternate control is removed.
+    clearOwnedStatusPillPresentations(document);
     closeStatusChooser();
+    statusPeekController?.destroy?.();
+    statusPeekController = null;
     stopStatusPillObserver();
     stopThemeObserver();
 

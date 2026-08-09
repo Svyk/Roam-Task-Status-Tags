@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — 2026-08-09
+
+- Add the recommended **Checkbox only — reveal on intent** display mode while preserving the exact queryable `task-status/<Name>` graph token.
+- Hide only a certified managed-prefix page reference after the exact sibling checkbox has successfully taken ownership; ambiguous, unreadable, later-prose, disabled, and missing-checkbox renders fail visible.
+- Reveal one portaled status control after intentional hover or immediately on keyboard focus, reusing the existing chooser and certified Better Tasks-aware write path.
+- Open the chooser with `Enter` or `Alt+ArrowDown`, preserve native checkbox click and `Space`, and retain Shift+click removal, multiselect, slash, palette, and context-menu power.
+- Add Svy Theme and bare-Roam light/dark styling, semantic glyphs, focus-visible, reduced-motion, forced-colors, narrow viewport positioning, ARIA token preservation, and exact lifecycle cleanup.
+- Add a persistent **Checkbox + status pill** fallback mode; disabling native checkbox styling always restores visible labels without writing graph data.
+
 ## 0.4.0 — 2026-08-08
 
 - Redesign unchecked task checkboxes with centered, semantic workflow glyphs: play, pause, stop, ring, exclamation, X, and diamond.

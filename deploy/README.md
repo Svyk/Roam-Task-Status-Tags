@@ -17,8 +17,11 @@ Example:
 
 ## Behavior
 
-- Click a status pill on a TODO block to open a status chooser.
-- Shift+click a status pill to remove the status while keeping TODO.
+- The recommended **Checkbox only — reveal on intent** mode keeps task lines quiet at rest: only the status-aware native checkbox and task text are visible.
+- Hover or focus that checkbox to reveal a compact status control. Click it, or press `Enter` / `Alt+ArrowDown` on the focused checkbox, to open the full chooser.
+- Shift+click the revealed control to remove the status while keeping TODO.
+- Ordinary checkbox click and `Space` remain Roam's native complete/reopen interactions.
+- **Checkbox + status pill** mode keeps the persistent v0.4-style label and its click/Shift+click interactions.
 - TODO/DONE remains authoritative. Status edits never complete or reopen an existing task.
 - Completing a task preserves its last status tag; remove it explicitly when desired.
 - Better Tasks-owned tasks route status writes through `window.betterTasks.v2`.
@@ -43,8 +46,9 @@ does not replace it, intercept it, or create another completion state.
 | Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |
 
 When a task is checked, the workflow glyph disappears completely and the active
-Roam/Svy Theme completion fill and checkmark become authoritative. The status pill
-remains the text label, so status is never communicated by color alone.
+Roam/Svy Theme completion fill and checkmark become authoritative. Its retained status
+is still available by hovering or focusing the checkbox; persistent-pill mode keeps the
+label visible instead.
 
 Checkbox accents are derived separately for light and dark surfaces with a minimum
 3.2:1 contrast target. Svy Theme users get its public surface and focus tokens; bare
@@ -56,6 +60,20 @@ The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclama
 making statuses readable by shape as well as color. Dark base colors such as Cancelled
 are automatically lightened on Svy Theme's dark canvas without changing the configured
 hue used in light mode.
+
+### Quiet display without losing query power
+
+Checkbox-only mode changes presentation only. A Waiting task still stores exactly:
+
+```text
+{{[[TODO]]}} #[[task-status/Waiting]] Call supplier
+```
+
+The namespaced page reference remains available to Roam queries, backlinks, search,
+exports, and Better Tasks. The raw token is visible while editing. The plugin hides only
+the exact rendered managed-prefix tag after it has successfully styled the exact sibling
+checkbox; later-prose tags, ambiguous renders, and query results without a proven
+checkbox remain visible.
 
 ## Default Statuses
 
@@ -111,6 +129,7 @@ Statuses:
 - Deleting a status removes it from commands, chooser, and styling. Existing tags remain in the graph as ordinary Roam tags.
 - `Reset colors` returns all statuses to their built-in defaults.
 - `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
+- `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
 
 Hotkeys note:
 
@@ -168,9 +187,9 @@ npm run check
 ```
 
 The tests cover status text transforms, Better Tasks routing, certified writes, exact
-checkbox ownership and cleanup, light/dark contrast derivation, CSS scoping and theme
-signals, lifecycle cleanup, build determinism, secret scanning, and multiselect target
-resolution.
+checkbox and hidden-pill ownership, reveal timing and keyboard semantics, ARIA cleanup,
+light/dark contrast derivation, CSS scoping and theme signals, lifecycle cleanup, build
+determinism, secret scanning, and multiselect target resolution.
 
 ## Troubleshooting
 

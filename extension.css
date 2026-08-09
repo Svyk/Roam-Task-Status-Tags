@@ -5,6 +5,7 @@
 :where(
   span.rm-page-ref[data-task-status-key],
   a.rm-page-ref[data-task-status-key],
+  .ts-status-peek[data-task-status-key],
   .ts-status-portal,
   .ts-status-names-panel
 ) {
@@ -59,6 +60,14 @@
 
   --ts-preview-surface-bg: var(--bp3-surface, #ffffff);
   --ts-preview-surface-border: rgba(0, 0, 0, 0.08);
+}
+
+/*
+ * Checkbox-only mode hides only the exact page reference certified by JS.
+ * Unowned, ambiguous, stale, later-prose, and editor tokens remain visible.
+ */
+.rm-page-ref[data-ts-managed-status-pill="true"][data-ts-status-pill-hidden="true"] {
+  display: none !important;
 }
 
 :root.bp3-dark :where(.ts-status-portal, .ts-status-names-panel),
@@ -350,6 +359,15 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
     border-color: currentColor !important;
     forced-color-adjust: auto;
   }
+
+  .ts-status-portal > .ts-status-peek[data-task-status-key] {
+    background: Canvas !important;
+    color: ButtonText !important;
+    border-color: ButtonText !important;
+    box-shadow: none !important;
+    filter: none !important;
+    forced-color-adjust: auto;
+  }
 }
 
 /*
@@ -363,6 +381,7 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   a.rm-page-ref[data-task-status-key],
   .bt-pill[data-task-status-title^="task-status/"],
   .ts-status-pill-preview[data-task-status-key],
+  .ts-status-peek[data-task-status-key],
   .ts-status-choice-dot[data-task-status-key]
 ) {
   --ts-status-bg: var(--ts-status-bg-light, rgba(100, 116, 139, 0.1));
@@ -374,6 +393,7 @@ span.rm-page-ref[data-task-status-key],
 a.rm-page-ref[data-task-status-key],
 .bt-pill[data-task-status-title^="task-status/"],
 .ts-status-pill-preview[data-task-status-key],
+.ts-status-peek[data-task-status-key],
 .ts-status-choice-dot[data-task-status-key] {
   background-color: var(--ts-status-bg) !important;
   color: var(--ts-status-fg) !important;
@@ -386,6 +406,7 @@ a.rm-page-ref[data-task-status-key],
     a.rm-page-ref[data-task-status-key],
     .bt-pill[data-task-status-title^="task-status/"],
     .ts-status-pill-preview[data-task-status-key],
+    .ts-status-peek[data-task-status-key],
     .ts-status-choice-dot[data-task-status-key]
   ),
 body.bt-theme-dark
@@ -394,6 +415,7 @@ body.bt-theme-dark
     a.rm-page-ref[data-task-status-key],
     .bt-pill[data-task-status-title^="task-status/"],
     .ts-status-pill-preview[data-task-status-key],
+    .ts-status-peek[data-task-status-key],
     .ts-status-choice-dot[data-task-status-key]
   ),
 .rm-dark-theme
@@ -402,6 +424,7 @@ body.bt-theme-dark
     a.rm-page-ref[data-task-status-key],
     .bt-pill[data-task-status-title^="task-status/"],
     .ts-status-pill-preview[data-task-status-key],
+    .ts-status-peek[data-task-status-key],
     .ts-status-choice-dot[data-task-status-key]
   ),
 body.roam-body.dark
@@ -410,6 +433,7 @@ body.roam-body.dark
     a.rm-page-ref[data-task-status-key],
     .bt-pill[data-task-status-title^="task-status/"],
     .ts-status-pill-preview[data-task-status-key],
+    .ts-status-peek[data-task-status-key],
     .ts-status-choice-dot[data-task-status-key]
   ) {
   --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
@@ -424,6 +448,7 @@ body.roam-body.dark
       a.rm-page-ref[data-task-status-key],
       .bt-pill[data-task-status-title^="task-status/"],
       .ts-status-pill-preview[data-task-status-key],
+      .ts-status-peek[data-task-status-key],
       .ts-status-choice-dot[data-task-status-key]
     ) {
     --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
@@ -519,6 +544,117 @@ a.rm-page-ref[data-task-status-key]:hover {
   min-width: 0;
 }
 
+/* One portaled status control, revealed only on checkbox hover or keyboard focus. */
+.ts-status-portal > .ts-status-peek[data-task-status-key] {
+  appearance: none;
+  position: fixed;
+  z-index: 9998;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  max-width: min(220px, calc(100vw - 16px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 7px;
+  border: 1px solid var(--ts-status-border, transparent);
+  border-radius: var(--ts-pill-radius, 5px);
+  background-color: var(--ts-status-bg) !important;
+  color: var(--ts-status-fg) !important;
+  box-shadow:
+    0 7px 18px rgba(15, 23, 42, 0.16),
+    0 1px 3px rgba(15, 23, 42, 0.12);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  animation: ts-status-peek-in 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ts-status-portal > .ts-status-peek[data-task-status-key]::before {
+  content: "";
+  flex: 0 0 auto;
+  width: var(--ts-pill-marker-width, var(--ts-pill-dot));
+  height: var(--ts-pill-marker-height, var(--ts-pill-dot));
+  box-sizing: border-box;
+  border: var(--ts-pill-marker-border, 0 solid transparent);
+  border-radius: var(--ts-pill-marker-radius, 999px);
+  background: var(--ts-pill-marker-background, currentColor);
+  clip-path: var(--ts-pill-marker-clip, none);
+  opacity: var(--ts-pill-marker-opacity, 0.9);
+  transform: var(--ts-pill-marker-transform, none);
+}
+
+.ts-status-portal > .ts-status-peek[data-task-status-key]:hover {
+  filter: brightness(0.97) saturate(1.04);
+}
+
+/* Keep menu-button semantics in the accessibility tree without overlapping
+   the chooser visually while it is expanded. */
+.ts-status-portal > .ts-status-peek.ts-status-peek-expanded {
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+
+.ts-status-portal > .ts-status-peek[data-task-status-key]:focus-visible {
+  outline: 2px solid var(--svy-accent, var(--cl-blue, #137cbd));
+  outline-offset: 2px;
+}
+
+.ts-status-peek-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ts-status-peek-chevron {
+  flex: 0 0 auto;
+  margin-left: 1px;
+  opacity: 0.72;
+  font-size: 13px;
+  line-height: 0.8;
+  transform: translateY(-1px);
+}
+
+.ts-status-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@keyframes ts-status-peek-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+:root.bp3-dark .ts-status-portal > .ts-status-peek,
+body.bt-theme-dark .ts-status-portal > .ts-status-peek,
+.rm-dark-theme .ts-status-portal > .ts-status-peek,
+body.roam-body.dark .ts-status-portal > .ts-status-peek {
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.42),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
 /* Settings UI preview pill (not a real page ref; avoids observer stripping data-attrs) */
 .ts-status-pill-surface {
   display: inline-flex;
@@ -564,7 +700,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="ACTIVE"] {
   --ts-pill-marker-width: 6px;
   --ts-pill-marker-height: 7px;
@@ -577,7 +714,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="WAITING"] {
   --ts-pill-marker-width: 7px;
   --ts-pill-marker-height: 7px;
@@ -594,7 +732,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="HOLDING"] {
   --ts-pill-marker-width: 6px;
   --ts-pill-marker-height: 6px;
@@ -607,7 +746,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="INCUBATING"] {
   --ts-pill-marker-width: 6px;
   --ts-pill-marker-height: 6px;
@@ -619,7 +759,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="ALERT"] {
   --ts-pill-marker-width: 6px;
   --ts-pill-marker-height: 7px;
@@ -632,7 +773,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="CANCELLED"] {
   --ts-pill-marker-width: 7px;
   --ts-pill-marker-height: 7px;
@@ -655,7 +797,8 @@ a.rm-page-ref[data-task-status-key]:hover {
 :where(
   span.rm-page-ref,
   a.rm-page-ref,
-  .ts-status-pill-preview
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key]:not(
     [data-task-status-key="ACTIVE"],
     [data-task-status-key="WAITING"],
@@ -675,8 +818,10 @@ a.rm-page-ref[data-task-status-key]:hover {
 
 @media (prefers-reduced-motion: reduce) {
   span.rm-page-ref[data-task-status-key],
-  a.rm-page-ref[data-task-status-key] {
+  a.rm-page-ref[data-task-status-key],
+  .ts-status-peek[data-task-status-key] {
     transition: none !important;
+    animation: none !important;
   }
   span.rm-page-ref[data-task-status-key]:hover,
   a.rm-page-ref[data-task-status-key]:hover {
@@ -687,6 +832,7 @@ a.rm-page-ref[data-task-status-key]:hover {
 /* Individual status colors */
 span.rm-page-ref[data-task-status-key="ACTIVE"],
 a.rm-page-ref[data-task-status-key="ACTIVE"],
+.ts-status-peek[data-task-status-key="ACTIVE"],
 .ts-status-pill-preview[data-task-status-key="ACTIVE"] {
   --ts-status-bg-light: var(--ts-active-bg-light);
   --ts-status-fg-light: var(--ts-active-fg-light);
@@ -698,6 +844,7 @@ a.rm-page-ref[data-task-status-key="ACTIVE"],
 
 span.rm-page-ref[data-task-status-key="WAITING"],
 a.rm-page-ref[data-task-status-key="WAITING"],
+.ts-status-peek[data-task-status-key="WAITING"],
 .ts-status-pill-preview[data-task-status-key="WAITING"] {
   --ts-status-bg-light: var(--ts-waiting-bg-light);
   --ts-status-fg-light: var(--ts-waiting-fg-light);
@@ -709,6 +856,7 @@ a.rm-page-ref[data-task-status-key="WAITING"],
 
 span.rm-page-ref[data-task-status-key="HOLDING"],
 a.rm-page-ref[data-task-status-key="HOLDING"],
+.ts-status-peek[data-task-status-key="HOLDING"],
 .ts-status-pill-preview[data-task-status-key="HOLDING"] {
   --ts-status-bg-light: var(--ts-holding-bg-light);
   --ts-status-fg-light: var(--ts-holding-fg-light);
@@ -720,6 +868,7 @@ a.rm-page-ref[data-task-status-key="HOLDING"],
 
 span.rm-page-ref[data-task-status-key="INCUBATING"],
 a.rm-page-ref[data-task-status-key="INCUBATING"],
+.ts-status-peek[data-task-status-key="INCUBATING"],
 .ts-status-pill-preview[data-task-status-key="INCUBATING"] {
   --ts-status-bg-light: var(--ts-incubating-bg-light);
   --ts-status-fg-light: var(--ts-incubating-fg-light);
@@ -731,6 +880,7 @@ a.rm-page-ref[data-task-status-key="INCUBATING"],
 
 span.rm-page-ref[data-task-status-key="ALERT"],
 a.rm-page-ref[data-task-status-key="ALERT"],
+.ts-status-peek[data-task-status-key="ALERT"],
 .ts-status-pill-preview[data-task-status-key="ALERT"] {
   --ts-status-bg-light: var(--ts-alert-bg-light);
   --ts-status-fg-light: var(--ts-alert-fg-light);
@@ -742,6 +892,7 @@ a.rm-page-ref[data-task-status-key="ALERT"],
 
 span.rm-page-ref[data-task-status-key="CANCELLED"],
 a.rm-page-ref[data-task-status-key="CANCELLED"],
+.ts-status-peek[data-task-status-key="CANCELLED"],
 .ts-status-pill-preview[data-task-status-key="CANCELLED"] {
   --ts-status-bg-light: var(--ts-cancelled-bg-light);
   --ts-status-fg-light: var(--ts-cancelled-fg-light);

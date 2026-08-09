@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.4.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.5.0 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -309,6 +309,9 @@ function createCertifiedBlockStringWriter({
 var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
+var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
+var HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
+var OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
 var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
 var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
@@ -571,6 +574,80 @@ function syncStatusCheckboxForPill({
     shape: decision.shape
   });
 }
+function clearStatusPillPresentation(statusPill) {
+  if (!statusPill?.removeAttribute) return;
+  statusPill.removeAttribute(MANAGED_STATUS_PILL_ATTRIBUTE);
+  statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+}
+function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {}) {
+  if (!statusPill?.setAttribute) {
+    clearStatusPillPresentation(statusPill);
+    return false;
+  }
+  statusPill.setAttribute(MANAGED_STATUS_PILL_ATTRIBUTE, "true");
+  if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
+  else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+  return true;
+}
+function escapeRegex(text) {
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function countExactStatusTagOccurrences(blockString, tagTitle) {
+  if (typeof blockString !== "string" || !tagTitle) return 0;
+  const title = escapeRegex(tagTitle);
+  const matcher = new RegExp(
+    `#\\[\\[${title}\\]\\]|#${title}(?=$|\\s|[\\.,;:!\\?\\)\\]\\}])`,
+    "g"
+  );
+  return Array.from(blockString.matchAll(matcher)).length;
+}
+function isExactManagedStatusPill({
+  statusPill,
+  tagTitle,
+  blockString
+} = {}) {
+  const parent = statusPill?.parentElement;
+  if (!parent || statusPill.getAttribute?.("data-tag") !== tagTitle) return false;
+  const checkbox = findSiblingTaskCheckbox(statusPill);
+  if (!checkbox) return false;
+  const children = Array.from(parent.children || []);
+  if (children.indexOf(checkbox) >= children.indexOf(statusPill)) return false;
+  const renderedMatches = children.filter(
+    (child) => child?.classList?.contains?.("rm-page-ref") && child.getAttribute?.("data-tag") === tagTitle
+  );
+  const textOccurrences = countExactStatusTagOccurrences(blockString, tagTitle);
+  return renderedMatches.length > 0 && renderedMatches.length === textOccurrences && renderedMatches[0] === statusPill;
+}
+function syncStatusPresentationForPill({
+  statusPill,
+  hideManagedPill = false,
+  ...checkboxOptions
+} = {}) {
+  clearStatusPillPresentation(statusPill);
+  const checkboxResult = syncStatusCheckboxForPill({
+    statusPill,
+    ...checkboxOptions
+  });
+  if (!checkboxResult.annotated) return checkboxResult;
+  if (!isExactManagedStatusPill({
+    statusPill,
+    tagTitle: checkboxOptions.tagTitle,
+    blockString: checkboxOptions.blockString
+  })) {
+    return Object.freeze({
+      ...checkboxResult,
+      managed: false,
+      hidden: false,
+      reason: "not-exact-managed-pill"
+    });
+  }
+  applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  return Object.freeze({
+    ...checkboxResult,
+    managed: true,
+    hidden: Boolean(hideManagedPill)
+  });
+}
 function includingRoot(root, selector) {
   const nodes = [];
   if (root?.matches?.(selector)) nodes.push(root);
@@ -582,10 +659,487 @@ function clearOwnedStatusCheckboxes(root) {
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
 }
+function clearOwnedStatusPillPresentations(root) {
+  const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
+  statusPills.forEach(clearStatusPillPresentation);
+  return statusPills.length;
+}
+
+// src/status-peek.js
+var STATUS_PEEK_CLASS = "ts-status-peek";
+var STATUS_PEEK_HELP_ID = "ts-status-checkbox-help";
+function contains(container, target) {
+  if (!container || !target) return false;
+  if (typeof container.contains === "function") return container.contains(target);
+  let current = target;
+  while (current) {
+    if (current === container) return true;
+    current = current.parentElement || current.parentNode || null;
+  }
+  return false;
+}
+function attributeTokens(element, name) {
+  return String(element?.getAttribute?.(name) || "").split(/\s+/).map((token) => token.trim()).filter(Boolean);
+}
+function appendAttributeToken(element, name, token) {
+  const ownedToken = String(token || "").trim();
+  if (!element?.setAttribute || !ownedToken) return false;
+  const next = [.../* @__PURE__ */ new Set([...attributeTokens(element, name), ownedToken])];
+  element.setAttribute(name, next.join(" "));
+  return true;
+}
+function removeAttributeToken(element, name, token) {
+  const ownedToken = String(token || "").trim();
+  if (!element?.removeAttribute || !ownedToken) return false;
+  const next = attributeTokens(element, name).filter((item) => item !== ownedToken);
+  if (next.length) element.setAttribute(name, next.join(" "));
+  else element.removeAttribute(name);
+  return true;
+}
+function resolveOwnedStatusCheckbox(target) {
+  const checkbox = target?.closest?.(OWNED_CHECKBOX_SELECTOR) || null;
+  if (!checkbox) return null;
+  if (checkbox.isConnected === false) return null;
+  const statusKey = checkbox.getAttribute?.(CHECKBOX_STATUS_ATTRIBUTE);
+  const input = checkbox.querySelector?.('input[type="checkbox"]') || null;
+  const checkmark = checkbox.querySelector?.(".checkmark") || null;
+  if (!statusKey || !input || !checkmark) return null;
+  return Object.freeze({ checkbox, input, checkmark, statusKey });
+}
+function isStatusChooserKey(event) {
+  if (!event || event.ctrlKey || event.metaKey) return false;
+  if (event.key === "Enter" && !event.altKey && !event.shiftKey) {
+    return true;
+  }
+  return event.key === "ArrowDown" && Boolean(event.altKey) && !event.shiftKey;
+}
+function stopIntentEvent(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  event?.stopImmediatePropagation?.();
+}
+function setButtonText(button, label) {
+  const text = button?.querySelector?.(".ts-status-peek-label");
+  if (text) text.textContent = label;
+}
+function createStatusPeekController({
+  document: documentLike,
+  window: windowLike,
+  portalRoot,
+  resolveContext,
+  onOpen,
+  onRemove,
+  onAnchorInvalid = () => {
+  },
+  onError = () => {
+  },
+  showDelay = 210,
+  hideDelay = 120
+} = {}) {
+  if (!documentLike?.createElement || !portalRoot?.appendChild) {
+    throw new TypeError("Status peek requires a document and portal root");
+  }
+  const eventRoot = documentLike;
+  const setTimer = windowLike?.setTimeout?.bind(windowLike) || setTimeout;
+  const clearTimer = windowLike?.clearTimeout?.bind(windowLike) || clearTimeout;
+  const requestFrame = windowLike?.requestAnimationFrame?.bind(windowLike) || ((callback) => setTimer(callback, 0));
+  let enabled = false;
+  let started = false;
+  let activeContext = null;
+  let peekButton = null;
+  let describedInput = null;
+  let showTimer = null;
+  let hideTimer = null;
+  let helperEl = null;
+  let chooserOpen = false;
+  let activationRevision = 0;
+  function report(error) {
+    try {
+      onError(error);
+    } catch (_) {
+    }
+  }
+  function reportInvalidAnchor() {
+    try {
+      onAnchorInvalid();
+    } catch (error) {
+      report(error);
+    }
+  }
+  function clearShowTimer() {
+    if (showTimer !== null) clearTimer(showTimer);
+    showTimer = null;
+  }
+  function clearHideTimer() {
+    if (hideTimer !== null) clearTimer(hideTimer);
+    hideTimer = null;
+  }
+  function ensureHelper() {
+    if (helperEl) return helperEl;
+    helperEl = documentLike.createElement("span");
+    helperEl.id = STATUS_PEEK_HELP_ID;
+    helperEl.className = "ts-status-sr-only";
+    helperEl.textContent = "Workflow status. Press Enter or Alt plus Down Arrow to choose a status. Press Space to complete or reopen the task.";
+    portalRoot.appendChild(helperEl);
+    return helperEl;
+  }
+  function detachDescription() {
+    if (describedInput) {
+      removeAttributeToken(describedInput, "aria-describedby", STATUS_PEEK_HELP_ID);
+    }
+    describedInput = null;
+  }
+  function attachDescription(input, label) {
+    if (!input) return;
+    if (describedInput !== input) detachDescription();
+    ensureHelper().textContent = `${label} workflow status. Press Enter or Alt plus Down Arrow to choose a status. Press Space to complete or reopen the task.`;
+    appendAttributeToken(input, "aria-describedby", STATUS_PEEK_HELP_ID);
+    describedInput = input;
+  }
+  function removePeekButton() {
+    if (peekButton?.remove) peekButton.remove();
+    peekButton = null;
+  }
+  function hide() {
+    activationRevision += 1;
+    clearShowTimer();
+    clearHideTimer();
+    detachDescription();
+    removePeekButton();
+    activeContext = null;
+    chooserOpen = false;
+  }
+  function resolveFreshContext(owned) {
+    if (!owned || typeof resolveContext !== "function") return null;
+    const freshOwned = resolveOwnedStatusCheckbox(owned.checkbox);
+    if (!freshOwned) return null;
+    const resolved = resolveContext(freshOwned);
+    if (!resolved?.blockUid || !resolved?.statusKey) return null;
+    return Object.freeze({
+      ...resolved,
+      ...freshOwned,
+      label: String(resolved.label || resolved.statusKey),
+      anchorEl: freshOwned.checkbox,
+      returnFocusEl: freshOwned.input
+    });
+  }
+  function positionPeek(button, context) {
+    if (!button?.style || !context?.checkbox?.getBoundingClientRect) return;
+    const anchorRect = context.checkbox.getBoundingClientRect();
+    const viewportWidth = windowLike?.innerWidth || documentLike.documentElement?.clientWidth || 0;
+    const viewportHeight = windowLike?.innerHeight || documentLike.documentElement?.clientHeight || 0;
+    const margin = 8;
+    const gap = 7;
+    button.style.visibility = "hidden";
+    button.style.left = "0px";
+    button.style.top = "0px";
+    const applyPosition = () => {
+      if (!peekButton || peekButton !== button || !button.isConnected) return;
+      if (activeContext?.checkbox !== context.checkbox) return;
+      if (context.checkbox.isConnected === false) {
+        hide();
+        reportInvalidAnchor();
+        return;
+      }
+      const rect = button.getBoundingClientRect?.() || { width: 0, height: 0 };
+      const width = Number(button.offsetWidth) || Number(rect.width) || 0;
+      const height = Number(button.offsetHeight) || Number(rect.height) || 0;
+      const centered = anchorRect.left + anchorRect.width / 2 - width / 2;
+      const left = Math.max(margin, Math.min(centered, viewportWidth - width - margin));
+      const above = anchorRect.top - height - gap;
+      const opensBelow = above < margin;
+      const below = anchorRect.bottom + gap;
+      const top = opensBelow ? Math.min(below, Math.max(margin, viewportHeight - height - margin)) : above;
+      button.classList?.toggle?.("ts-status-peek-below", opensBelow);
+      button.style.left = `${Math.round(left)}px`;
+      button.style.top = `${Math.round(top)}px`;
+      button.style.visibility = "visible";
+    };
+    applyPosition();
+    requestFrame(applyPosition);
+  }
+  async function activate(context, event, remove = false) {
+    stopIntentEvent(event);
+    if (!remove && chooserOpen) return false;
+    const fresh = resolveFreshContext(context);
+    if (!fresh) {
+      hide();
+      return false;
+    }
+    let intentContext = fresh;
+    if (remove) hide();
+    else {
+      const activationId = ++activationRevision;
+      clearShowTimer();
+      clearHideTimer();
+      detachDescription();
+      activeContext = fresh;
+      if (!peekButton) {
+        peekButton = makePeekButton(fresh);
+        portalRoot.appendChild(peekButton);
+        positionPeek(peekButton, fresh);
+      }
+      chooserOpen = true;
+      peekButton?.setAttribute("aria-expanded", "true");
+      peekButton?.classList?.toggle?.("ts-status-peek-expanded", true);
+      intentContext = Object.freeze({
+        ...fresh,
+        isIntentCurrent: () => chooserOpen && activationRevision === activationId && activeContext?.checkbox === fresh.checkbox && activeContext?.statusKey === fresh.statusKey && activeContext?.blockUid === fresh.blockUid
+      });
+    }
+    try {
+      const result2 = remove ? await onRemove?.(intentContext) : await onOpen?.(intentContext);
+      if (!remove && result2 === false) hide();
+      return true;
+    } catch (error) {
+      hide();
+      report(error);
+      return false;
+    }
+  }
+  function makePeekButton(context) {
+    const button = documentLike.createElement("button");
+    button.type = "button";
+    button.className = STATUS_PEEK_CLASS;
+    button.setAttribute("data-task-status-peek", "true");
+    button.setAttribute("data-task-status-key", context.statusKey);
+    button.setAttribute("aria-haspopup", "menu");
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute(
+      "aria-label",
+      `Change task status from ${context.label}. Shift-click to remove.`
+    );
+    const label = documentLike.createElement("span");
+    label.className = "ts-status-peek-label";
+    label.textContent = context.label;
+    const chevron = documentLike.createElement("span");
+    chevron.className = "ts-status-peek-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "⌄";
+    button.append(label, chevron);
+    button.addEventListener("mousedown", stopIntentEvent);
+    button.addEventListener("click", (event) => {
+      if (activeContext) void activate(activeContext, event, Boolean(event.shiftKey));
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        stopIntentEvent(event);
+        const focusTarget = activeContext?.returnFocusEl;
+        hide();
+        focusTarget?.focus?.({ preventScroll: true });
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        if (activeContext) void activate(activeContext, event, Boolean(event.shiftKey));
+      }
+    });
+    return button;
+  }
+  function show(owned, { describe = false } = {}) {
+    clearShowTimer();
+    if (!enabled) return false;
+    if (chooserOpen) return true;
+    const context = resolveFreshContext(owned);
+    if (!context) {
+      hide();
+      return false;
+    }
+    clearHideTimer();
+    activeContext = context;
+    if (describe) attachDescription(context.input, context.label);
+    else if (describedInput && describedInput !== context.input) detachDescription();
+    if (!peekButton) {
+      peekButton = makePeekButton(context);
+      portalRoot.appendChild(peekButton);
+    } else {
+      peekButton.setAttribute("data-task-status-key", context.statusKey);
+      peekButton.setAttribute(
+        "aria-label",
+        `Change task status from ${context.label}. Shift-click to remove.`
+      );
+      setButtonText(peekButton, context.label);
+    }
+    positionPeek(peekButton, context);
+    return true;
+  }
+  function scheduleShow(owned, describe = false) {
+    clearShowTimer();
+    clearHideTimer();
+    const delay = Math.max(0, Number(showDelay) || 0);
+    if (delay === 0) {
+      show(owned, { describe });
+      return;
+    }
+    showTimer = setTimer(() => {
+      showTimer = null;
+      show(owned, { describe });
+    }, delay);
+  }
+  function scheduleHide() {
+    if (chooserOpen) return;
+    clearShowTimer();
+    clearHideTimer();
+    const delay = Math.max(0, Number(hideDelay) || 0);
+    if (delay === 0) {
+      hide();
+      return;
+    }
+    hideTimer = setTimer(() => {
+      hideTimer = null;
+      hide();
+    }, delay);
+  }
+  function relatedStaysInside(event, owned) {
+    const related = event?.relatedTarget;
+    return contains(owned?.checkbox, related) || contains(peekButton, related);
+  }
+  function handlePointerOver(event) {
+    if (!enabled) return;
+    if (event.pointerType === "touch") return;
+    if (contains(peekButton, event.target)) {
+      clearHideTimer();
+      return;
+    }
+    const owned = resolveOwnedStatusCheckbox(event.target);
+    if (!owned) return;
+    if (contains(owned.checkbox, event.relatedTarget)) return;
+    scheduleShow(owned, false);
+  }
+  function handlePointerOut(event) {
+    if (!enabled) return;
+    if (event.pointerType === "touch") return;
+    if (contains(peekButton, event.target)) {
+      if (contains(peekButton, event.relatedTarget)) return;
+      if (contains(activeContext?.checkbox, event.relatedTarget)) return;
+      scheduleHide();
+      return;
+    }
+    const owned = resolveOwnedStatusCheckbox(event.target);
+    if (!owned || relatedStaysInside(event, owned)) return;
+    scheduleHide();
+  }
+  function handleFocusIn(event) {
+    if (!enabled) return;
+    if (contains(peekButton, event.target)) {
+      clearHideTimer();
+      return;
+    }
+    const owned = resolveOwnedStatusCheckbox(event.target);
+    if (owned) show(owned, { describe: true });
+  }
+  function handleFocusOut(event) {
+    if (!enabled) return;
+    if (contains(peekButton, event.target)) {
+      if (contains(peekButton, event.relatedTarget)) return;
+      if (contains(activeContext?.checkbox, event.relatedTarget)) return;
+      scheduleHide();
+      return;
+    }
+    const owned = resolveOwnedStatusCheckbox(event.target);
+    if (!owned || relatedStaysInside(event, owned)) return;
+    scheduleHide();
+  }
+  function handleKeyDown(event) {
+    if (!enabled) return;
+    const owned = resolveOwnedStatusCheckbox(event.target);
+    if (event.key === "Escape" && owned && activeContext) {
+      stopIntentEvent(event);
+      hide();
+      return;
+    }
+    if (!owned || !isStatusChooserKey(event)) return;
+    void activate(owned, event, false);
+  }
+  function handleOutsideMouseDown(event) {
+    if (!enabled || !activeContext || chooserOpen) return;
+    if (contains(activeContext.checkbox, event.target) || contains(peekButton, event.target)) {
+      return;
+    }
+    hide();
+  }
+  function handleViewportChange() {
+    if (activeContext) hide();
+  }
+  const delegatedListeners = [
+    ["pointerover", handlePointerOver],
+    ["pointerout", handlePointerOut],
+    ["focusin", handleFocusIn],
+    ["focusout", handleFocusOut],
+    ["keydown", handleKeyDown],
+    ["mousedown", handleOutsideMouseDown]
+  ];
+  const viewportListeners = [
+    ["resize", handleViewportChange],
+    ["scroll", handleViewportChange]
+  ];
+  function start() {
+    if (started) return;
+    started = true;
+    ensureHelper();
+    delegatedListeners.forEach(([type, handler]) => {
+      eventRoot.addEventListener(type, handler, true);
+    });
+    viewportListeners.forEach(([type, handler]) => {
+      windowLike?.addEventListener?.(type, handler, true);
+    });
+  }
+  function setEnabled(nextEnabled) {
+    enabled = Boolean(nextEnabled);
+    if (!enabled) hide();
+  }
+  function refresh() {
+    if (!activeContext) return;
+    if (!enabled) {
+      hide();
+      return;
+    }
+    if (chooserOpen) {
+      const fresh = resolveFreshContext(activeContext);
+      if (!fresh || fresh.statusKey !== activeContext.statusKey || fresh.blockUid !== activeContext.blockUid) {
+        hide();
+        reportInvalidAnchor();
+        return false;
+      }
+      activeContext = fresh;
+      return true;
+    }
+    const describe = describedInput === activeContext.input;
+    return show(activeContext, { describe });
+  }
+  function chooserClosed() {
+    if (!chooserOpen) return;
+    hide();
+  }
+  function destroy() {
+    if (started) {
+      delegatedListeners.forEach(([type, handler]) => {
+        eventRoot.removeEventListener(type, handler, true);
+      });
+      viewportListeners.forEach(([type, handler]) => {
+        windowLike?.removeEventListener?.(type, handler, true);
+      });
+    }
+    started = false;
+    enabled = false;
+    hide();
+    if (helperEl?.remove) helperEl.remove();
+    helperEl = null;
+  }
+  return Object.freeze({
+    start,
+    destroy,
+    hide,
+    refresh,
+    chooserClosed,
+    setEnabled,
+    isEnabled: () => enabled,
+    isVisible: () => Boolean(peekButton?.isConnected)
+  });
+}
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.4.0" : "development";
+var BUNDLED_VERSION = true ? "0.5.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -642,7 +1196,7 @@ function createTaskStatusTextHelpers(options = {}) {
     });
     return out;
   }
-  function escapeRegex(text) {
+  function escapeRegex2(text) {
     return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function containsAny(text, patterns) {
@@ -660,7 +1214,7 @@ function createTaskStatusTextHelpers(options = {}) {
   }
   function hasPlainHashtagToken(text, tagTitle) {
     if (!text || typeof text !== "string") return false;
-    const t = escapeRegex(tagTitle);
+    const t = escapeRegex2(tagTitle);
     const re = new RegExp(`(^|\\s)#${t}(?=\\s|$|[\\.,;:!\\?\\)\\]\\}])`, "g");
     return re.test(text);
   }
@@ -922,8 +1476,13 @@ function createTaskStatusExtension({ extensionAPI }) {
   const SETTINGS_KEYS = {
     statusList: "status-list",
     statusColorOverrides: "status-color-overrides",
-    styleNativeCheckboxes: "task-status-style-native-checkboxes"
+    styleNativeCheckboxes: "task-status-style-native-checkboxes",
+    statusLabelDisplay: "task-status-label-display"
   };
+  const STATUS_LABEL_DISPLAY = Object.freeze({
+    CHECKBOX_ONLY: "Checkbox only — reveal on intent",
+    CHECKBOX_AND_PILL: "Checkbox + status pill"
+  });
   const DEFAULT_STATUS_NAMES = {
     ACTIVE: "Active",
     WAITING: "Waiting",
@@ -964,6 +1523,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
   );
+  let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -1154,6 +1714,7 @@ span.rm-page-ref[data-task-status-key="${keySelector}"],
 a.rm-page-ref[data-task-status-key="${keySelector}"],
 .bt-pill[data-task-status-title="task-status/${cssString(STATUSES[statusKey]?.name || "")}"],
 .ts-status-pill-preview[data-task-status-key="${keySelector}"],
+.ts-status-peek[data-task-status-key="${keySelector}"],
 .ts-status-choice-dot[data-task-status-key="${keySelector}"] {
   --ts-status-bg-light: ${pillValues.lightBackgroundCss};
   --ts-status-fg-light: ${pillValues.lightTextCss};
@@ -1214,6 +1775,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeBooleanSetting(parseMaybeJson(raw), fallback);
+  }
+  function normalizeStatusLabelDisplay(value, fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY) {
+    const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+    const normalized = String(candidate || "").trim();
+    return Object.values(STATUS_LABEL_DISPLAY).includes(normalized) ? normalized : fallback;
+  }
+  function loadStatusLabelDisplaySetting() {
+    const fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.statusLabelDisplay);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.statusLabelDisplay, fallback);
+      return fallback;
+    }
+    return normalizeStatusLabelDisplay(parseMaybeJson(raw), fallback);
   }
   function saveSetting(key, value) {
     if (!extensionAPI?.settings?.set) return;
@@ -1488,6 +2064,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let themeRefreshFrame = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
+  let statusChooserReturnFocusEl = null;
+  let statusPeekController = null;
   function log(...args) {
     if (CONFIG.debug) console.log("[TaskStatus]", ...args);
   }
@@ -1548,6 +2126,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       root,
       "span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]"
     ).forEach((pill) => {
+      clearStatusPillPresentation(pill);
       pill.removeAttribute("data-task-status-key");
       pill.removeAttribute("data-task-status-label");
     });
@@ -1555,10 +2134,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function refreshStatusVisuals(root = document) {
     const scope = resolveRefreshScope(root);
     if (!scope?.querySelectorAll && !scope?.matches) return;
+    clearOwnedStatusPillPresentations(scope);
     clearOwnedStatusCheckboxes(scope);
     const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
     pills.forEach(annotateStatusPillElement);
-    if (!checkboxStylingEnabled) return;
+    if (!checkboxStylingEnabled) {
+      statusPeekController?.refresh?.();
+      return;
+    }
     const blockStringsByUid = /* @__PURE__ */ new Map();
     const textHelpers = getTextHelpers();
     pills.forEach((pill) => {
@@ -1574,20 +2157,42 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           typeof liveValue === "string" ? liveValue : getBlockString(blockUid)
         );
       }
-      syncStatusCheckboxForPill({
+      syncStatusPresentationForPill({
         statusPill: pill,
         enabled: checkboxStylingEnabled,
+        hideManagedPill: statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers
       });
     });
+    statusPeekController?.refresh?.();
+  }
+  function isStatusPeekEnabled() {
+    return checkboxStylingEnabled && statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
   }
   function setCheckboxStylingEnabled(nextValue) {
     checkboxStylingEnabled = normalizeBooleanSetting(nextValue, checkboxStylingEnabled);
-    if (checkboxStylingEnabled) refreshStatusVisuals(document);
-    else clearOwnedStatusCheckboxes(document);
+    if (checkboxStylingEnabled) {
+      refreshStatusVisuals(document);
+      statusPeekController?.setEnabled?.(isStatusPeekEnabled());
+    } else {
+      clearOwnedStatusPillPresentations(document);
+      statusPeekController?.setEnabled?.(false);
+      clearOwnedStatusCheckboxes(document);
+    }
+  }
+  function setStatusLabelDisplay(nextValue) {
+    statusLabelDisplay = normalizeStatusLabelDisplay(nextValue, statusLabelDisplay);
+    if (statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_AND_PILL) {
+      clearOwnedStatusPillPresentations(document);
+      statusPeekController?.setEnabled?.(false);
+      refreshStatusVisuals(document);
+    } else {
+      refreshStatusVisuals(document);
+      statusPeekController?.setEnabled?.(isStatusPeekEnabled());
+    }
   }
   function refreshMutationScopes(mutations) {
     const refreshed = /* @__PURE__ */ new Set();
@@ -1634,6 +2239,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }
     pillObserver = null;
+    clearOwnedStatusPillPresentations(document);
     clearOwnedStatusCheckboxes(document);
     clearStatusPillAnnotations(document);
   }
@@ -1903,9 +2509,30 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!isManagedStatus) return null;
     const hasTodo = containsAny(blockString, TODO_PATTERNS);
     if (!hasTodo && !isTaskLike(blockString)) return null;
-    return { statusKey, blockUid, anchorEl };
+    return { statusKey, blockUid, anchorEl, returnFocusEl: anchorEl };
   }
-  function closeStatusChooser() {
+  function resolveStatusPeekContext({ checkbox, input, statusKey }) {
+    if (!checkbox || !input || !statusKey || !STATUSES[statusKey]?.active) return null;
+    const blockUid = getBlockUidFromElement(checkbox);
+    if (!blockUid) return null;
+    const liveValue = getLiveBlockInputValue(blockUid);
+    const blockString = typeof liveValue === "string" ? liveValue : getBlockString(blockUid);
+    if (typeof blockString !== "string") return null;
+    const parsed = getTextHelpers().parseManagedPrefix(blockString);
+    if (!parsed?.managed || !parsed?.hadStatus || parsed.currentStatus !== statusKey || parsed.taskKind !== "todo" && parsed.taskKind !== "done") {
+      return null;
+    }
+    return {
+      blockUid,
+      statusKey,
+      label: STATUSES[statusKey].label || statusKey,
+      anchorEl: checkbox,
+      returnFocusEl: input
+    };
+  }
+  function closeStatusChooser({ restoreFocus = false } = {}) {
+    const hadChooser = Boolean(statusChooserEl || statusChooserTeardown);
+    const returnFocusEl = statusChooserReturnFocusEl;
     if (statusChooserTeardown) {
       try {
         statusChooserTeardown();
@@ -1920,6 +2547,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }
     statusChooserEl = null;
+    statusChooserReturnFocusEl = null;
+    if (hadChooser) statusPeekController?.chooserClosed?.();
+    if (restoreFocus && returnFocusEl?.isConnected) {
+      try {
+        returnFocusEl.focus?.({ preventScroll: true });
+      } catch (_) {
+      }
+    }
   }
   function positionStatusChooser(el, anchorEl) {
     if (!el || !anchorEl?.getBoundingClientRect) return;
@@ -2022,10 +2657,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (choice) choice.setAttribute("data-task-status-choice", statusKey);
     return item;
   }
-  async function openStatusChooser({ blockUid, statusKey, anchorEl }) {
+  async function openStatusChooser({
+    blockUid,
+    statusKey,
+    anchorEl,
+    returnFocusEl = null,
+    isIntentCurrent = null
+  }) {
     closeStatusChooser();
     const targetUids = await getOperationTargetUids({ primaryUid: blockUid });
-    if (!targetUids.length) return;
+    if (typeof isIntentCurrent === "function" && !isIntentCurrent()) return false;
+    if (!targetUids.length) return false;
     const chooser = document.createElement("div");
     chooser.className = "ts-status-chooser bp3-popover";
     const content = document.createElement("div");
@@ -2064,6 +2706,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     chooser.append(makeBlueprintPopoverArrow(), content);
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
+    statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
     positionStatusChooser(chooser, anchorEl);
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true
@@ -2075,7 +2718,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const closeOnKeyDown = (event) => {
       if (event.key === "Escape") {
         stopRoamNavigation(event);
-        closeStatusChooser();
+        closeStatusChooser({ restoreFocus: true });
       }
     };
     const closeOnViewportChange = () => closeStatusChooser();
@@ -2089,6 +2732,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       window.removeEventListener("resize", closeOnViewportChange, true);
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
+    return true;
   }
   function handleStatusMouseDown(event) {
     if (typeof event.button === "number" && event.button !== 0) return;
@@ -3149,6 +3793,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.statusLabelDisplay,
+          name: "Status label display",
+          description: "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal the status control.",
+          action: {
+            type: "select",
+            items: Object.values(STATUS_LABEL_DISPLAY),
+            onChange: (value) => setStatusLabelDisplay(value)
+          }
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -3157,7 +3811,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: "task-status-help",
           name: "Help",
-          description: "Stores a workflow label as a task-status/<Name> tag after TODO/DONE. Status edits never complete or reopen a task. Click a tag to choose; Shift+click to remove.",
+          description: "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus the checkbox to reveal it; Enter or Alt+Down opens the chooser, Space remains native completion, and Shift+click removes.",
           action: {
             type: "button",
             content: "Print Help",
@@ -3170,6 +3824,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               );
               console.log("  - Click status tag: choose status");
               console.log("  - Shift+click status tag: remove status");
+              console.log("  - Checkbox-only mode: hover/focus checkbox to reveal status");
+              console.log("  - Enter or Alt+Down: choose status; Space: native completion");
               console.log("  - Command palette: 'Task Status: ...'");
             }
           }
@@ -3185,6 +3841,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     document.body.appendChild(portalRoot);
     await registerSettingsPanel();
     if (!isActive()) return false;
+    statusPeekController = createStatusPeekController({
+      document,
+      window,
+      portalRoot,
+      resolveContext: resolveStatusPeekContext,
+      onOpen: (context) => openStatusChooser(context),
+      onRemove: (context) => setStatusForTargets(context.blockUid, null),
+      onAnchorInvalid: () => closeStatusChooser(),
+      onError: (error) => log("Status peek error:", error)
+    });
+    statusPeekController.start();
+    statusPeekController.setEnabled(isStatusPeekEnabled());
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
     if (!isActive()) return false;
@@ -3202,7 +3870,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return true;
   }
   async function cleanup() {
+    clearOwnedStatusPillPresentations(document);
     closeStatusChooser();
+    statusPeekController?.destroy?.();
+    statusPeekController = null;
     stopStatusPillObserver();
     stopThemeObserver();
     clearStatusColorOverrides();

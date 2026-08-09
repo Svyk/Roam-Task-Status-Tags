@@ -8,6 +8,7 @@ const checkboxSource = await readFile(
   new URL("../src/status-checkbox.js", import.meta.url),
   "utf8"
 );
+const peekSource = await readFile(new URL("../src/status-peek.js", import.meta.url), "utf8");
 
 test("checkbox CSS is scoped exclusively by the extension-owned marker", () => {
   assert.match(css, /\.rm-checkbox\[data-ts-checkbox-status\]/);
@@ -144,9 +145,39 @@ test("observer handles mutation scopes synchronously without a full-document deb
   assert.doesNotMatch(source, /setTimeout\(\(\) => \{\s*refreshStatusVisuals\(document\)/s);
 });
 
-test("the setting describes a cosmetic boundary and no checkbox event is installed", () => {
+test("the setting describes a cosmetic boundary and no per-checkbox event is installed", () => {
   assert.match(source, /Style native checkboxes by task status/);
   assert.match(source, /This is cosmetic and never changes completion or Better Tasks data/);
   assert.doesNotMatch(source, /\.rm-checkbox[^\n]*addEventListener/);
+  assert.doesNotMatch(peekSource, /checkbox\.addEventListener/);
+  assert.match(peekSource, /\["pointerover", handlePointerOver\]/);
+  assert.match(peekSource, /\["keydown", handleKeyDown\]/);
   assert.doesNotMatch(checkboxSource, /roamAlphaAPI|data\.block|betterTasks/);
+});
+
+test("checkbox-only hiding is exact, fail-visible in source, and never a broad tag rule", () => {
+  assert.match(
+    css,
+    /\.rm-page-ref\[data-ts-managed-status-pill="true"\]\[data-ts-status-pill-hidden="true"\]\s*\{\s*display: none !important;/
+  );
+  assert.doesNotMatch(css, /\[data-tag\^="task-status\/"\][^{]*\{[^}]*display:\s*none/is);
+  assert.match(source, /clearOwnedStatusPillPresentations\(scope\)/);
+  assert.match(source, /syncStatusPresentationForPill/);
+  assert.match(checkboxSource, /clearStatusPillPresentation\(statusPill\)/);
+});
+
+test("the reveal control carries status shapes and light, dark, focus, motion, and forced-color support", () => {
+  assert.match(css, /\.ts-status-portal > \.ts-status-peek\[data-task-status-key\]/);
+  assert.match(css, /\.ts-status-peek\[data-task-status-key="WAITING"\]/);
+  assert.match(css, /\.ts-status-peek\[data-task-status-key="CANCELLED"\]/);
+  assert.match(css, /\.ts-status-peek\[data-task-status-key\]:focus-visible/);
+  assert.match(css, /animation: ts-status-peek-in/);
+  assert.match(css, /\.ts-status-peek\[data-task-status-key\][^{]*\{[^}]*animation: none !important/is);
+  assert.match(css, /background: Canvas !important/);
+  assert.match(css, /color: ButtonText !important/);
+  assert.match(peekSource, /Press Enter or Alt plus Down Arrow/);
+  assert.match(peekSource, /event\.key === "Enter"/);
+  assert.match(peekSource, /event\.key === "ArrowDown"/);
+  assert.match(peekSource, /isIntentCurrent/);
+  assert.match(source, /typeof isIntentCurrent === "function" && !isIntentCurrent\(\)/);
 });

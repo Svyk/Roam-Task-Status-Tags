@@ -16,24 +16,40 @@
       main { display: grid; grid-template-columns: repeat(2, minmax(310px, 1fr)); gap: 24px; padding: 32px; }
       .panel { border: 1px solid rgba(15, 23, 42, 0.14); border-radius: 14px; padding: 22px; background: #f8fafc; box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08); }
       .panel.dark { --svy-canvas: #1f2b33; --svy-accent: #48aff0; background: #1f2b33; color: #f8fafc; border-color: rgba(255, 255, 255, 0.16); }
-      h1 { grid-column: 1 / -1; margin: 0; font-size: 22px; }
+      .fixture-header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      h1 { margin: 0; font-size: 22px; }
+      .fixture-actions { display: flex; align-items: center; gap: 10px; }
+      .fixture-actions button { border: 1px solid rgba(15, 23, 42, 0.18); border-radius: 7px; padding: 7px 10px; background: #fff; color: #1f2937; cursor: pointer; }
+      #fixture-log { min-width: 260px; font-size: 12px; opacity: 0.72; text-align: right; }
       h2 { margin: 0 0 16px; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.68; }
       .row { min-height: 43px; display: grid; grid-template-columns: 24px minmax(0, 1fr) 76px; align-items: center; column-gap: 10px; border-bottom: 1px solid rgba(100, 116, 139, 0.14); }
       .row:last-child { border-bottom: 0; }
       .label { font-size: 15px; font-weight: 550; }
       .state { font-size: 11px; opacity: 0.58; text-align: right; }
       .rm-checkbox { display: inline-flex; align-items: center; }
+      .task-control { display: inline-flex; align-items: center; min-width: 24px; }
       .check-container { display: inline-block; position: relative; width: 16px; height: 16px; }
       .check-container input { position: absolute; opacity: 0; width: 16px; height: 16px; margin: 0; }
       .checkmark { position: absolute; inset: 0; width: 16px; height: 16px; border: 2px solid #738091; border-radius: 4px; background: transparent; }
       .check-container input:checked ~ .checkmark { background: #1684b7; border-color: #1684b7; }
       .check-container input:checked ~ .checkmark::after { content: ""; position: absolute; left: 4px; top: 0.5px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-      @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 18px; } h1 { grid-column: 1; } }
+      .safety-panel { grid-column: 1 / -1; }
+      .safety-sample { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+      @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 18px; } .fixture-header, .safety-panel { grid-column: 1; } .fixture-header { align-items: flex-start; flex-direction: column; } #fixture-log { text-align: left; min-width: 0; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>Semantic workflow glyphs</h1>
+      <header class="fixture-header">
+        <div>
+          <h1>Checkbox-only status display</h1>
+          <div style="margin-top: 5px; opacity: 0.68; font-size: 13px;">Hover or focus any checkbox. Press Enter to exercise the chooser handoff; Space remains native.</div>
+        </div>
+        <div class="fixture-actions">
+          <span id="fixture-log" aria-live="polite">No interaction yet</span>
+          <button id="theme-toggle" type="button">Toggle global dark signal</button>
+        </div>
+      </header>
       <section class="panel" aria-label="Light mode statuses">
         <h2>Light · unchecked</h2>
         <div id="light-rows"></div>
@@ -50,8 +66,22 @@
         <h2>Dark · checked</h2>
         <div id="dark-checked-rows"></div>
       </section>
+      <section class="panel safety-panel" aria-label="Fail-visible safety examples">
+        <h2>Fail-visible safety</h2>
+        <div class="safety-sample">
+          <span class="label">Query result without an exact checkbox:</span>
+          <span class="rm-page-ref" data-task-status-key="ALERT" data-task-status-label="Alert">#[[task-status/Alert]]</span>
+        </div>
+        <div class="safety-sample">
+          <span class="label">Later-prose status reference:</span>
+          <span class="rm-page-ref" data-task-status-key="WAITING" data-task-status-label="Waiting">#[[task-status/Waiting]]</span>
+        </div>
+      </section>
     </main>
-    <script>
+    <div class="ts-status-portal" data-task-status-portal="true"></div>
+    <script type="module">
+      import { createStatusPeekController } from "../../src/status-peek.js";
+
       const statuses = [
         ["ACTIVE", "active", "Active · play"],
         ["WAITING", "waiting", "Waiting · pause"],
@@ -63,13 +93,16 @@
       ];
 
       function render(target, checked) {
-        document.getElementById(target).innerHTML = statuses.map(([status, shape, label]) => `
+        document.getElementById(target).innerHTML = statuses.map(([status, shape, label], index) => `
           <div class="row">
-            <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}">
-              <label class="check-container">
-                <input type="checkbox" ${checked ? "checked" : ""} aria-label="${label}" />
-                <span class="checkmark"></span>
-              </label>
+            <span class="task-control">
+              <span class="rm-checkbox rm-todo" data-ts-checkbox-status="${status}" data-ts-checkbox-shape="${shape}" data-fixture-label="${label.split(" · ")[0]}" data-fixture-uid="${target}-${index}">
+                <label class="check-container">
+                  <input type="checkbox" ${checked ? "checked" : ""} aria-label="${label}" />
+                  <span class="checkmark"></span>
+                </label>
+              </span>
+              <span class="rm-page-ref" data-tag="task-status/${label.split(" · ")[0]}" data-task-status-key="${status}" data-task-status-label="${label.split(" · ")[0]}" data-ts-managed-status-pill="true" data-ts-status-pill-hidden="true">#[[task-status/${label.split(" · ")[0]}]]</span>
             </span>
             <span class="label">${label}</span>
             <span class="state">${checked ? "completed" : "workflow"}</span>
@@ -81,6 +114,40 @@
       render("dark-rows", false);
       render("light-checked-rows", true);
       render("dark-checked-rows", true);
+
+      const log = document.getElementById("fixture-log");
+      const controller = createStatusPeekController({
+        document,
+        window,
+        portalRoot: document.querySelector(".ts-status-portal"),
+        resolveContext: ({ checkbox, statusKey }) => ({
+          blockUid: checkbox.getAttribute("data-fixture-uid"),
+          statusKey,
+          label: checkbox.getAttribute("data-fixture-label"),
+        }),
+        onOpen: ({ label }) => {
+          log.textContent = `${label}: chooser handoff fired once`;
+          return false;
+        },
+        onRemove: ({ label }) => {
+          log.textContent = `${label}: Shift-click remove handoff fired once`;
+        },
+        onError: (error) => {
+          log.textContent = `Fixture error: ${error.message}`;
+        },
+      });
+      controller.start();
+      controller.setEnabled(true);
+
+      document.getElementById("theme-toggle").addEventListener("click", () => {
+        const root = document.documentElement;
+        const dark = !root.classList.contains("bp3-dark");
+        root.classList.toggle("bp3-dark", dark);
+        root.classList.toggle("bp3-light", !dark);
+        log.textContent = dark ? "Global .bp3-dark enabled" : "Global .bp3-light enabled";
+      });
+
+      window.addEventListener("beforeunload", () => controller.destroy(), { once: true });
     </script>
   </body>
 </html>

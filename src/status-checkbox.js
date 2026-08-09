@@ -1,6 +1,9 @@
 export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
+export const MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
+export const HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
+export const OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
 
 const DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 const DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
@@ -318,6 +321,109 @@ export function syncStatusCheckboxForPill({
   });
 }
 
+export function clearStatusPillPresentation(statusPill) {
+  if (!statusPill?.removeAttribute) return;
+  statusPill.removeAttribute(MANAGED_STATUS_PILL_ATTRIBUTE);
+  statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+}
+
+export function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {}) {
+  if (!statusPill?.setAttribute) {
+    clearStatusPillPresentation(statusPill);
+    return false;
+  }
+
+  statusPill.setAttribute(MANAGED_STATUS_PILL_ATTRIBUTE, "true");
+  if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
+  else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+  return true;
+}
+
+function escapeRegex(text) {
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function countExactStatusTagOccurrences(blockString, tagTitle) {
+  if (typeof blockString !== "string" || !tagTitle) return 0;
+  const title = escapeRegex(tagTitle);
+  const matcher = new RegExp(
+    `#\\[\\[${title}\\]\\]|#${title}(?=$|\\s|[\\.,;:!\\?\\)\\]\\}])`,
+    "g"
+  );
+  return Array.from(blockString.matchAll(matcher)).length;
+}
+
+/**
+ * Certify that this DOM node represents the first exact occurrence of the
+ * managed prefix tag, rather than a duplicate reference later in prose.
+ * Count disagreement is treated as a partial/ambiguous render and fails visible.
+ */
+export function isExactManagedStatusPill({
+  statusPill,
+  tagTitle,
+  blockString,
+} = {}) {
+  const parent = statusPill?.parentElement;
+  if (!parent || statusPill.getAttribute?.("data-tag") !== tagTitle) return false;
+
+  const checkbox = findSiblingTaskCheckbox(statusPill);
+  if (!checkbox) return false;
+  const children = Array.from(parent.children || []);
+  if (children.indexOf(checkbox) >= children.indexOf(statusPill)) return false;
+
+  const renderedMatches = children.filter(
+    (child) =>
+      child?.classList?.contains?.("rm-page-ref") &&
+      child.getAttribute?.("data-tag") === tagTitle
+  );
+  const textOccurrences = countExactStatusTagOccurrences(blockString, tagTitle);
+  return (
+    renderedMatches.length > 0 &&
+    renderedMatches.length === textOccurrences &&
+    renderedMatches[0] === statusPill
+  );
+}
+
+/**
+ * Synchronize the checkbox and its exact rendered status page-reference as one
+ * presentation unit. The page-reference is always made visible before any
+ * ownership decision, then hidden only after the native checkbox was
+ * positively identified and annotated for the same managed prefix.
+ */
+export function syncStatusPresentationForPill({
+  statusPill,
+  hideManagedPill = false,
+  ...checkboxOptions
+} = {}) {
+  clearStatusPillPresentation(statusPill);
+  const checkboxResult = syncStatusCheckboxForPill({
+    statusPill,
+    ...checkboxOptions,
+  });
+  if (!checkboxResult.annotated) return checkboxResult;
+  if (
+    !isExactManagedStatusPill({
+      statusPill,
+      tagTitle: checkboxOptions.tagTitle,
+      blockString: checkboxOptions.blockString,
+    })
+  ) {
+    return Object.freeze({
+      ...checkboxResult,
+      managed: false,
+      hidden: false,
+      reason: "not-exact-managed-pill",
+    });
+  }
+
+  applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  return Object.freeze({
+    ...checkboxResult,
+    managed: true,
+    hidden: Boolean(hideManagedPill),
+  });
+}
+
 function includingRoot(root, selector) {
   const nodes = [];
   if (root?.matches?.(selector)) nodes.push(root);
@@ -329,4 +435,10 @@ export function clearOwnedStatusCheckboxes(root) {
   const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR);
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
+}
+
+export function clearOwnedStatusPillPresentations(root) {
+  const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
+  statusPills.forEach(clearStatusPillPresentation);
+  return statusPills.length;
 }

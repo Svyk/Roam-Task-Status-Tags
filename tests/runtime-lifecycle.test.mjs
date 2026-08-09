@@ -60,9 +60,14 @@ class FakeElement extends EventTarget {
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   removeAttribute(name) { this.attributes.delete(name); }
   matches(selector) {
-    return selector === ".rm-checkbox[data-ts-checkbox-status]" &&
-      this.classList.contains("rm-checkbox") &&
-      this.attributes.has("data-ts-checkbox-status");
+    if (selector === ".rm-checkbox[data-ts-checkbox-status]") {
+      return this.classList.contains("rm-checkbox") &&
+        this.attributes.has("data-ts-checkbox-status");
+    }
+    if (selector === "[data-ts-managed-status-pill]") {
+      return this.attributes.has("data-ts-managed-status-pill");
+    }
+    return false;
   }
   querySelectorAll(selector) {
     const matches = [];
@@ -122,6 +127,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
   const originalMutationObserver = globalThis.MutationObserver;
   const document = new FakeDocument();
   const activeCommands = new Set();
+  let graphWriteCalls = 0;
   const palette = commandApi(activeCommands);
   const slashCalls = { added: [], removed: [] };
   const slash = commandApi(activeCommands, slashCalls);
@@ -151,8 +157,8 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     roamAlphaAPI: {
       data: {
         async: { pull: async () => null },
-        block: { update: async () => {} },
-        page: { update: async () => {} },
+        block: { update: async () => { graphWriteCalls += 1; } },
+        page: { update: async () => { graphWriteCalls += 1; } },
       },
       ui: {
         commandPalette: palette,
@@ -227,6 +233,25 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
     ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
 
+    const displaySetting = latestPanelConfig.settings.find(
+      (entry) => entry.id === "task-status-label-display"
+    );
+    assert.equal(displaySetting.action.type, "select");
+    assert.deepEqual(displaySetting.action.items, [
+      "Checkbox only — reveal on intent",
+      "Checkbox + status pill",
+    ]);
+    displaySetting.action.onChange("Checkbox + status pill");
+    displaySetting.action.onChange("Checkbox only — reveal on intent");
+    assert.equal(graphWriteCalls, 0);
+
+    const ownedPill = new FakeElement("span");
+    ownedPill.className = "rm-page-ref";
+    ownedPill.setAttribute("data-ts-managed-status-pill", "true");
+    ownedPill.setAttribute("data-ts-status-pill-hidden", "true");
+    ownedPill.setAttribute("data-foreign-owner", "keep");
+    document.body.appendChild(ownedPill);
+
     releaseFirstPanel();
     const cleanupFirst = await firstLoad;
     await cleanupFirst();
@@ -242,6 +267,10 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
     assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
+    assert.equal(ownedPill.getAttribute("data-ts-managed-status-pill"), null);
+    assert.equal(ownedPill.getAttribute("data-ts-status-pill-hidden"), null);
+    assert.equal(ownedPill.getAttribute("data-foreign-owner"), "keep");
+    assert.equal(graphWriteCalls, 0);
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;
