@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.2.1 | generated; edit src/ */
+/* Roam Task Status Tags v0.3.0 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -305,9 +305,233 @@ function createCertifiedBlockStringWriter({
   });
 }
 
+// src/status-checkbox.js
+var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
+var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
+var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
+var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
+var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
+var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
+var WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
+var BUILTIN_SHAPES = Object.freeze({
+  ACTIVE: "active",
+  WAITING: "waiting",
+  HOLDING: "holding",
+  INCUBATING: "incubating",
+  ALERT: "alert",
+  CANCELLED: "cancelled"
+});
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+function channel(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? clamp(parsed, 0, 255) : 0;
+}
+function normalizeRgb(value, fallback = BLACK) {
+  if (!value || typeof value !== "object") return { ...fallback };
+  return {
+    r: channel(value.r),
+    g: channel(value.g),
+    b: channel(value.b)
+  };
+}
+function linearizedChannel(value) {
+  const normalized = channel(value) / 255;
+  return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+function relativeLuminance(rgb) {
+  const value = normalizeRgb(rgb);
+  return 0.2126 * linearizedChannel(value.r) + 0.7152 * linearizedChannel(value.g) + 0.0722 * linearizedChannel(value.b);
+}
+function contrastRatio(first, second) {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+function mixRgb(from, to, amount) {
+  const start = normalizeRgb(from);
+  const end = normalizeRgb(to);
+  const ratio = clamp(Number(amount) || 0, 0, 1);
+  return {
+    r: start.r + (end.r - start.r) * ratio,
+    g: start.g + (end.g - start.g) * ratio,
+    b: start.b + (end.b - start.b) * ratio
+  };
+}
+function nearestPassingMix(base, surface, target, minimumContrast) {
+  if (contrastRatio(target, surface) < minimumContrast) return null;
+  let low = 0;
+  let high = 1;
+  for (let index = 0; index < 28; index += 1) {
+    const middle = (low + high) / 2;
+    const candidate = mixRgb(base, target, middle);
+    if (contrastRatio(candidate, surface) >= minimumContrast) high = middle;
+    else low = middle;
+  }
+  return {
+    amount: high,
+    color: mixRgb(base, target, high)
+  };
+}
+function deriveAccessibleAccent(baseRgb, surfaceRgb, minimumContrast = 3.2) {
+  const base = normalizeRgb(baseRgb);
+  const surface = normalizeRgb(surfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const required = Math.max(1, Number(minimumContrast) || 3.2);
+  if (contrastRatio(base, surface) >= required) return base;
+  const candidates = [
+    nearestPassingMix(base, surface, BLACK, required),
+    nearestPassingMix(base, surface, WHITE, required)
+  ].filter(Boolean);
+  candidates.sort((a, b) => a.amount - b.amount);
+  return candidates[0]?.color || (relativeLuminance(surface) > 0.5 ? { ...BLACK } : { ...WHITE });
+}
+function roundedRgb(rgb) {
+  const value = normalizeRgb(rgb);
+  return {
+    r: Math.round(value.r),
+    g: Math.round(value.g),
+    b: Math.round(value.b)
+  };
+}
+function rgbCss(rgb) {
+  const value = roundedRgb(rgb);
+  return `rgb(${value.r}, ${value.g}, ${value.b})`;
+}
+function rgbaCss(rgb, alpha) {
+  const value = roundedRgb(rgb);
+  const opacity = clamp(Number(alpha) || 0, 0, 1);
+  return `rgba(${value.r}, ${value.g}, ${value.b}, ${opacity})`;
+}
+function buildStatusCheckboxColors({
+  baseRgb,
+  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
+  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
+  minimumContrast = 3.2
+} = {}) {
+  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
+  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
+  const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
+  const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
+  const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
+  return Object.freeze({
+    base: roundedRgb(base),
+    lightSurface: roundedRgb(lightSurface),
+    darkSurface: roundedRgb(darkSurface),
+    lightAccent: roundedRgb(lightAccent),
+    darkAccent: roundedRgb(darkAccent),
+    lightAccentCss: rgbCss(lightAccent),
+    darkAccentCss: rgbCss(darkAccent),
+    lightWashCss: rgbaCss(base, 0.09),
+    darkWashCss: rgbaCss(base, 0.16)
+  });
+}
+function getStatusCheckboxShape(statusKey) {
+  const key = String(statusKey || "").trim().toUpperCase();
+  return BUILTIN_SHAPES[key] || "custom";
+}
+function lookupStatusKey(statusTagToKey, tagTitle) {
+  if (!tagTitle) return null;
+  if (statusTagToKey instanceof Map) return statusTagToKey.get(tagTitle) || null;
+  return statusTagToKey?.[tagTitle] || null;
+}
+function decideStatusCheckboxAnnotation({
+  enabled = true,
+  tagTitle,
+  statusTagToKey,
+  blockString,
+  textHelpers
+} = {}) {
+  if (!enabled || typeof blockString !== "string" || !textHelpers?.parseManagedPrefix) {
+    return null;
+  }
+  const statusKey = lookupStatusKey(statusTagToKey, tagTitle);
+  if (!statusKey) return null;
+  const parsed = textHelpers.parseManagedPrefix(blockString);
+  if (!parsed?.managed || !parsed?.hadStatus || parsed.currentStatus !== statusKey || parsed.taskKind !== "todo" && parsed.taskKind !== "done") {
+    return null;
+  }
+  return Object.freeze({
+    statusKey,
+    shape: getStatusCheckboxShape(statusKey)
+  });
+}
+function hasClass(element, className) {
+  return Boolean(element?.classList?.contains?.(className));
+}
+function findSiblingTaskCheckbox(statusPill) {
+  const parent = statusPill?.parentElement;
+  if (!parent) return null;
+  const children = Array.from(parent.children || []);
+  const candidates = children.filter((child) => hasClass(child, "rm-checkbox"));
+  if (candidates.length !== 1) return null;
+  const checkbox = candidates[0];
+  const input = checkbox.querySelector?.('input[type="checkbox"]');
+  const checkmark = checkbox.querySelector?.(".checkmark");
+  return input && checkmark ? checkbox : null;
+}
+function clearStatusCheckboxAnnotation(checkbox) {
+  if (!checkbox?.removeAttribute) return;
+  checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
+}
+function applyStatusCheckboxAnnotation(checkbox, decision) {
+  if (!checkbox?.setAttribute || !decision?.statusKey) {
+    clearStatusCheckboxAnnotation(checkbox);
+    return false;
+  }
+  checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, decision.statusKey);
+  checkbox.setAttribute(
+    CHECKBOX_SHAPE_ATTRIBUTE,
+    decision.shape || getStatusCheckboxShape(decision.statusKey)
+  );
+  return true;
+}
+function syncStatusCheckboxForPill({
+  statusPill,
+  enabled = true,
+  tagTitle,
+  statusTagToKey,
+  blockString,
+  textHelpers
+} = {}) {
+  const checkbox = findSiblingTaskCheckbox(statusPill);
+  if (!checkbox) return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
+  clearStatusCheckboxAnnotation(checkbox);
+  const decision = decideStatusCheckboxAnnotation({
+    enabled,
+    tagTitle,
+    statusTagToKey,
+    blockString,
+    textHelpers
+  });
+  if (!decision) return Object.freeze({ annotated: false, reason: "not-managed" });
+  applyStatusCheckboxAnnotation(checkbox, decision);
+  return Object.freeze({
+    annotated: true,
+    checkbox,
+    statusKey: decision.statusKey,
+    shape: decision.shape
+  });
+}
+function includingRoot(root, selector) {
+  const nodes = [];
+  if (root?.matches?.(selector)) nodes.push(root);
+  if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
+  return nodes;
+}
+function clearOwnedStatusCheckboxes(root) {
+  const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR);
+  checkboxes.forEach(clearStatusCheckboxAnnotation);
+  return checkboxes.length;
+}
+
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.2.1" : "development";
+var BUNDLED_VERSION = true ? "0.3.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -624,7 +848,13 @@ async function resolveTaskStatusTargetUids({
 }
 function createTaskStatusExtension({ extensionAPI }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
-  const PILL_REFRESH_THROTTLE_MS = 80;
+  const STATUS_PILL_SELECTOR = [
+    'span.rm-page-ref[data-tag^="task-status/"]',
+    'a.rm-page-ref[data-tag^="task-status/"]',
+    "span.rm-page-ref[data-task-status-key]",
+    "a.rm-page-ref[data-task-status-key]"
+  ].join(", ");
+  const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
     cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
@@ -637,7 +867,8 @@ function createTaskStatusExtension({ extensionAPI }) {
   const STATUS_TAG_PREFIX = "task-status/";
   const SETTINGS_KEYS = {
     statusList: "status-list",
-    statusColorOverrides: "status-color-overrides"
+    statusColorOverrides: "status-color-overrides",
+    styleNativeCheckboxes: "task-status-style-native-checkboxes"
   };
   const DEFAULT_STATUS_NAMES = {
     ACTIVE: "Active",
@@ -683,6 +914,10 @@ function createTaskStatusExtension({ extensionAPI }) {
     CANCELLED: { bg: 0.06, border: 0.16 }
   };
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+  let checkboxStylingEnabled = loadBooleanSetting(
+    SETTINGS_KEYS.styleNativeCheckboxes,
+    true
+  );
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -753,6 +988,42 @@ function createTaskStatusExtension({ extensionAPI }) {
       return null;
     }
   }
+  function readComputedCssColor(element, propertyName) {
+    if (!element || !window.getComputedStyle) return null;
+    try {
+      const styles = window.getComputedStyle(element);
+      const raw = propertyName.startsWith("--") ? styles?.getPropertyValue?.(propertyName) : styles?.[propertyName];
+      const parsed = parseCssColorToRgb(raw);
+      return parsed && parsed.a !== 0 ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function resolveCheckboxSurfaces() {
+    const lightFallback = { r: 245, g: 248, b: 250 };
+    const darkFallback = { r: 32, g: 43, b: 51 };
+    let lightSurface = lightFallback;
+    let darkSurface = darkFallback;
+    const candidates = [];
+    const nativeCheckmark = document.querySelector?.(
+      ".rm-checkbox.rm-todo:not([data-ts-checkbox-status]) .checkmark"
+    );
+    const nativeSurface = readComputedCssColor(nativeCheckmark, "backgroundColor");
+    if (nativeSurface) candidates.push(nativeSurface);
+    const roots = [document.documentElement, document.body].filter(Boolean);
+    const tokenNames = ["--svy-surface", "--bp3-surface", "--svy-canvas"];
+    tokenNames.forEach((token) => {
+      roots.forEach((root) => {
+        const color = readComputedCssColor(root, token);
+        if (color) candidates.push(color);
+      });
+    });
+    const bodySurface = readComputedCssColor(document.body, "backgroundColor");
+    if (bodySurface) candidates.push(bodySurface);
+    lightSurface = candidates.find((candidate) => relativeLuminance(candidate) >= 0.45) || lightSurface;
+    darkSurface = candidates.find((candidate) => relativeLuminance(candidate) < 0.45) || darkSurface;
+    return { lightSurface, darkSurface };
+  }
   function getStatusCssVarNames(statusKey) {
     const slug = String(statusKey || "").toLowerCase();
     return {
@@ -795,6 +1066,18 @@ function createTaskStatusExtension({ extensionAPI }) {
     }
     return values;
   }
+  function deriveStatusCheckboxColorValues(statusKey, entry, surfaces) {
+    const base = normalizeCssColorValue(entry?.base) || getDefaultStatusColor(statusKey);
+    const parsedBase = parseCssColorToRgb(base) || parseCssColorToRgb(
+      getDefaultStatusColor(statusKey)
+    );
+    return buildStatusCheckboxColors({
+      baseRgb: parsedBase || { r: 100, g: 116, b: 139 },
+      lightSurfaceRgb: surfaces?.lightSurface,
+      darkSurfaceRgb: surfaces?.darkSurface,
+      minimumContrast: 3.2
+    });
+  }
   function ensureStatusColorStyleElement() {
     if (statusColorStyleEl && statusColorStyleEl.isConnected) return statusColorStyleEl;
     try {
@@ -826,10 +1109,16 @@ function createTaskStatusExtension({ extensionAPI }) {
   function applyStatusColorOverrides(overrides) {
     clearStatusColorOverrides();
     const dynamicRules = [];
+    const checkboxSurfaces = resolveCheckboxSurfaces();
     getRenderableStatusKeys().forEach((statusKey) => {
       const entry = overrides?.[statusKey];
       const vars = getStatusCssVarNames(statusKey);
       const values = deriveStatusColorValues(statusKey, entry);
+      const checkboxValues = deriveStatusCheckboxColorValues(
+        statusKey,
+        entry,
+        checkboxSurfaces
+      );
       const keySelector = cssStatusKeySelector(statusKey);
       dynamicRules.push(`
 span.rm-page-ref[data-task-status-key="${keySelector}"],
@@ -840,6 +1129,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   background-color: ${values.bg || `var(${vars.bg})`} !important;
   color: ${values.fg || `var(${vars.fg})`} !important;
   border-color: ${values.border || `var(${vars.border})`} !important;
+}
+
+.rm-checkbox[data-ts-checkbox-status="${keySelector}"] {
+  --ts-checkbox-accent-light: ${checkboxValues.lightAccentCss};
+  --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
+  --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
+  --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
 }`);
     });
     const styleEl = ensureStatusColorStyleElement();
@@ -862,6 +1158,27 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (raw === null || typeof raw === "undefined") return fallback;
     const parsed = parseMaybeJson(raw);
     return isPlainObject(parsed) ? parsed : fallback;
+  }
+  function normalizeBooleanSetting(value, fallback = false) {
+    if (typeof value === "boolean") return value;
+    if (value && typeof value === "object") {
+      if (typeof value.target?.checked === "boolean") return value.target.checked;
+      if (typeof value.currentTarget?.checked === "boolean") {
+        return value.currentTarget.checked;
+      }
+    }
+    if (value === "true" || value === 1 || value === "1") return true;
+    if (value === "false" || value === 0 || value === "0") return false;
+    return fallback;
+  }
+  function loadBooleanSetting(key, fallback = false) {
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(key);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(key, fallback);
+      return fallback;
+    }
+    return normalizeBooleanSetting(parseMaybeJson(raw), fallback);
   }
   function saveSetting(key, value) {
     if (!extensionAPI?.settings?.set) return;
@@ -999,7 +1316,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
   function rebuildStatusIndexesFromMemory() {
     syncCycleOrderFromStatusList();
@@ -1008,7 +1325,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
   function escapeDatalogString(text) {
     return String(text || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -1130,7 +1447,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   };
   const pendingOperations = /* @__PURE__ */ new Set();
   let pillObserver = null;
-  let pillRefreshTimer = null;
+  let themeObserver = null;
+  let themeMediaQuery = null;
+  let themeMediaListener = null;
+  let themeRefreshFrame = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
   function log(...args) {
@@ -1177,50 +1497,99 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       el.removeAttribute("data-task-status-label");
     }
   }
-  function refreshStatusPills(root = document) {
-    const scope = root && root.querySelectorAll ? root : document;
-    const nodes = scope.querySelectorAll(
-      'span.rm-page-ref[data-tag^="task-status/"], a.rm-page-ref[data-tag^="task-status/"], span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]'
-    );
-    nodes.forEach(annotateStatusPillElement);
+  function elementsIncludingRoot(root, selector) {
+    const nodes = [];
+    if (root?.matches?.(selector)) nodes.push(root);
+    if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
+    return nodes;
   }
-  function scheduleStatusPillRefresh() {
-    if (pillRefreshTimer) return;
-    pillRefreshTimer = window.setTimeout(() => {
-      pillRefreshTimer = null;
-      try {
-        refreshStatusPills(document);
-      } catch (err) {
-        log("Pill refresh error:", err);
+  function resolveRefreshScope(root) {
+    if (!root || root === document || root === document.body) return root || document;
+    if (root.nodeType !== 1) return root.parentElement || document;
+    return root.closest?.(RENDER_SCOPE_SELECTOR) || root;
+  }
+  function clearStatusPillAnnotations(root = document) {
+    elementsIncludingRoot(
+      root,
+      "span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]"
+    ).forEach((pill) => {
+      pill.removeAttribute("data-task-status-key");
+      pill.removeAttribute("data-task-status-label");
+    });
+  }
+  function refreshStatusVisuals(root = document) {
+    const scope = resolveRefreshScope(root);
+    if (!scope?.querySelectorAll && !scope?.matches) return;
+    clearOwnedStatusCheckboxes(scope);
+    const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
+    pills.forEach(annotateStatusPillElement);
+    if (!checkboxStylingEnabled) return;
+    const blockStringsByUid = /* @__PURE__ */ new Map();
+    const textHelpers = getTextHelpers();
+    pills.forEach((pill) => {
+      const tagTitle = pill.getAttribute?.("data-tag");
+      const statusKey = pill.getAttribute?.("data-task-status-key");
+      if (!tagTitle || !statusKey) return;
+      const blockUid = getBlockUidFromElement(pill);
+      if (!blockUid) return;
+      if (!blockStringsByUid.has(blockUid)) {
+        const liveValue = getLiveBlockInputValue(blockUid);
+        blockStringsByUid.set(
+          blockUid,
+          typeof liveValue === "string" ? liveValue : getBlockString(blockUid)
+        );
       }
-    }, PILL_REFRESH_THROTTLE_MS);
+      syncStatusCheckboxForPill({
+        statusPill: pill,
+        enabled: checkboxStylingEnabled,
+        tagTitle,
+        statusTagToKey,
+        blockString: blockStringsByUid.get(blockUid),
+        textHelpers
+      });
+    });
+  }
+  function setCheckboxStylingEnabled(nextValue) {
+    checkboxStylingEnabled = normalizeBooleanSetting(nextValue, checkboxStylingEnabled);
+    if (checkboxStylingEnabled) refreshStatusVisuals(document);
+    else clearOwnedStatusCheckboxes(document);
+  }
+  function refreshMutationScopes(mutations) {
+    const refreshed = /* @__PURE__ */ new Set();
+    const refreshOnce = (node) => {
+      if (!node) return;
+      const scope = resolveRefreshScope(node);
+      if (!scope || refreshed.has(scope)) return;
+      refreshed.add(scope);
+      refreshStatusVisuals(scope);
+    };
+    for (const mutation of mutations || []) {
+      if (mutation.type === "attributes") {
+        if (mutation.attributeName === "data-tag") refreshOnce(mutation.target);
+        continue;
+      }
+      let handledAddedElement = false;
+      for (const node of mutation.addedNodes || []) {
+        if (node?.nodeType !== 1) continue;
+        handledAddedElement = true;
+        refreshOnce(node);
+      }
+      if ((mutation.removedNodes?.length || 0) > 0 || !handledAddedElement) {
+        refreshOnce(mutation.target);
+      }
+    }
   }
   function startStatusPillObserver() {
     if (pillObserver) return;
     if (!document?.body) return;
-    pillObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.type === "attributes") {
-          if (m.attributeName === "data-tag") {
-            scheduleStatusPillRefresh();
-          }
-          continue;
-        }
-        for (const node of m.addedNodes || []) {
-          if (node && node.nodeType === 1) {
-            scheduleStatusPillRefresh();
-            break;
-          }
-        }
-      }
-    });
+    pillObserver = new MutationObserver((mutations) => refreshMutationScopes(mutations));
     pillObserver.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ["data-tag"]
     });
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
   function stopStatusPillObserver() {
     if (pillObserver) {
@@ -1230,10 +1599,64 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }
     pillObserver = null;
-    if (pillRefreshTimer) {
-      window.clearTimeout(pillRefreshTimer);
+    clearOwnedStatusCheckboxes(document);
+    clearStatusPillAnnotations(document);
+  }
+  function scheduleThemeColorRefresh() {
+    if (themeRefreshFrame != null) return;
+    const requestFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
+    themeRefreshFrame = requestFrame(() => {
+      themeRefreshFrame = null;
+      applyStatusColorOverrides(statusColorOverrides);
+    });
+  }
+  function startThemeObserver() {
+    if (themeObserver) return;
+    themeObserver = new MutationObserver(() => scheduleThemeColorRefresh());
+    [document.documentElement, document.body].filter(Boolean).forEach((target) => {
+      themeObserver.observe(target, {
+        attributes: true,
+        attributeFilter: ["class", "style"]
+      });
+    });
+    try {
+      themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
+      themeMediaListener = () => scheduleThemeColorRefresh();
+      if (themeMediaQuery?.addEventListener) {
+        themeMediaQuery.addEventListener("change", themeMediaListener);
+      } else if (themeMediaQuery?.addListener) {
+        themeMediaQuery.addListener(themeMediaListener);
+      }
+    } catch (_) {
+      themeMediaQuery = null;
+      themeMediaListener = null;
     }
-    pillRefreshTimer = null;
+  }
+  function stopThemeObserver() {
+    if (themeObserver) {
+      try {
+        themeObserver.disconnect();
+      } catch (_) {
+      }
+    }
+    themeObserver = null;
+    if (themeMediaQuery && themeMediaListener) {
+      try {
+        if (themeMediaQuery.removeEventListener) {
+          themeMediaQuery.removeEventListener("change", themeMediaListener);
+        } else if (themeMediaQuery.removeListener) {
+          themeMediaQuery.removeListener(themeMediaListener);
+        }
+      } catch (_) {
+      }
+    }
+    themeMediaQuery = null;
+    themeMediaListener = null;
+    if (themeRefreshFrame != null) {
+      const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
+      cancelFrame?.(themeRefreshFrame);
+    }
+    themeRefreshFrame = null;
   }
   function getBlockString(blockUid) {
     try {
@@ -2221,21 +2644,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           )
         ) : null
       );
-      const setColorDraftValue = (k, channel, value) => {
+      const setColorDraftValue = (k, channel2, value) => {
         clearColorMessages(k);
-        setDraftColors(k, { [channel]: value });
+        setDraftColors(k, { [channel2]: value });
       };
       const renderColorPopover = ({
         k,
-        channel,
+        channel: channel2,
         label,
         draftValue,
         hexValue,
         fallbackValue,
         disabled
       }) => {
-        const popoverKey = `${k}:${channel}`;
-        const isText = channel === "text";
+        const popoverKey = `${k}:${channel2}`;
+        const isText = channel2 === "text";
         const isOpen = openColorPopover === popoverKey;
         return React.createElement(
           "div",
@@ -2291,7 +2714,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                       style: { backgroundColor: preset.value },
                       title: preset.name,
                       "aria-label": `Use ${preset.name}`,
-                      onClick: () => setColorDraftValue(k, channel, preset.value)
+                      onClick: () => setColorDraftValue(k, channel2, preset.value)
                     })
                   )
                 ),
@@ -2303,7 +2726,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                     className: "ts-status-native-color-input",
                     value: hexValue,
                     disabled,
-                    onChange: (e) => setColorDraftValue(k, channel, e.target.value),
+                    onChange: (e) => setColorDraftValue(k, channel2, e.target.value),
                     "aria-label": `${label} native color picker`
                   }),
                   React.createElement("input", {
@@ -2311,7 +2734,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                     value: draftValue,
                     disabled,
                     placeholder: isText ? "Optional text color" : fallbackValue || "#14b8a6",
-                    onChange: (e) => setColorDraftValue(k, channel, e.target.value),
+                    onChange: (e) => setColorDraftValue(k, channel2, e.target.value),
                     "aria-label": `${label} color value`
                   })
                 ),
@@ -2324,7 +2747,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                       type: "button",
                       className: "bp3-button bp3-small bp3-minimal",
                       disabled,
-                      onClick: () => setColorDraftValue(k, channel, "")
+                      onClick: () => setColorDraftValue(k, channel2, "")
                     },
                     isText ? "Clear Text" : "Clear Base"
                   )
@@ -2678,6 +3101,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       tabTitle: "Task Status Tags",
       settings: [
         {
+          id: SETTINGS_KEYS.styleNativeCheckboxes,
+          name: "Style native checkboxes by task status",
+          description: "Adds an accessible color-and-shape treatment to the exact TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
+          action: {
+            type: "switch",
+            onChange: (value) => setCheckboxStylingEnabled(value)
+          }
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -2717,6 +3149,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
     if (!isActive()) return false;
+    startThemeObserver();
     await registerAllCommands();
     if (!isActive()) {
       await cleanup();
@@ -2732,6 +3165,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function cleanup() {
     closeStatusChooser();
     stopStatusPillObserver();
+    stopThemeObserver();
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;

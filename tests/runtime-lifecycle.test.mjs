@@ -2,9 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 class FakeClassList {
-  toggle() {}
-  add() {}
-  remove() {}
+  constructor(owner) { this.owner = owner; }
+  values() { return new Set(String(this.owner.className || "").split(/\s+/).filter(Boolean)); }
+  contains(value) { return this.values().has(value); }
+  toggle(value, force) {
+    const values = this.values();
+    const next = typeof force === "boolean" ? force : !values.has(value);
+    if (next) values.add(value); else values.delete(value);
+    this.owner.className = [...values].join(" ");
+    return next;
+  }
+  add(...items) {
+    const values = this.values();
+    items.forEach((item) => values.add(item));
+    this.owner.className = [...values].join(" ");
+  }
+  remove(...items) {
+    const values = this.values();
+    items.forEach((item) => values.delete(item));
+    this.owner.className = [...values].join(" ");
+  }
 }
 
 class FakeElement extends EventTarget {
@@ -15,7 +32,7 @@ class FakeElement extends EventTarget {
     this.parentNode = null;
     this.attributes = new Map();
     this.className = "";
-    this.classList = new FakeClassList();
+    this.classList = new FakeClassList(this);
     this.isConnected = false;
     this.textContent = "";
     this.style = {
@@ -42,8 +59,23 @@ class FakeElement extends EventTarget {
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   removeAttribute(name) { this.attributes.delete(name); }
-  querySelectorAll() { return []; }
-  querySelector() { return null; }
+  matches(selector) {
+    return selector === ".rm-checkbox[data-ts-checkbox-status]" &&
+      this.classList.contains("rm-checkbox") &&
+      this.attributes.has("data-ts-checkbox-status");
+  }
+  querySelectorAll(selector) {
+    const matches = [];
+    const visit = (node) => {
+      for (const child of node.children || []) {
+        if (child.matches?.(selector)) matches.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return matches;
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   closest() { return null; }
 }
 
@@ -60,8 +92,14 @@ class FakeDocument extends EventTarget {
   }
   createElement(name) { return new FakeElement(name); }
   createElementNS(_namespace, name) { return new FakeElement(name); }
-  querySelectorAll() { return []; }
-  querySelector() { return null; }
+  querySelectorAll(selector) {
+    return [
+      ...this.documentElement.querySelectorAll(selector),
+      ...this.head.querySelectorAll(selector),
+      ...this.body.querySelectorAll(selector),
+    ];
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   getElementById() { return null; }
 }
 
@@ -133,6 +171,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
   globalThis.MutationObserver = FakeMutationObserver;
 
   let panelCalls = 0;
+  let latestPanelConfig = null;
   let releaseFirstPanel;
   const firstPanel = new Promise((resolve) => { releaseFirstPanel = resolve; });
   const extensionAPI = {
@@ -140,8 +179,9 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       get: () => null,
       set: async () => {},
       panel: {
-        create: async () => {
+        create: async (config) => {
           panelCalls += 1;
+          latestPanelConfig = config;
           if (panelCalls === 1) await firstPanel;
         },
       },
@@ -170,6 +210,23 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.ok(activeCommands.size > 0);
     assert.equal(slashCalls.added.length, 6);
 
+    const ownedCheckbox = new FakeElement("span");
+    ownedCheckbox.className = "rm-checkbox rm-todo";
+    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
+    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+    ownedCheckbox.setAttribute("data-foreign-owner", "keep");
+    document.body.appendChild(ownedCheckbox);
+
+    const checkboxSetting = latestPanelConfig.settings.find(
+      (entry) => entry.id === "task-status-style-native-checkboxes"
+    );
+    assert.equal(checkboxSetting.action.type, "switch");
+    checkboxSetting.action.onChange(false);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
+    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
+    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+
     releaseFirstPanel();
     const cleanupFirst = await firstLoad;
     await cleanupFirst();
@@ -182,6 +239,9 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
     assert.equal(activeCommands.size, 0);
     assert.equal(slashCalls.removed.length, 6);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
+    assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;

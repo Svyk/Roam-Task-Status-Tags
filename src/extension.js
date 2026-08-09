@@ -4,6 +4,12 @@ import {
   createCertifiedBlockStringWriter,
   createFreshBlockStringReader,
 } from "./status-write.js";
+import {
+  buildStatusCheckboxColors,
+  clearOwnedStatusCheckboxes,
+  relativeLuminance,
+  syncStatusCheckboxForPill,
+} from "./status-checkbox.js";
 
 // Task Status Tags (Roam Depot dev extension)
 //
@@ -399,7 +405,13 @@ export async function resolveTaskStatusTargetUids({
 
 function createTaskStatusExtension({ extensionAPI }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
-  const PILL_REFRESH_THROTTLE_MS = 80;
+  const STATUS_PILL_SELECTOR = [
+    'span.rm-page-ref[data-tag^="task-status/"]',
+    'a.rm-page-ref[data-tag^="task-status/"]',
+    "span.rm-page-ref[data-task-status-key]",
+    "a.rm-page-ref[data-task-status-key]",
+  ].join(", ");
+  const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
 
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
@@ -417,6 +429,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   const SETTINGS_KEYS = {
     statusList: "status-list",
     statusColorOverrides: "status-color-overrides",
+    styleNativeCheckboxes: "task-status-style-native-checkboxes",
   };
 
   const DEFAULT_STATUS_NAMES = {
@@ -469,6 +482,10 @@ function createTaskStatusExtension({ extensionAPI }) {
   };
 
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+  let checkboxStylingEnabled = loadBooleanSetting(
+    SETTINGS_KEYS.styleNativeCheckboxes,
+    true
+  );
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -549,6 +566,54 @@ function createTaskStatusExtension({ extensionAPI }) {
     }
   }
 
+  function readComputedCssColor(element, propertyName) {
+    if (!element || !window.getComputedStyle) return null;
+    try {
+      const styles = window.getComputedStyle(element);
+      const raw = propertyName.startsWith("--")
+        ? styles?.getPropertyValue?.(propertyName)
+        : styles?.[propertyName];
+      const parsed = parseCssColorToRgb(raw);
+      return parsed && parsed.a !== 0 ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function resolveCheckboxSurfaces() {
+    const lightFallback = { r: 245, g: 248, b: 250 };
+    const darkFallback = { r: 32, g: 43, b: 51 };
+    let lightSurface = lightFallback;
+    let darkSurface = darkFallback;
+
+    const candidates = [];
+
+    const nativeCheckmark = document.querySelector?.(
+      ".rm-checkbox.rm-todo:not([data-ts-checkbox-status]) .checkmark"
+    );
+    const nativeSurface = readComputedCssColor(nativeCheckmark, "backgroundColor");
+    if (nativeSurface) candidates.push(nativeSurface);
+
+    const roots = [document.documentElement, document.body].filter(Boolean);
+    const tokenNames = ["--svy-surface", "--bp3-surface", "--svy-canvas"];
+    tokenNames.forEach((token) => {
+      roots.forEach((root) => {
+        const color = readComputedCssColor(root, token);
+        if (color) candidates.push(color);
+      });
+    });
+
+    const bodySurface = readComputedCssColor(document.body, "backgroundColor");
+    if (bodySurface) candidates.push(bodySurface);
+
+    lightSurface =
+      candidates.find((candidate) => relativeLuminance(candidate) >= 0.45) || lightSurface;
+    darkSurface =
+      candidates.find((candidate) => relativeLuminance(candidate) < 0.45) || darkSurface;
+
+    return { lightSurface, darkSurface };
+  }
+
   function getStatusCssVarNames(statusKey) {
     const slug = String(statusKey || "").toLowerCase();
     return {
@@ -600,6 +665,20 @@ function createTaskStatusExtension({ extensionAPI }) {
     return values;
   }
 
+  function deriveStatusCheckboxColorValues(statusKey, entry, surfaces) {
+    const base = normalizeCssColorValue(entry?.base) || getDefaultStatusColor(statusKey);
+    const parsedBase = parseCssColorToRgb(base) || parseCssColorToRgb(
+      getDefaultStatusColor(statusKey)
+    );
+
+    return buildStatusCheckboxColors({
+      baseRgb: parsedBase || { r: 100, g: 116, b: 139 },
+      lightSurfaceRgb: surfaces?.lightSurface,
+      darkSurfaceRgb: surfaces?.darkSurface,
+      minimumContrast: 3.2,
+    });
+  }
+
   function ensureStatusColorStyleElement() {
     if (statusColorStyleEl && statusColorStyleEl.isConnected) return statusColorStyleEl;
     try {
@@ -633,11 +712,17 @@ function createTaskStatusExtension({ extensionAPI }) {
     clearStatusColorOverrides();
 
     const dynamicRules = [];
+    const checkboxSurfaces = resolveCheckboxSurfaces();
 
     getRenderableStatusKeys().forEach((statusKey) => {
       const entry = overrides?.[statusKey];
       const vars = getStatusCssVarNames(statusKey);
       const values = deriveStatusColorValues(statusKey, entry);
+      const checkboxValues = deriveStatusCheckboxColorValues(
+        statusKey,
+        entry,
+        checkboxSurfaces
+      );
 
       const keySelector = cssStatusKeySelector(statusKey);
       dynamicRules.push(`
@@ -649,6 +734,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   background-color: ${values.bg || `var(${vars.bg})`} !important;
   color: ${values.fg || `var(${vars.fg})`} !important;
   border-color: ${values.border || `var(${vars.border})`} !important;
+}
+
+.rm-checkbox[data-ts-checkbox-status="${keySelector}"] {
+  --ts-checkbox-accent-light: ${checkboxValues.lightAccentCss};
+  --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
+  --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
+  --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
 }`);
     });
 
@@ -675,6 +767,29 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (raw === null || typeof raw === "undefined") return fallback;
     const parsed = parseMaybeJson(raw);
     return isPlainObject(parsed) ? parsed : fallback;
+  }
+
+  function normalizeBooleanSetting(value, fallback = false) {
+    if (typeof value === "boolean") return value;
+    if (value && typeof value === "object") {
+      if (typeof value.target?.checked === "boolean") return value.target.checked;
+      if (typeof value.currentTarget?.checked === "boolean") {
+        return value.currentTarget.checked;
+      }
+    }
+    if (value === "true" || value === 1 || value === "1") return true;
+    if (value === "false" || value === 0 || value === "0") return false;
+    return fallback;
+  }
+
+  function loadBooleanSetting(key, fallback = false) {
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(key);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(key, fallback);
+      return fallback;
+    }
+    return normalizeBooleanSetting(parseMaybeJson(raw), fallback);
   }
 
   function saveSetting(key, value) {
@@ -840,7 +955,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
 
   function rebuildStatusIndexesFromMemory() {
@@ -850,7 +965,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
 
   function escapeDatalogString(text) {
@@ -1011,7 +1126,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   const pendingOperations = new Set();
 
   let pillObserver = null;
-  let pillRefreshTimer = null;
+  let themeObserver = null;
+  let themeMediaQuery = null;
+  let themeMediaListener = null;
+  let themeRefreshFrame = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
 
@@ -1067,47 +1185,107 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
   }
 
-  function refreshStatusPills(root = document) {
-    const scope = root && root.querySelectorAll ? root : document;
-    const nodes = scope.querySelectorAll(
-      'span.rm-page-ref[data-tag^="task-status/"], a.rm-page-ref[data-tag^="task-status/"], span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]'
-    );
-    nodes.forEach(annotateStatusPillElement);
+  function elementsIncludingRoot(root, selector) {
+    const nodes = [];
+    if (root?.matches?.(selector)) nodes.push(root);
+    if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
+    return nodes;
   }
 
-  function scheduleStatusPillRefresh() {
-    if (pillRefreshTimer) return;
-    pillRefreshTimer = window.setTimeout(() => {
-      pillRefreshTimer = null;
-      try {
-        refreshStatusPills(document);
-      } catch (err) {
-        log("Pill refresh error:", err);
+  function resolveRefreshScope(root) {
+    if (!root || root === document || root === document.body) return root || document;
+    if (root.nodeType !== 1) return root.parentElement || document;
+    return root.closest?.(RENDER_SCOPE_SELECTOR) || root;
+  }
+
+  function clearStatusPillAnnotations(root = document) {
+    elementsIncludingRoot(
+      root,
+      "span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]"
+    ).forEach((pill) => {
+      pill.removeAttribute("data-task-status-key");
+      pill.removeAttribute("data-task-status-label");
+    });
+  }
+
+  function refreshStatusVisuals(root = document) {
+    const scope = resolveRefreshScope(root);
+    if (!scope?.querySelectorAll && !scope?.matches) return;
+
+    clearOwnedStatusCheckboxes(scope);
+    const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
+    pills.forEach(annotateStatusPillElement);
+    if (!checkboxStylingEnabled) return;
+
+    const blockStringsByUid = new Map();
+    const textHelpers = getTextHelpers();
+
+    pills.forEach((pill) => {
+      const tagTitle = pill.getAttribute?.("data-tag");
+      const statusKey = pill.getAttribute?.("data-task-status-key");
+      if (!tagTitle || !statusKey) return;
+
+      const blockUid = getBlockUidFromElement(pill);
+      if (!blockUid) return;
+      if (!blockStringsByUid.has(blockUid)) {
+        const liveValue = getLiveBlockInputValue(blockUid);
+        blockStringsByUid.set(
+          blockUid,
+          typeof liveValue === "string" ? liveValue : getBlockString(blockUid)
+        );
       }
-    }, PILL_REFRESH_THROTTLE_MS);
+
+      syncStatusCheckboxForPill({
+        statusPill: pill,
+        enabled: checkboxStylingEnabled,
+        tagTitle,
+        statusTagToKey,
+        blockString: blockStringsByUid.get(blockUid),
+        textHelpers,
+      });
+    });
+  }
+
+  function setCheckboxStylingEnabled(nextValue) {
+    checkboxStylingEnabled = normalizeBooleanSetting(nextValue, checkboxStylingEnabled);
+    if (checkboxStylingEnabled) refreshStatusVisuals(document);
+    else clearOwnedStatusCheckboxes(document);
+  }
+
+  function refreshMutationScopes(mutations) {
+    const refreshed = new Set();
+    const refreshOnce = (node) => {
+      if (!node) return;
+      const scope = resolveRefreshScope(node);
+      if (!scope || refreshed.has(scope)) return;
+      refreshed.add(scope);
+      refreshStatusVisuals(scope);
+    };
+
+    for (const mutation of mutations || []) {
+      if (mutation.type === "attributes") {
+        if (mutation.attributeName === "data-tag") refreshOnce(mutation.target);
+        continue;
+      }
+
+      let handledAddedElement = false;
+      for (const node of mutation.addedNodes || []) {
+        if (node?.nodeType !== 1) continue;
+        handledAddedElement = true;
+        refreshOnce(node);
+      }
+
+      if ((mutation.removedNodes?.length || 0) > 0 || !handledAddedElement) {
+        refreshOnce(mutation.target);
+      }
+    }
   }
 
   function startStatusPillObserver() {
     if (pillObserver) return;
     if (!document?.body) return;
 
-    pillObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.type === "attributes") {
-          // Roam can reuse elements and set data-tag after render.
-          if (m.attributeName === "data-tag") {
-            scheduleStatusPillRefresh();
-          }
-          continue;
-        }
-        for (const node of m.addedNodes || []) {
-          if (node && node.nodeType === 1) {
-            scheduleStatusPillRefresh();
-            break;
-          }
-        }
-      }
-    });
+    pillObserver = new MutationObserver((mutations) => refreshMutationScopes(mutations));
 
     pillObserver.observe(document.body, {
       childList: true,
@@ -1115,7 +1293,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       attributes: true,
       attributeFilter: ["data-tag"],
     });
-    scheduleStatusPillRefresh();
+    refreshStatusVisuals(document);
   }
 
   function stopStatusPillObserver() {
@@ -1125,10 +1303,68 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       } catch (_) {}
     }
     pillObserver = null;
-    if (pillRefreshTimer) {
-      window.clearTimeout(pillRefreshTimer);
+    clearOwnedStatusCheckboxes(document);
+    clearStatusPillAnnotations(document);
+  }
+
+  function scheduleThemeColorRefresh() {
+    if (themeRefreshFrame != null) return;
+    const requestFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
+    themeRefreshFrame = requestFrame(() => {
+      themeRefreshFrame = null;
+      applyStatusColorOverrides(statusColorOverrides);
+    });
+  }
+
+  function startThemeObserver() {
+    if (themeObserver) return;
+    themeObserver = new MutationObserver(() => scheduleThemeColorRefresh());
+    [document.documentElement, document.body].filter(Boolean).forEach((target) => {
+      themeObserver.observe(target, {
+        attributes: true,
+        attributeFilter: ["class", "style"],
+      });
+    });
+
+    try {
+      themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
+      themeMediaListener = () => scheduleThemeColorRefresh();
+      if (themeMediaQuery?.addEventListener) {
+        themeMediaQuery.addEventListener("change", themeMediaListener);
+      } else if (themeMediaQuery?.addListener) {
+        themeMediaQuery.addListener(themeMediaListener);
+      }
+    } catch (_) {
+      themeMediaQuery = null;
+      themeMediaListener = null;
     }
-    pillRefreshTimer = null;
+  }
+
+  function stopThemeObserver() {
+    if (themeObserver) {
+      try {
+        themeObserver.disconnect();
+      } catch (_) {}
+    }
+    themeObserver = null;
+
+    if (themeMediaQuery && themeMediaListener) {
+      try {
+        if (themeMediaQuery.removeEventListener) {
+          themeMediaQuery.removeEventListener("change", themeMediaListener);
+        } else if (themeMediaQuery.removeListener) {
+          themeMediaQuery.removeListener(themeMediaListener);
+        }
+      } catch (_) {}
+    }
+    themeMediaQuery = null;
+    themeMediaListener = null;
+
+    if (themeRefreshFrame != null) {
+      const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
+      cancelFrame?.(themeRefreshFrame);
+    }
+    themeRefreshFrame = null;
   }
 
   function getBlockString(blockUid) {
@@ -2844,6 +3080,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       tabTitle: "Task Status Tags",
       settings: [
         {
+          id: SETTINGS_KEYS.styleNativeCheckboxes,
+          name: "Style native checkboxes by task status",
+          description:
+            "Adds an accessible color-and-shape treatment to the exact TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
+          action: {
+            type: "switch",
+            onChange: (value) => setCheckboxStylingEnabled(value),
+          },
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -2891,6 +3137,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
     if (!isActive()) return false;
+    startThemeObserver();
 
     await registerAllCommands();
     if (!isActive()) {
@@ -2912,6 +3159,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function cleanup() {
     closeStatusChooser();
     stopStatusPillObserver();
+    stopThemeObserver();
 
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();

@@ -49,6 +49,259 @@
   --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
 }
 
+/*
+ * Status-aware native checkbox treatment.
+ *
+ * JavaScript owns the exact data-ts-checkbox-* attributes. Nothing below can
+ * match an unclaimed Roam checkbox, so Better Tasks and the active theme keep
+ * their native completion behavior everywhere else.
+ */
+.rm-checkbox[data-ts-checkbox-status] {
+  --ts-checkbox-accent-light: rgb(100, 116, 139);
+  --ts-checkbox-accent-dark: rgb(105, 121, 143);
+  --ts-checkbox-wash-light: rgba(100, 116, 139, 0.09);
+  --ts-checkbox-wash-dark: rgba(100, 116, 139, 0.16);
+  --ts-checkbox-accent: var(--ts-checkbox-accent-light);
+  --ts-checkbox-wash: var(--ts-checkbox-wash-light);
+  --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #137cbd));
+  --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #ffffff));
+}
+
+:root.bp3-dark .rm-checkbox[data-ts-checkbox-status],
+body.bt-theme-dark .rm-checkbox[data-ts-checkbox-status],
+.rm-dark-theme .rm-checkbox[data-ts-checkbox-status],
+body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
+  --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
+  --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
+  --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #48aff0));
+  --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #182026));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.bp3-light) .rm-checkbox[data-ts-checkbox-status] {
+    --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
+    --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
+    --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #48aff0));
+    --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #182026));
+  }
+}
+
+.rm-checkbox[data-ts-checkbox-status="ACTIVE"] {
+  --ts-checkbox-accent-light: rgb(17, 155, 139);
+  --ts-checkbox-accent-dark: rgb(20, 184, 166);
+  --ts-checkbox-wash-light: rgba(20, 184, 166, 0.09);
+  --ts-checkbox-wash-dark: rgba(20, 184, 166, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status="WAITING"] {
+  --ts-checkbox-accent-light: rgb(172, 132, 6);
+  --ts-checkbox-accent-dark: rgb(234, 179, 8);
+  --ts-checkbox-wash-light: rgba(234, 179, 8, 0.09);
+  --ts-checkbox-wash-dark: rgba(234, 179, 8, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status="HOLDING"] {
+  --ts-checkbox-accent-light: rgb(126, 139, 157);
+  --ts-checkbox-accent-dark: rgb(148, 163, 184);
+  --ts-checkbox-wash-light: rgba(148, 163, 184, 0.09);
+  --ts-checkbox-wash-dark: rgba(148, 163, 184, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status="INCUBATING"] {
+  --ts-checkbox-accent-light: rgb(99, 102, 241);
+  --ts-checkbox-accent-dark: rgb(100, 103, 241);
+  --ts-checkbox-wash-light: rgba(99, 102, 241, 0.09);
+  --ts-checkbox-wash-dark: rgba(99, 102, 241, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status="ALERT"] {
+  --ts-checkbox-accent-light: rgb(244, 63, 94);
+  --ts-checkbox-accent-dark: rgb(244, 63, 94);
+  --ts-checkbox-wash-light: rgba(244, 63, 94, 0.09);
+  --ts-checkbox-wash-dark: rgba(244, 63, 94, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status="CANCELLED"] {
+  --ts-checkbox-accent-light: rgb(30, 41, 59);
+  --ts-checkbox-accent-dark: rgb(113, 120, 131);
+  --ts-checkbox-wash-light: rgba(30, 41, 59, 0.09);
+  --ts-checkbox-wash-dark: rgba(30, 41, 59, 0.16);
+}
+
+.rm-checkbox[data-ts-checkbox-status] > .check-container {
+  overflow: visible !important;
+}
+
+/* Invisible 24px target without changing the native 16px visual footprint. */
+.rm-checkbox[data-ts-checkbox-status] > .check-container::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.rm-checkbox[data-ts-checkbox-status]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  box-sizing: border-box !important;
+  border: 2px solid var(--ts-checkbox-accent) !important;
+  border-radius: 4px !important;
+  background: var(--ts-checkbox-wash) !important;
+  box-shadow: 0 1px 1px rgba(16, 22, 26, 0.12) !important;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease !important;
+}
+
+.rm-checkbox[data-ts-checkbox-status]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark {
+  box-shadow:
+    0 0 0 1px var(--ts-checkbox-accent),
+    0 1px 1px rgba(16, 22, 26, 0.12) !important;
+}
+
+.rm-checkbox[data-ts-checkbox-status]
+  > .check-container
+  > input:focus-visible
+  ~ .checkmark {
+  outline: 2px solid var(--ts-checkbox-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* The host theme continues to own checked fill and .checkmark::after geometry. */
+.rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: var(--ts-checkbox-accent);
+  transition: opacity 140ms ease;
+}
+
+.rm-checkbox[data-ts-checkbox-status]
+  > .check-container
+  > input:checked
+  ~ .checkmark::before {
+  opacity: 0.55;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="active"]
+  > .check-container
+  > .checkmark::before {
+  border-radius: 999px;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="waiting"]
+  > .check-container
+  > .checkmark::before {
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--ts-checkbox-accent) 0 2px,
+    transparent 2px 4px,
+    var(--ts-checkbox-accent) 4px 6px
+  );
+}
+
+.rm-checkbox[data-ts-checkbox-shape="holding"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-style: dashed !important;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="holding"]
+  > .check-container
+  > .checkmark::before {
+  top: -1px;
+  right: -4px;
+  width: 7px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="incubating"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-style: dotted !important;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="incubating"]
+  > .check-container
+  > .checkmark::before {
+  border: 2px solid var(--ts-checkbox-accent);
+  border-radius: 999px;
+  background: var(--ts-checkbox-surface);
+}
+
+.rm-checkbox[data-ts-checkbox-shape="alert"]
+  > .check-container
+  > .checkmark::before {
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="cancelled"]
+  > .check-container
+  > .checkmark::before {
+  top: -1px;
+  right: -4px;
+  width: 8px;
+  height: 2px;
+  transform: rotate(-45deg);
+  transform-origin: center;
+  border-radius: 1px;
+}
+
+.rm-checkbox[data-ts-checkbox-shape="custom"]
+  > .check-container
+  > .checkmark::before {
+  border-radius: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-checkbox[data-ts-checkbox-status]
+    > .check-container
+    > input:not(:checked)
+    ~ .checkmark,
+  .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .rm-checkbox[data-ts-checkbox-status]
+    > .check-container
+    > input:not(:checked)
+    ~ .checkmark {
+    border-color: currentColor !important;
+    background: Canvas !important;
+    box-shadow: none !important;
+    forced-color-adjust: auto;
+  }
+
+  .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
+    border-color: currentColor !important;
+    background: currentColor !important;
+    forced-color-adjust: auto;
+  }
+}
+
 /* Base pill styling (JS annotates matching refs with data-task-status-key/label) */
 span.rm-page-ref[data-task-status-key],
 a.rm-page-ref[data-task-status-key] {

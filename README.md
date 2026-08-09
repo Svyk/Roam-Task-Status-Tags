@@ -26,6 +26,31 @@ Example:
 - Selected-block commands apply to the selected blocks only.
 - Status editing is token-aware: it changes the managed TODO/status prefix and preserves the rest of the block text as much as possible.
 
+## Status-aware Checkboxes
+
+Task Status Tags gives the exact native checkbox beside a managed status a compact
+color-and-shape treatment. The checkbox is still Roam's real checkbox: this feature
+does not replace it, intercept it, or create another completion state.
+
+| Status | Light mode, unchecked | Dark mode, unchecked | Checked |
+|---|---|---|---|
+| Active | Darkened teal solid outline + round beacon | Teal solid outline + round beacon | Native checkmark + secondary beacon |
+| Waiting | Darkened amber outline + parallel bars | Amber outline + parallel bars | Native checkmark + secondary bars |
+| Holding | Darkened slate dashed outline + tab | Slate dashed outline + tab | Native checkmark + secondary tab |
+| Incubating | Violet dotted outline + hollow circle | Adjusted violet dotted outline + hollow circle | Native checkmark + secondary circle |
+| Alert | Rose strong outline + diamond | Rose strong outline + diamond | Native checkmark + secondary diamond |
+| Cancelled | Charcoal outline + corner slash | Lightened slate outline + corner slash | Native checkmark + secondary slash |
+| Custom status | Contrast-adjusted configured hue + square | Contrast-adjusted configured hue + square | Native checkmark + secondary square |
+
+When a task is checked, the active Roam/Svy Theme completion fill and checkmark remain
+dominant; the status marker becomes secondary. The status pill remains the text label,
+so status is never communicated by color alone.
+
+Checkbox accents are derived separately for light and dark surfaces with a minimum
+3.2:1 contrast target. Svy Theme users get its public surface and focus tokens; bare
+Roam and other themes use safe fallbacks. Reduced-motion and forced-colors modes are
+supported.
+
 ## Default Statuses
 
 - Active
@@ -79,6 +104,7 @@ Statuses:
 - When renaming, `Yes` renames the existing `task-status/<Old>` page to `task-status/<New>`. `No` changes the configured status name without aliasing the old tag.
 - Deleting a status removes it from commands, chooser, and styling. Existing tags remain in the graph as ordinary Roam tags.
 - `Reset colors` returns all statuses to their built-in defaults.
+- `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
 
 Hotkeys note:
 
@@ -135,7 +161,10 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-The tests cover status text transforms, Better Tasks routing, certified writes, lifecycle cleanup, build determinism, secret scanning, and multiselect target resolution.
+The tests cover status text transforms, Better Tasks routing, certified writes, exact
+checkbox ownership and cleanup, light/dark contrast derivation, CSS scoping and theme
+signals, lifecycle cleanup, build determinism, secret scanning, and multiselect target
+resolution.
 
 ## Troubleshooting
 
