@@ -85,6 +85,10 @@
     <div class="ts-status-portal" data-task-status-portal="true"></div>
     <script type="module">
       import { createStatusPeekController } from "../../src/status-peek.js";
+      import {
+        OWNED_CHECKBOX_SELECTOR,
+        syncAlertBeaconForNativeCheckboxState,
+      } from "../../src/status-checkbox.js";
 
       const statuses = [
         ["ACTIVE", "active", "Active · play"],
@@ -143,6 +147,22 @@
       });
       controller.start();
       controller.setEnabled(true);
+
+      window.addEventListener("change", (event) => {
+        const input = event.target;
+        if (!input?.matches?.('input[type="checkbox"]')) return;
+        const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
+        if (!checkbox) return;
+        const result = syncAlertBeaconForNativeCheckboxState({
+          checkbox,
+          input,
+          alertBeaconEnabled: true,
+        });
+        controller.syncNativeCheckboxState(input);
+        log.textContent = `${checkbox.getAttribute("data-fixture-label")}: ${
+          input.checked ? "completed" : "reopened"
+        } · lightweight=${result.handled}`;
+      });
 
       document.getElementById("theme-toggle").addEventListener("click", () => {
         const root = document.documentElement;

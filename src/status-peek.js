@@ -517,6 +517,12 @@ export function createStatusPeekController({
     if (peekButton && activeContext) syncAlertBeacon(peekButton, activeContext);
   }
 
+  function syncNativeCheckboxState(input) {
+    if (!peekButton || !activeContext || activeContext.input !== input) return false;
+    syncAlertBeacon(peekButton, activeContext);
+    return true;
+  }
+
   function refresh() {
     if (!activeContext) return;
     if (!enabled) {
@@ -570,6 +576,7 @@ export function createStatusPeekController({
     chooserClosed,
     setEnabled,
     setAlertBeaconEnabled,
+    syncNativeCheckboxState,
     isEnabled: () => enabled,
     isVisible: () => Boolean(peekButton?.isConnected),
   });

@@ -74,7 +74,9 @@ The beacon is enabled by default under **Task Status Tags → Animate Alert stat
 Turning it off changes presentation only and performs no graph writes. Checked tasks
 never pulse, and the animation is disabled automatically for `prefers-reduced-motion`,
 forced-colors mode, and print. Query results, later-prose Alert references, ambiguous
-renders, and other unowned tags never receive animation ownership.
+renders, and other unowned tags never receive animation ownership. Native completion
+finishes before the plugin mirrors the checked state, with no graph read or write in that
+event path.
 
 ### Quiet display without losing query power
 

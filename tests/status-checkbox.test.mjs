@@ -23,6 +23,7 @@ import {
   findSiblingTaskCheckbox,
   getStatusCheckboxShape,
   isExactManagedStatusPill,
+  syncAlertBeaconForNativeCheckboxState,
   syncStatusCheckboxForPill,
   syncStatusPresentationForPill,
 } from "../src/status-checkbox.js";
@@ -481,6 +482,54 @@ test("Alert beacon belongs only to the exact managed unchecked Alert presentatio
   assert.equal(disabledResult.alertBeacon, false);
   assert.equal(active.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
   assert.equal(active.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+});
+
+test("native completion updates only owned Alert beacon markers without re-certifying the graph", () => {
+  const render = taggedTaskRender("task-status/Alert");
+  render.checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, "ALERT");
+  render.checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+  render.pill.setAttribute(MANAGED_STATUS_PILL_ATTRIBUTE, "true");
+  render.pill.setAttribute("data-task-status-key", "ALERT");
+  render.pill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+
+  render.input.checked = true;
+  const completed = syncAlertBeaconForNativeCheckboxState({
+    checkbox: render.checkbox,
+    input: render.input,
+    alertBeaconEnabled: true,
+  });
+
+  assert.deepEqual(completed, {
+    handled: true,
+    statusKey: "ALERT",
+    alertBeacon: false,
+    pillCount: 1,
+  });
+  assert.equal(render.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+  assert.equal(render.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
+
+  render.input.checked = false;
+  const reopened = syncAlertBeaconForNativeCheckboxState({
+    checkbox: render.checkbox,
+    input: render.input,
+    alertBeaconEnabled: true,
+  });
+
+  assert.equal(reopened.alertBeacon, true);
+  assert.equal(render.checkbox.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+  assert.equal(render.pill.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+
+  const foreignPill = new FakeElement("span", ["rm-page-ref"]);
+  foreignPill.setAttribute("data-task-status-key", "ALERT");
+  foreignPill.setAttribute(ALERT_BEACON_ATTRIBUTE, "foreign");
+  render.parent.append(foreignPill);
+  render.input.checked = true;
+  syncAlertBeaconForNativeCheckboxState({
+    checkbox: render.checkbox,
+    input: render.input,
+    alertBeaconEnabled: true,
+  });
+  assert.equal(foreignPill.getAttribute(ALERT_BEACON_ATTRIBUTE), "foreign");
 });
 
 test("Alert lookalikes and non-Alert managed statuses never gain beacon ownership", () => {

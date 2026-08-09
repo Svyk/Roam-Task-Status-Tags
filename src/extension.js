@@ -12,6 +12,7 @@ import {
   clearStatusPillPresentation,
   OWNED_CHECKBOX_SELECTOR,
   relativeLuminance,
+  syncAlertBeaconForNativeCheckboxState,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
 import { createStatusPeekController } from "./status-peek.js";
@@ -1347,9 +1348,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!input?.matches?.('input[type="checkbox"]')) return;
     const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
     if (!checkbox) return;
-    // Change bubbles after the native checked state flips. Re-certification is
-    // presentation-only and makes the Alert beacon stop/start immediately.
-    refreshStatusVisuals(checkbox);
+    // This listener runs at window bubble, after Roam's completion handler.
+    // Only mirror the native checked state into markers that were already
+    // certified; never pull graph data or rebuild DOM inside the host event.
+    const result = syncAlertBeaconForNativeCheckboxState({
+      checkbox,
+      input,
+      alertBeaconEnabled,
+    });
+    if (result.handled) statusPeekController?.syncNativeCheckboxState?.(input);
   }
 
   function startStatusPillObserver() {
@@ -3314,7 +3321,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
-    window.addEventListener("change", handleNativeCheckboxChange, true);
+    window.addEventListener("change", handleNativeCheckboxChange);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
@@ -3335,7 +3342,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
-    window.removeEventListener("change", handleNativeCheckboxChange, true);
+    window.removeEventListener("change", handleNativeCheckboxChange);
     pendingOperations.clear();
 
     await unregisterAllCommands();

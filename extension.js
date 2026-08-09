@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.6.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.6.1 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -594,6 +594,33 @@ function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {})
   else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
   return true;
 }
+function syncAlertBeaconForNativeCheckboxState({
+  checkbox,
+  input,
+  alertBeaconEnabled = false
+} = {}) {
+  if (!checkbox?.getAttribute || !checkbox?.setAttribute || !checkbox?.removeAttribute || !input || checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE) === null) {
+    return Object.freeze({ handled: false, reason: "not-owned-checkbox" });
+  }
+  const statusKey = checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE);
+  const shouldBeacon = Boolean(alertBeaconEnabled) && statusKey === "ALERT" && input.checked === false;
+  if (shouldBeacon) checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+  else checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+  const ownedPills = Array.from(checkbox.parentElement?.children || []).filter(
+    (candidate) => candidate?.getAttribute?.(MANAGED_STATUS_PILL_ATTRIBUTE) === "true"
+  );
+  ownedPills.forEach((pill) => {
+    const ownsSameAlert = pill.getAttribute?.("data-task-status-key") === "ALERT";
+    if (shouldBeacon && ownsSameAlert) pill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+    else pill.removeAttribute?.(ALERT_BEACON_ATTRIBUTE);
+  });
+  return Object.freeze({
+    handled: true,
+    statusKey,
+    alertBeacon: shouldBeacon,
+    pillCount: ownedPills.length
+  });
+}
 function escapeRegex(text) {
   return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -1117,6 +1144,11 @@ function createStatusPeekController({
     alertBeaconEnabled = Boolean(nextEnabled);
     if (peekButton && activeContext) syncAlertBeacon(peekButton, activeContext);
   }
+  function syncNativeCheckboxState(input) {
+    if (!peekButton || !activeContext || activeContext.input !== input) return false;
+    syncAlertBeacon(peekButton, activeContext);
+    return true;
+  }
   function refresh() {
     if (!activeContext) return;
     if (!enabled) {
@@ -1163,6 +1195,7 @@ function createStatusPeekController({
     chooserClosed,
     setEnabled,
     setAlertBeaconEnabled,
+    syncNativeCheckboxState,
     isEnabled: () => enabled,
     isVisible: () => Boolean(peekButton?.isConnected)
   });
@@ -1170,7 +1203,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.6.0" : "development";
+var BUNDLED_VERSION = true ? "0.6.1" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -2265,7 +2298,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!input?.matches?.('input[type="checkbox"]')) return;
     const checkbox = input.closest?.(OWNED_CHECKBOX_SELECTOR);
     if (!checkbox) return;
-    refreshStatusVisuals(checkbox);
+    const result2 = syncAlertBeaconForNativeCheckboxState({
+      checkbox,
+      input,
+      alertBeaconEnabled
+    });
+    if (result2.handled) statusPeekController?.syncNativeCheckboxState?.(input);
   }
   function startStatusPillObserver() {
     if (pillObserver) return;
@@ -3925,7 +3963,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
-    window.addEventListener("change", handleNativeCheckboxChange, true);
+    window.addEventListener("change", handleNativeCheckboxChange);
     console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
@@ -3942,7 +3980,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
-    window.removeEventListener("change", handleNativeCheckboxChange, true);
+    window.removeEventListener("change", handleNativeCheckboxChange);
     pendingOperations.clear();
     await unregisterAllCommands();
     console.log("[TaskStatus] Unloaded.");

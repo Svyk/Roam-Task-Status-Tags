@@ -344,6 +344,51 @@ export function applyManagedStatusPillPresentation(statusPill, { hidden = false 
   return true;
 }
 
+/**
+ * Mirror the native checked state into the already-certified Alert presentation.
+ * This deliberately performs no graph read, ownership re-classification, or
+ * broad DOM refresh: it runs on Roam's native completion path, where doing any
+ * of those synchronously can interfere with the host's own event transaction.
+ */
+export function syncAlertBeaconForNativeCheckboxState({
+  checkbox,
+  input,
+  alertBeaconEnabled = false,
+} = {}) {
+  if (
+    !checkbox?.getAttribute ||
+    !checkbox?.setAttribute ||
+    !checkbox?.removeAttribute ||
+    !input ||
+    checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE) === null
+  ) {
+    return Object.freeze({ handled: false, reason: "not-owned-checkbox" });
+  }
+
+  const statusKey = checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE);
+  const shouldBeacon =
+    Boolean(alertBeaconEnabled) && statusKey === "ALERT" && input.checked === false;
+
+  if (shouldBeacon) checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+  else checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+
+  const ownedPills = Array.from(checkbox.parentElement?.children || []).filter(
+    (candidate) => candidate?.getAttribute?.(MANAGED_STATUS_PILL_ATTRIBUTE) === "true"
+  );
+  ownedPills.forEach((pill) => {
+    const ownsSameAlert = pill.getAttribute?.("data-task-status-key") === "ALERT";
+    if (shouldBeacon && ownsSameAlert) pill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+    else pill.removeAttribute?.(ALERT_BEACON_ATTRIBUTE);
+  });
+
+  return Object.freeze({
+    handled: true,
+    statusKey,
+    alertBeacon: shouldBeacon,
+    pillCount: ownedPills.length,
+  });
+}
+
 function escapeRegex(text) {
   return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

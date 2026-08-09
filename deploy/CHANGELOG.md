@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 — 2026-08-09
+
+- Fix Roam freezing when an Alert checkbox is completed or reopened.
+- Let Roam finish its native completion event before Task Status Tags mirrors the checked state into its already-certified Alert markers.
+- Remove synchronous graph pulls and full DOM re-certification from the native checkbox event path while preserving immediate checkbox, pill, and reveal-control updates.
+- Add regression coverage and a 1,000-transition browser stress fixture for the lightweight completion bridge.
+
 ## 0.6.0 — 2026-08-09
 
 - Add an eye-catching Alert beacon: two brief rose halo beats followed by a long quiet interval on the exact unchecked Alert checkbox.

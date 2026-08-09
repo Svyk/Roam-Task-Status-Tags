@@ -161,8 +161,13 @@ test("Alert attention is a scoped two-beat beacon with a long quiet interval", (
   );
   assert.match(source, /Animate Alert status/);
   assert.match(source, /This is cosmetic, writes no task data/);
-  assert.match(source, /addEventListener\("change", handleNativeCheckboxChange, true\)/);
-  assert.match(source, /removeEventListener\("change", handleNativeCheckboxChange, true\)/);
+  assert.match(source, /addEventListener\("change", handleNativeCheckboxChange\)/);
+  assert.match(source, /removeEventListener\("change", handleNativeCheckboxChange\)/);
+  assert.match(source, /syncAlertBeaconForNativeCheckboxState/);
+  assert.doesNotMatch(
+    source,
+    /function handleNativeCheckboxChange[\s\S]*?refreshStatusVisuals\(checkbox\)/
+  );
   assert.match(checkboxSource, /ALERT_BEACON_ATTRIBUTE/);
   assert.match(peekSource, /setAlertBeaconEnabled/);
 });

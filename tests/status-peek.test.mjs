@@ -350,10 +350,13 @@ test("peek Alert beacon follows the setting, exact status, and native checked st
   assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
 
   fixture.task.input.checked = true;
-  fixture.controller.refresh();
+  assert.equal(fixture.controller.syncNativeCheckboxState(fixture.task.input), true);
   assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), null);
 
   fixture.task.input.checked = false;
+  assert.equal(fixture.controller.syncNativeCheckboxState(fixture.task.input), true);
+  assert.equal(button.getAttribute(ALERT_BEACON_ATTRIBUTE), "true");
+
   fixture.task.checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, "WAITING");
   fixture.controller.refresh();
   assert.equal(button.getAttribute("data-task-status-key"), "WAITING");
