@@ -258,3 +258,36 @@ test("target resolver falls back to explicit then focused block", async () => {
   assert.deepEqual(explicit, ["explicit"]);
   assert.deepEqual(focused, ["focused"]);
 });
+
+const inReviewHelpers = createTaskStatusTextHelpers({
+  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING"],
+  statuses: Object.fromEntries(
+    [
+      ["ACTIVE", "Active"],
+      ["WAITING", "Waiting"],
+      ["IN_REVIEW", "In Review"],
+      ["HOLDING", "Holding"],
+    ].map(([key, name]) => [
+      key,
+      { name, label: name, tagTitle: `task-status/${name}`, tagTitles: [`task-status/${name}`] },
+    ])
+  ),
+});
+
+test("two-word In Review status applies, detects, replaces, and removes as one token", () => {
+  const applied = inReviewHelpers.applyStatusToText("Send SOP", "IN_REVIEW");
+  assert.equal(applied, "{{[[TODO]]}} #[[task-status/In Review]] Send SOP");
+  assert.equal(inReviewHelpers.hasManagedStatusTag(applied, "IN_REVIEW"), true);
+  assert.equal(
+    inReviewHelpers.applyStatusToText(applied, "HOLDING"),
+    "{{[[TODO]]}} #[[task-status/Holding]] Send SOP"
+  );
+  assert.equal(inReviewHelpers.removeStatusFromText(applied), "{{[[TODO]]}} Send SOP");
+});
+
+test("default text helpers know In Review", () => {
+  assert.equal(
+    helpers.applyStatusToText("Send SOP", "IN_REVIEW"),
+    "{{[[TODO]]}} #[[task-status/In Review]] Send SOP"
+  );
+});

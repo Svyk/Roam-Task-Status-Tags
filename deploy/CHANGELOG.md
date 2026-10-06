@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 — 2026-10-06
+
+- Add a built-in **In Review** status (`#[[task-status/In Review]]`) for work waiting on someone's review or sign-off. It sits after Waiting in the default order, with its own sky-blue palette and a half-filled circle glyph on both checkbox and pill.
+- Existing installs get In Review once, after Waiting (or at the end if Waiting was removed), through a new `defaults-version` setting. It is skipped if a status named In Review already exists and never re-added after you delete it.
+- Add coverage for the two-word status name, the migration, and the new contrast and glyph rules.
+
 ## 0.7.0 — 2026-08-09
 
 - Move the checkbox-only reveal control and full status chooser into the quiet gutter immediately left of the current block bullet, keeping task text unobstructed.

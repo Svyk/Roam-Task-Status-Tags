@@ -40,8 +40,27 @@ export function resolveTaskStatusRuntimeVersion(extensionVersion) {
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
 }
 
+export const STATUS_DEFAULTS_VERSION = 2;
+
+export function migrateStatusListDefaults(list, defaultsVersion) {
+  const version = Number.isFinite(Number(defaultsVersion)) ? Number(defaultsVersion) : 1;
+  if (version >= STATUS_DEFAULTS_VERSION || !Array.isArray(list)) return list;
+  const exists = list.some(
+    (entry) =>
+      entry?.key === "IN_REVIEW" ||
+      String(entry?.name || "").trim().toLowerCase() === "in review"
+  );
+  if (exists) return list;
+  const next = list.map((entry) => ({ ...entry }));
+  const waitingIdx = next.findIndex((entry) => entry.key === "WAITING");
+  const entry = { key: "IN_REVIEW", name: "In Review" };
+  if (waitingIdx === -1) next.push(entry);
+  else next.splice(waitingIdx + 1, 0, entry);
+  return next;
+}
+
 const TEXT_HELPER_DEFAULTS = {
-  cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
   todoPatterns: ["{{[[TODO]]}}", "{{TODO}}"],
   donePatterns: ["{{[[DONE]]}}", "{{DONE}}"],
   todoCanonical: "{{[[TODO]]}}",
@@ -49,6 +68,7 @@ const TEXT_HELPER_DEFAULTS = {
   statusNames: {
     ACTIVE: "Active",
     WAITING: "Waiting",
+    IN_REVIEW: "In Review",
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
@@ -426,7 +446,7 @@ function createTaskStatusExtension({ extensionAPI }) {
 
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
-    cycleOrder: ["ACTIVE", "WAITING", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+    cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
     shiftClickRemoves: true,
     debug: false,
   };
@@ -439,6 +459,7 @@ function createTaskStatusExtension({ extensionAPI }) {
 
   const SETTINGS_KEYS = {
     statusList: "status-list",
+    defaultsVersion: "defaults-version",
     statusColorOverrides: "status-color-overrides",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
@@ -453,6 +474,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   const DEFAULT_STATUS_NAMES = {
     ACTIVE: "Active",
     WAITING: "Waiting",
+    IN_REVIEW: "In Review",
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
@@ -462,6 +484,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   const DEFAULT_STATUS_LIST = [
     { key: "ACTIVE", name: "Active" },
     { key: "WAITING", name: "Waiting" },
+    { key: "IN_REVIEW", name: "In Review" },
     { key: "HOLDING", name: "Holding" },
     { key: "INCUBATING", name: "Incubating" },
     { key: "ALERT", name: "Alert" },
@@ -471,6 +494,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   const DEFAULT_STATUS_BASE_COLORS = {
     ACTIVE: "#14b8a6",
     WAITING: "#eab308",
+    IN_REVIEW: "#0ea5e9",
     HOLDING: "#94a3b8",
     INCUBATING: "#6366f1",
     ALERT: "#f43f5e",
@@ -899,12 +923,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   function loadStatusList() {
     const stored = parseMaybeJson(extensionAPI?.settings?.get?.(SETTINGS_KEYS.statusList));
+    const storedVersion = parseMaybeJson(extensionAPI?.settings?.get?.(SETTINGS_KEYS.defaultsVersion));
     if (Array.isArray(stored) && stored.length) {
-      return normalizeStatusList(stored);
+      const normalized = normalizeStatusList(stored);
+      if (Number(storedVersion) >= STATUS_DEFAULTS_VERSION) return normalized;
+      const migrated = migrateStatusListDefaults(normalized, storedVersion);
+      if (migrated !== normalized) saveSetting(SETTINGS_KEYS.statusList, migrated);
+      saveSetting(SETTINGS_KEYS.defaultsVersion, STATUS_DEFAULTS_VERSION);
+      return migrated;
     }
 
     const defaults = normalizeStatusList(DEFAULT_STATUS_LIST);
     saveSetting(SETTINGS_KEYS.statusList, defaults);
+    saveSetting(SETTINGS_KEYS.defaultsVersion, STATUS_DEFAULTS_VERSION);
     return defaults;
   }
 

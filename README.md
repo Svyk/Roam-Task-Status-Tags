@@ -40,6 +40,7 @@ does not replace it, intercept it, or create another completion state.
 |---|---|---|---|
 | Active | Darkened teal outline + centered play symbol | Teal outline + centered play symbol | Native theme checkmark |
 | Waiting | Darkened amber outline + centered pause symbol | Amber outline + centered pause symbol | Native theme checkmark |
+| In Review | Darkened sky-blue outline + centered half-filled circle | Sky-blue outline + centered half-filled circle | Native theme checkmark |
 | Holding | Darkened slate dashed outline + centered stop symbol | Slate dashed outline + centered stop symbol | Native theme checkmark |
 | Incubating | Violet dotted outline + centered ring | Adjusted violet dotted outline + centered ring | Native theme checkmark |
 | Alert | Rose strong outline + centered exclamation mark | Rose strong outline + centered exclamation mark | Native theme checkmark |
@@ -106,6 +107,7 @@ checkbox remain visible.
 
 - Active
 - Waiting
+- In Review
 - Holding
 - Incubating
 - Alert
@@ -114,7 +116,7 @@ checkbox remain visible.
 Default order:
 
 ```text
-Active -> Waiting -> Holding -> Incubating -> Alert -> Cancelled
+Active -> Waiting -> In Review -> Holding -> Incubating -> Alert -> Cancelled
 ```
 
 You can add, rename, delete, and reorder statuses in settings.

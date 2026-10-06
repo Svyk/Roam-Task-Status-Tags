@@ -20,6 +20,7 @@ test("all built-in shapes and the custom fallback have explicit treatments", () 
   for (const shape of [
     "active",
     "waiting",
+    "in-review",
     "holding",
     "incubating",
     "alert",
@@ -52,10 +53,20 @@ test("unchecked checkboxes use centered semantic glyphs instead of corner orname
   );
 });
 
+test("In Review has its own palette tokens and half-filled circle glyph", () => {
+  assert.match(css, /--ts-in-review-fg-light:/);
+  assert.match(css, /--ts-in-review-fg-dark:/);
+  assert.match(
+    css,
+    /data-ts-checkbox-shape="in-review"[\s\S]*var\(--ts-checkbox-accent\) 0 50%/
+  );
+});
+
 test("pill markers repeat every semantic checkbox glyph instead of using color alone", () => {
   for (const status of [
     "ACTIVE",
     "WAITING",
+    "IN_REVIEW",
     "HOLDING",
     "INCUBATING",
     "ALERT",

@@ -23,6 +23,13 @@
   --ts-waiting-fg-dark: rgb(234, 179, 8);
   --ts-waiting-border-dark: rgba(234, 179, 8, 0.62);
 
+  --ts-in-review-bg-light: rgba(14, 165, 233, 0.1);
+  --ts-in-review-fg-light: rgb(3, 105, 161);
+  --ts-in-review-border-light: rgba(2, 132, 199, 0.48);
+  --ts-in-review-bg-dark: rgba(14, 165, 233, 0.2);
+  --ts-in-review-fg-dark: rgb(86, 188, 242);
+  --ts-in-review-border-dark: rgba(14, 165, 233, 0.62);
+
   --ts-holding-bg-light: rgba(148, 163, 184, 0.1);
   --ts-holding-fg-light: rgb(95, 104, 118);
   --ts-holding-border-light: rgba(126, 139, 157, 0.48);
@@ -190,6 +197,13 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
   --ts-checkbox-wash-dark: rgba(234, 179, 8, 0.16);
 }
 
+.rm-checkbox[data-ts-checkbox-status="IN_REVIEW"] {
+  --ts-checkbox-accent-light: rgb(2, 132, 199);
+  --ts-checkbox-accent-dark: rgb(14, 165, 233);
+  --ts-checkbox-wash-light: rgba(14, 165, 233, 0.09);
+  --ts-checkbox-wash-dark: rgba(14, 165, 233, 0.16);
+}
+
 .rm-checkbox[data-ts-checkbox-status="HOLDING"] {
   --ts-checkbox-accent-light: rgb(126, 139, 157);
   --ts-checkbox-accent-dark: rgb(148, 163, 184);
@@ -310,6 +324,18 @@ body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
     var(--ts-checkbox-accent) 0 3px,
     transparent 3px 6px,
     var(--ts-checkbox-accent) 6px 9px
+  );
+}
+
+.rm-checkbox[data-ts-checkbox-shape="in-review"] {
+  --ts-checkbox-glyph-width: 9px;
+  --ts-checkbox-glyph-height: 9px;
+  --ts-checkbox-glyph-border: 2px solid var(--ts-checkbox-accent);
+  --ts-checkbox-glyph-radius: 999px;
+  --ts-checkbox-glyph-background: linear-gradient(
+    90deg,
+    var(--ts-checkbox-accent) 0 50%,
+    transparent 50% 100%
   );
 }
 
@@ -995,6 +1021,24 @@ body.roam-body.dark .ts-status-portal > .ts-status-peek {
   a.rm-page-ref,
   .ts-status-pill-preview,
   .ts-status-peek
+)[data-task-status-key="IN_REVIEW"] {
+  --ts-pill-marker-width: 6px;
+  --ts-pill-marker-height: 6px;
+  --ts-pill-marker-border: 1.5px solid currentColor;
+  --ts-pill-marker-radius: 999px;
+  --ts-pill-marker-background: linear-gradient(
+    90deg,
+    currentColor 0 50%,
+    transparent 50% 100%
+  );
+  --ts-pill-marker-opacity: 0.9;
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview,
+  .ts-status-peek
 )[data-task-status-key="HOLDING"] {
   --ts-pill-marker-width: 6px;
   --ts-pill-marker-height: 6px;
@@ -1063,6 +1107,7 @@ body.roam-body.dark .ts-status-portal > .ts-status-peek {
 )[data-task-status-key]:not(
     [data-task-status-key="ACTIVE"],
     [data-task-status-key="WAITING"],
+    [data-task-status-key="IN_REVIEW"],
     [data-task-status-key="HOLDING"],
     [data-task-status-key="INCUBATING"],
     [data-task-status-key="ALERT"],
@@ -1123,6 +1168,18 @@ a.rm-page-ref[data-task-status-key="WAITING"],
   --ts-status-bg-dark: var(--ts-waiting-bg-dark);
   --ts-status-fg-dark: var(--ts-waiting-fg-dark);
   --ts-status-border-dark: var(--ts-waiting-border-dark);
+}
+
+span.rm-page-ref[data-task-status-key="IN_REVIEW"],
+a.rm-page-ref[data-task-status-key="IN_REVIEW"],
+.ts-status-peek[data-task-status-key="IN_REVIEW"],
+.ts-status-pill-preview[data-task-status-key="IN_REVIEW"] {
+  --ts-status-bg-light: var(--ts-in-review-bg-light);
+  --ts-status-fg-light: var(--ts-in-review-fg-light);
+  --ts-status-border-light: var(--ts-in-review-border-light);
+  --ts-status-bg-dark: var(--ts-in-review-bg-dark);
+  --ts-status-fg-dark: var(--ts-in-review-fg-dark);
+  --ts-status-border-dark: var(--ts-in-review-border-dark);
 }
 
 span.rm-page-ref[data-task-status-key="HOLDING"],

@@ -214,7 +214,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.notEqual(secondRuntime, firstRuntime);
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
     assert.ok(activeCommands.size > 0);
-    assert.equal(slashCalls.added.length, 6);
+    assert.equal(slashCalls.added.length, 7);
 
     const ownedCheckbox = new FakeElement("span");
     ownedCheckbox.className = "rm-checkbox rm-todo";
@@ -277,7 +277,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
     assert.equal(activeCommands.size, 0);
-    assert.equal(slashCalls.removed.length, 6);
+    assert.equal(slashCalls.removed.length, 7);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
     assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);

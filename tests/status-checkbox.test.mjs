@@ -31,6 +31,7 @@ import {
 const DEFAULT_COLORS = {
   ACTIVE: "#14b8a6",
   WAITING: "#eab308",
+  IN_REVIEW: "#0ea5e9",
   HOLDING: "#94a3b8",
   INCUBATING: "#6366f1",
   ALERT: "#f43f5e",
@@ -138,6 +139,7 @@ const textHelpers = createTaskStatusTextHelpers();
 const statusTagToKey = new Map([
   ["task-status/Active", "ACTIVE"],
   ["task-status/Waiting", "WAITING"],
+  ["task-status/In Review", "IN_REVIEW"],
   ["task-status/Holding", "HOLDING"],
   ["task-status/Incubating", "INCUBATING"],
   ["task-status/Alert", "ALERT"],
@@ -214,7 +216,7 @@ test("an already passing accent is preserved", () => {
 test("built-in shapes are stable and unknown statuses use the custom diamond", () => {
   assert.deepEqual(
     Object.keys(DEFAULT_COLORS).map(getStatusCheckboxShape),
-    ["active", "waiting", "holding", "incubating", "alert", "cancelled"]
+    ["active", "waiting", "in-review", "holding", "incubating", "alert", "cancelled"]
   );
   assert.equal(getStatusCheckboxShape("CUSTOM_DEEP_WORK"), "custom");
 });
@@ -235,6 +237,16 @@ test("managed TODO and DONE prefixes produce checkbox decisions", () => {
 
   assert.deepEqual(todo, { statusKey: "WAITING", shape: "waiting" });
   assert.deepEqual(done, { statusKey: "ALERT", shape: "alert" });
+});
+
+test("a two-word In Review tag claims the checkbox", () => {
+  const decision = decideStatusCheckboxAnnotation({
+    tagTitle: "task-status/In Review",
+    statusTagToKey,
+    blockString: "{{[[TODO]]}} #[[task-status/In Review]] Send SOP to Lori",
+    textHelpers,
+  });
+  assert.deepEqual(decision, { statusKey: "IN_REVIEW", shape: "in-review" });
 });
 
 test("a status tag later in prose never claims the checkbox", () => {

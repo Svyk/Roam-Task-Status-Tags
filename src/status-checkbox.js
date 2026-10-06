@@ -15,6 +15,7 @@ const WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
 const BUILTIN_SHAPES = Object.freeze({
   ACTIVE: "active",
   WAITING: "waiting",
+  IN_REVIEW: "in-review",
   HOLDING: "holding",
   INCUBATING: "incubating",
   ALERT: "alert",
