@@ -180,3 +180,155 @@ test("a detectable legacy Better Tasks runtime without capabilities fails closed
   assert.equal(result.reason, "better-tasks-capability-unavailable");
   assert.equal(direct.calls.length, 0);
 });
+
+// ── Activity log on the Better Tasks route ────────────────────────────────
+
+function activityHarness(record = async () => ({ recorded: true, reason: "recorded" })) {
+  const calls = [];
+  return {
+    calls,
+    recorder: {
+      record: async (args) => {
+        calls.push(args);
+        return record(args);
+      },
+    },
+  };
+}
+
+function v2Window(requestStatusTag, classifyBlock = async () => ({ kind: "task", uid: "task" })) {
+  return { betterTasks: { v2: { classifyBlock, requestStatusTag } } };
+}
+
+test("a certified Better Tasks write records exactly one activity line", async () => {
+  const direct = directHarness();
+  const activity = activityHarness();
+  const windowLike = v2Window(async () => ({
+    status: "updated",
+    didWrite: true,
+    reason: "certified",
+    string: "{{[[TODO]]}} #[[task-status/Waiting]] task",
+  }));
+  const router = createBetterTasksStatusRouter({
+    windowLike,
+    directWriter: direct.writer,
+    activityRecorder: activity.recorder,
+  });
+  const result = await router.apply({
+    uid: "task",
+    expectedString: "{{[[TODO]]}} task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] task",
+    statusTagTitle: "task-status/Waiting",
+  });
+
+  assert.equal(result.status, "updated");
+  assert.equal(result.didWrite, true);
+  assert.deepEqual(result.activity, { recorded: true, reason: "recorded" });
+  assert.deepEqual(activity.calls, [{
+    uid: "task",
+    previousString: "{{[[TODO]]}} task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] task",
+    statusTagTitle: "task-status/Waiting",
+  }]);
+  assert.equal(direct.calls.length, 0);
+});
+
+test("non-updated Better Tasks outcomes never reach the activity recorder", async () => {
+  for (const outcome of [
+    { status: "unchanged", didWrite: false, reason: "already-current" },
+    { status: "conflict", didWrite: false, reason: "stale-expected-string" },
+    { status: "rejected", didWrite: false, reason: "target-not-managed-task" },
+    { status: "not-updated", didWrite: false, reason: "write-not-observed" },
+    { status: "unknown", didWrite: false, reason: "post-write-read-failed" },
+  ]) {
+    const activity = activityHarness();
+    const router = createBetterTasksStatusRouter({
+      windowLike: v2Window(async () => outcome),
+      directWriter: directHarness().writer,
+      activityRecorder: activity.recorder,
+    });
+    const result = await router.apply({
+      uid: "task",
+      expectedString: "{{[[TODO]]}} task",
+      nextString: "unused",
+      statusTagTitle: "task-status/Waiting",
+    });
+    assert.equal(activity.calls.length, 0, outcome.status);
+    assert.equal(result.activity, undefined, outcome.status);
+  }
+});
+
+test("Better Tasks reporting its own activity entry suppresses the companion line", async () => {
+  const activity = activityHarness();
+  const router = createBetterTasksStatusRouter({
+    windowLike: v2Window(async () => ({
+      status: "updated",
+      didWrite: true,
+      reason: "certified",
+      activity: { recorded: true, reason: "better-tasks" },
+    })),
+    directWriter: directHarness().writer,
+    activityRecorder: activity.recorder,
+  });
+  const result = await router.apply({
+    uid: "task",
+    expectedString: "{{[[TODO]]}} task",
+    nextString: "unused",
+    statusTagTitle: "task-status/Waiting",
+  });
+  assert.equal(activity.calls.length, 0);
+  assert.deepEqual(result.activity, { recorded: true, reason: "better-tasks" });
+});
+
+test("a failing activity recorder never changes the certified write result", async () => {
+  const router = createBetterTasksStatusRouter({
+    windowLike: v2Window(async () => ({ status: "updated", didWrite: true, reason: "certified" })),
+    directWriter: directHarness().writer,
+    activityRecorder: { record: async () => { throw new Error("graph down"); } },
+  });
+  const result = await router.apply({
+    uid: "task",
+    expectedString: "{{[[TODO]]}} task",
+    nextString: "unused",
+    statusTagTitle: "task-status/Waiting",
+  });
+  assert.equal(result.status, "updated");
+  assert.equal(result.didWrite, true);
+  assert.equal(result.reason, "certified");
+  assert.equal(result.activity.recorded, false);
+  assert.equal(result.activity.reason, "activity-recorder-threw");
+});
+
+test("ordinary blocks and routers without a recorder record nothing", async () => {
+  const activity = activityHarness();
+  const direct = directHarness();
+  const router = createBetterTasksStatusRouter({
+    windowLike: v2Window(async () => ({ status: "updated", didWrite: true }), async () => ({ kind: "ordinary" })),
+    directWriter: direct.writer,
+    activityRecorder: activity.recorder,
+  });
+  const result = await router.apply({
+    uid: "plain",
+    expectedString: "plain",
+    nextString: "#[[task-status/Waiting]] plain",
+    statusTagTitle: "task-status/Waiting",
+  });
+  assert.equal(result.owner, "direct");
+  assert.equal(activity.calls.length, 0);
+
+  const bare = createBetterTasksStatusRouter({
+    windowLike: v2Window(async () => ({ status: "updated", didWrite: true, reason: "certified" })),
+    directWriter: direct.writer,
+  });
+  const bareResult = await bare.apply({
+    uid: "task",
+    expectedString: "{{[[TODO]]}} task",
+    nextString: "unused",
+    statusTagTitle: "task-status/Waiting",
+  });
+  assert.equal(bareResult.activity, undefined);
+  assert.throws(
+    () => createBetterTasksStatusRouter({ windowLike: {}, directWriter: direct.writer, activityRecorder: {} }),
+    TypeError
+  );
+});

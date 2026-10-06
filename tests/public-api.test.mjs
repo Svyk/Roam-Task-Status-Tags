@@ -458,8 +458,22 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
   const originalMutationObserver = globalThis.MutationObserver;
   const document = new FakeDocument();
   const activeCommands = new Set();
-  const blocks = new Map([["abcdefgh1", PLAIN_TODO]]);
+  const blocks = new Map([
+    ["abcdefgh1", PLAIN_TODO],
+    ["log000001", "**Activity log**"],
+    ["evt000001", "2026-10-04 15:20 \u2014 Created"],
+  ]);
+  // Better Tasks' activity log: a `**Activity log**` child under the task,
+  // one event block per change under that container.
+  const children = new Map([
+    ["abcdefgh1", ["log000001"]],
+    ["log000001", ["evt000001"]],
+  ]);
+  const props = new Map();
   let blockUpdates = 0;
+  let propsUpdates = 0;
+  let createdProps = 0;
+  let blockCreates = 0;
   let pageUpdates = 0;
   const statusRequests = [];
   let panelConfig = null;
@@ -501,17 +515,38 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
             const uid = entity?.[1];
             const string = blocks.get(uid);
             if (typeof string !== "string") return null;
-            return { ":block/uid": uid, ":block/string": string };
+            const kids = (children.get(uid) || []).map((childUid, index) => ({
+              ":block/uid": childUid,
+              ":block/string": blocks.get(childUid),
+              ":block/order": index,
+            }));
+            return { ":block/uid": uid, ":block/string": string, ":block/children": kids };
           },
         },
         block: {
           update: async ({ block }) => {
-            blockUpdates += 1;
+            if (typeof block.string === "string") {
+              blockUpdates += 1;
+              blocks.set(block.uid, block.string);
+            }
+            if (block.props) {
+              propsUpdates += 1;
+              props.set(block.uid, block.props);
+            }
+          },
+          create: async ({ location, block }) => {
+            blockCreates += 1;
             blocks.set(block.uid, block.string);
+            if (block.props) {
+              createdProps += 1;
+              props.set(block.uid, block.props);
+            }
+            children.set(location["parent-uid"], [...(children.get(location["parent-uid"]) || []), block.uid]);
           },
         },
         page: { update: async () => { pageUpdates += 1; } },
       },
+      util: { generateUID: () => `gen${String(blockCreates + 1).padStart(6, "0")}` },
       ui: {
         commandPalette: palette,
         slashCommand: {
@@ -655,9 +690,25 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
     };
     const updatesBeforeRoute = blockUpdates;
     const routed = await api.setStatus("abcdefgh1", "Waiting");
-    assert.deepEqual(routed, { status: "updated", didWrite: true });
-    assert.equal(blockUpdates, updatesBeforeRoute);
+    assert.deepEqual(routed, {
+      status: "updated",
+      didWrite: true,
+      activity: { recorded: true, reason: "recorded" },
+    });
+    assert.equal(blockUpdates, updatesBeforeRoute, "task string is written by Better Tasks only");
     assert.equal(pageUpdates, 0);
+    assert.equal(blockCreates, 1, "exactly one activity-log line");
+    assert.deepEqual(children.get("abcdefgh1"), ["log000001"], "no new task children");
+    assert.deepEqual(children.get("log000001"), ["evt000001", "gen000001"]);
+    assert.match(blocks.get("gen000001"), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \u2014 status \u2192 Waiting$/);
+    assert.equal(createdProps, 1, "props ride on the single create");
+    assert.equal(propsUpdates, 0, "no follow-up props update");
+    const eventProps = props.get("gen000001").bt;
+    assert.equal(eventProps.kind, "event");
+    assert.equal(eventProps.event, "attr_change");
+    assert.equal(eventProps.field, "status");
+    assert.equal(eventProps.to, "Waiting");
+    assert.equal(eventProps.source, "task-status-tags");
     assert.deepEqual(statusRequests, [{
       uid: "abcdefgh1",
       request: {
@@ -678,6 +729,7 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
     });
     assert.equal(blockUpdates, updatesBeforeRoute);
     assert.equal(statusRequests.length, 1);
+    assert.equal(blockCreates, 1, "a refused write records no activity");
     assert.equal(blocks.get("abcdefgh1"), PLAIN_TODO);
     delete windowLike.betterTasks;
 
@@ -745,4 +797,23 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
     globalThis.document = originalDocument;
     globalThis.MutationObserver = originalMutationObserver;
   }
+});
+
+test("setStatus surfaces the Better Tasks activity receipt only on updated results", () => {
+  assert.deepEqual(
+    mapPublicResult({ status: "updated", didWrite: true, reason: "certified", activity: { recorded: true, reason: "recorded", entryUid: "x", error: null } }),
+    { status: "updated", didWrite: true, reason: "certified", activity: { recorded: true, reason: "recorded" } }
+  );
+  assert.deepEqual(
+    mapPublicResult({ status: "updated", didWrite: true, reason: "certified", activity: { recorded: false, reason: "no-activity-log" } }),
+    { status: "updated", didWrite: true, reason: "certified", activity: { recorded: false, reason: "no-activity-log" } }
+  );
+  assert.deepEqual(
+    mapPublicResult({ status: "updated", didWrite: true, reason: "certified" }),
+    { status: "updated", didWrite: true, reason: "certified" }
+  );
+  assert.deepEqual(
+    mapPublicResult({ status: "unchanged", didWrite: false, reason: "already-current", activity: { recorded: true } }),
+    { status: "unchanged", didWrite: false, reason: "already-current" }
+  );
 });

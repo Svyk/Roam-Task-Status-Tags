@@ -70,6 +70,11 @@ export function mapPublicResult(outcome) {
   };
   if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
   else if (!known) mapped.reason = "unmapped-result";
+  const activity = outcome.activity;
+  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
+    mapped.activity = { recorded: activity.recorded };
+    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
+  }
   return mapped;
 }
 

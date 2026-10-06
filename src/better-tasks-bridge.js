@@ -21,9 +21,36 @@ function routed(status, fields = {}) {
   return { status, didWrite: status === "updated", ...fields };
 }
 
-export function createBetterTasksStatusRouter({ windowLike, directWriter }) {
+export function createBetterTasksStatusRouter({
+  windowLike,
+  directWriter,
+  activityRecorder = null,
+}) {
   if (!directWriter || typeof directWriter.apply !== "function") {
     throw new TypeError("directWriter.apply is required");
+  }
+  if (activityRecorder != null && typeof activityRecorder.record !== "function") {
+    throw new TypeError("activityRecorder.record must be a function");
+  }
+
+  // Better Tasks v2 `requestStatusTag` certifies the string change but records
+  // no activity-log event. Append the one line ourselves, unless Better Tasks
+  // reports that it already did (`activity` present on its result).
+  async function recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle }) {
+    if (!activityRecorder || outcome?.status !== "updated") return outcome;
+    if (outcome.activity !== undefined) return outcome;
+    let activity;
+    try {
+      activity = await activityRecorder.record({
+        uid,
+        previousString: expectedString,
+        nextString: typeof outcome.string === "string" ? outcome.string : nextString,
+        statusTagTitle,
+      });
+    } catch (error) {
+      activity = { recorded: false, reason: "activity-recorder-threw", error };
+    }
+    return { ...outcome, activity };
   }
 
   return Object.freeze({
@@ -96,8 +123,9 @@ export function createBetterTasksStatusRouter({ windowLike, directWriter }) {
         });
       }
 
+      let outcome;
       try {
-        return await provider.capability.requestStatusTag(uid, {
+        outcome = await provider.capability.requestStatusTag(uid, {
           expectedString,
           statusTagTitle,
           source: "task-status-tags",
@@ -106,6 +134,7 @@ export function createBetterTasksStatusRouter({ windowLike, directWriter }) {
       } catch (error) {
         return routed("unknown", { reason: "better-tasks-status-request-failed", error });
       }
+      return recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle });
     },
   });
 }

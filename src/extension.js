@@ -1,3 +1,4 @@
+import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
@@ -1592,6 +1593,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
+    activityRecorder: createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI }),
   });
 
   function getCurrentStatus(text) {

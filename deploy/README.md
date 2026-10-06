@@ -180,6 +180,8 @@ Other extensions can call the frozen `window.RoamTaskStatusTags` object (`apiVer
 
 `status` is `"updated"`, `"rejected"`, `"unknown"`, `"conflict"`, `"not-updated"`, or `"unchanged"`. `didWrite` is true only for `"updated"`. Writes go through the same certified path as the command palette, and a Better Tasks task is handed to `window.betterTasks.v2.requestStatusTag`. This extension still owns that routing.
 
+On a Better Tasks task an `"updated"` result also carries `activity: { recorded, reason }`. Better Tasks' `requestStatusTag` changes the task string but records nothing in the task's `**Activity log**`, so after a certified write this extension appends one line in Better Tasks' own shape (`2026-10-04 15:29 — status → Waiting`, or `status removed`, with `bt` event props, `source: "task-status-tags"`, in a single `block.create` call so the line and its props are one write and one undo step). It writes only into an activity-log container Better Tasks already created, never creates one (`reason: "no-activity-log"`), skips an identical trailing line (`"duplicate"`), and stands down as soon as Better Tasks returns its own `activity` field from `requestStatusTag`. A failed append never changes `status` or `didWrite`.
+
 Window events, with detail `{ apiVersion: 1 }`:
 
 - `roam-task-status-tags:ready` when the global is installed.

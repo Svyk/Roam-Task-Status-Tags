@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1 — 2026-10-06
+
+- A status change on a Better Tasks task now adds one line to that task's Better Tasks activity log (`2026-10-06 18:05 — status → Waiting`, or `status removed`), written in one step with Better Tasks' event props, so one undo takes it back. Better Tasks itself does not log status changes made through its router.
+- The line is only added to an activity log Better Tasks already created, never twice in a row, and not at all when Better Tasks starts reporting the activity itself. The task string and its other children are never touched.
+- `setStatus` results include `activity: { recorded, reason }` on an update.
+
 ## 0.9.0 — 2026-10-06
 
 - Add `window.RoamTaskStatusTags` (`apiVersion` 1) so another extension can read the configured statuses and ask this extension to set or cycle one.

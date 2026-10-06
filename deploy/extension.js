@@ -1,4 +1,134 @@
-/* Roam Task Status Tags v0.9.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.9.1 | generated; edit src/ */
+
+// src/better-tasks-activity.js
+var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
+  "**Activity log**",
+  "**Aktivitätsprotokoll**",
+  "**Journal d'activité**",
+  "**Log de atividade**",
+  "**Registo de atividade**",
+  "**Registro attività**",
+  "**Registro de actividad**",
+  "**Журнал активности**",
+  "**سجل النشاط**",
+  "**活动日志**",
+  "**活動ログ**",
+  "**活動日誌**",
+  "**활동 로그**"
+]);
+var CONTAINER_TITLE_SET = new Set(ACTIVITY_LOG_CONTAINER_TITLES);
+var STATUS_PREFIX = "task-status/";
+var TASK_TOKEN_RE = /^\s*(?:\{\{\s*(?:\[\[\s*)?(?:TODO|DONE)(?:\s*\]\])?\s*\}\}|TODO|DONE)(?=$|[ \t\r\n])/i;
+var STATUS_TAG_RE = /^[ \t]*#(?:\[\[(task-status\/[^\]\r\n]+)\]\]|(task-status\/[^\s.,;:!?)\]}\r\n]+))/i;
+var ACTIVITY_FIELD = "status";
+var ACTIVITY_SOURCE = "task-status-tags";
+var TASK_CHILDREN_PULL_PATTERN = "[:block/uid {:block/children [:block/uid :block/string :block/order]}]";
+function valueAt(value, keyword, fallback = null) {
+  if (!value || typeof value !== "object") return fallback;
+  const plain = keyword.replace(/^:/, "");
+  return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
+}
+function orderedChildren(block) {
+  const children = valueAt(block, ":block/children", []);
+  if (!Array.isArray(children)) return [];
+  return children.map((child) => ({
+    uid: valueAt(child, ":block/uid", null),
+    string: valueAt(child, ":block/string", null),
+    order: Number(valueAt(child, ":block/order", 0)) || 0
+  })).filter((child) => typeof child.uid === "string").sort((a, b) => a.order - b.order);
+}
+function isActivityLogContainerString(value) {
+  return typeof value === "string" && CONTAINER_TITLE_SET.has(value.trim());
+}
+function statusLabelFromTaskText(text) {
+  const source = String(text || "");
+  const token = source.match(TASK_TOKEN_RE);
+  if (!token) return null;
+  const tag = source.slice(token[0].length).match(STATUS_TAG_RE);
+  const title = tag?.[1] || tag?.[2];
+  return title ? title.slice(STATUS_PREFIX.length) : null;
+}
+function statusLabelFromTagTitle(title) {
+  if (typeof title !== "string") return null;
+  const trimmed = title.trim();
+  if (!trimmed.toLowerCase().startsWith(STATUS_PREFIX)) return null;
+  const label = trimmed.slice(STATUS_PREFIX.length);
+  return label || null;
+}
+function formatActivityTimestamp(ts) {
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function renderStatusActivityLine({ to, ts }) {
+  const label = to ? `${ACTIVITY_FIELD} → ${to}` : `${ACTIVITY_FIELD} removed`;
+  return `${formatActivityTimestamp(ts)} — ${label}`;
+}
+function buildStatusActivityProps({ from, to, ts }) {
+  const bt = { kind: "event", event: "attr_change", ts, field: ACTIVITY_FIELD, source: ACTIVITY_SOURCE };
+  if (from) bt.from = from;
+  if (to) bt.to = to;
+  return { bt };
+}
+function result(recorded, fields = {}) {
+  return { recorded, ...fields };
+}
+function resolveRoamSurface(roamAlphaAPI) {
+  const pull = roamAlphaAPI?.data?.async?.pull;
+  const create = roamAlphaAPI?.data?.block?.create;
+  const generateUID = roamAlphaAPI?.util?.generateUID;
+  if ([pull, create, generateUID].some((fn) => typeof fn !== "function")) return null;
+  return {
+    pull: (...args) => pull.call(roamAlphaAPI.data.async, ...args),
+    create: (...args) => create.call(roamAlphaAPI.data.block, ...args),
+    generateUID: () => generateUID.call(roamAlphaAPI.util)
+  };
+}
+function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
+  async function pullChildren(roam, uid) {
+    const block = await roam.pull(TASK_CHILDREN_PULL_PATTERN, [":block/uid", uid]);
+    if (valueAt(block, ":block/uid", null) !== uid) return null;
+    return orderedChildren(block);
+  }
+  return Object.freeze({
+    async record({ uid, previousString, nextString, statusTagTitle }) {
+      if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
+      const roam = resolveRoamSurface(roamAlphaAPI);
+      if (!roam) return result(false, { reason: "roam-api-unavailable" });
+      const from = statusLabelFromTaskText(previousString);
+      const to = statusTagTitle == null ? statusLabelFromTaskText(nextString) : statusLabelFromTagTitle(statusTagTitle);
+      if ((from || null) === (to || null)) return result(false, { reason: "status-unchanged" });
+      let containerUid;
+      let siblings;
+      try {
+        const taskChildren = await pullChildren(roam, uid);
+        if (!taskChildren) return result(false, { reason: "block-not-found" });
+        const container = taskChildren.find((child) => isActivityLogContainerString(child.string));
+        if (!container) return result(false, { reason: "no-activity-log" });
+        containerUid = container.uid;
+        siblings = await pullChildren(roam, containerUid) || [];
+      } catch (error) {
+        return result(false, { reason: "activity-read-failed", error });
+      }
+      const ts = now();
+      const text = renderStatusActivityLine({ to, ts });
+      const last = siblings[siblings.length - 1];
+      if (last && last.string === text) {
+        return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
+      }
+      const entryUid = roam.generateUID();
+      try {
+        await roam.create({
+          location: { "parent-uid": containerUid, order: "last" },
+          block: { uid: entryUid, string: text, props: buildStatusActivityProps({ from, to, ts }) }
+        });
+      } catch (error) {
+        return result(false, { reason: "activity-write-failed", error, containerUid });
+      }
+      return result(true, { reason: "recorded", containerUid, entryUid, text });
+    }
+  });
+}
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -21,9 +151,32 @@ function resolveBetterTasksProvider(windowLike) {
 function routed(status, fields = {}) {
   return { status, didWrite: status === "updated", ...fields };
 }
-function createBetterTasksStatusRouter({ windowLike, directWriter }) {
+function createBetterTasksStatusRouter({
+  windowLike,
+  directWriter,
+  activityRecorder = null
+}) {
   if (!directWriter || typeof directWriter.apply !== "function") {
     throw new TypeError("directWriter.apply is required");
+  }
+  if (activityRecorder != null && typeof activityRecorder.record !== "function") {
+    throw new TypeError("activityRecorder.record must be a function");
+  }
+  async function recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle }) {
+    if (!activityRecorder || outcome?.status !== "updated") return outcome;
+    if (outcome.activity !== void 0) return outcome;
+    let activity;
+    try {
+      activity = await activityRecorder.record({
+        uid,
+        previousString: expectedString,
+        nextString: typeof outcome.string === "string" ? outcome.string : nextString,
+        statusTagTitle
+      });
+    } catch (error) {
+      activity = { recorded: false, reason: "activity-recorder-threw", error };
+    }
+    return { ...outcome, activity };
   }
   return Object.freeze({
     async apply({
@@ -90,8 +243,9 @@ function createBetterTasksStatusRouter({ windowLike, directWriter }) {
           classification
         });
       }
+      let outcome;
       try {
-        return await provider.capability.requestStatusTag(uid, {
+        outcome = await provider.capability.requestStatusTag(uid, {
           expectedString,
           statusTagTitle,
           source: "task-status-tags",
@@ -100,6 +254,7 @@ function createBetterTasksStatusRouter({ windowLike, directWriter }) {
       } catch (error) {
         return routed("unknown", { reason: "better-tasks-status-request-failed", error });
       }
+      return recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle });
     }
   });
 }
@@ -109,8 +264,8 @@ function isPromiseLike(value) {
   return value != null && typeof value.then === "function";
 }
 async function callSafely(disposer) {
-  const result2 = disposer();
-  if (isPromiseLike(result2)) await result2;
+  const result3 = disposer();
+  if (isPromiseLike(result3)) await result3;
 }
 function createLifecycle() {
   let disposed = false;
@@ -255,6 +410,11 @@ function mapPublicResult(outcome) {
   };
   if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
   else if (!known) mapped.reason = "unmapped-result";
+  const activity = outcome.activity;
+  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
+    mapped.activity = { recorded: activity.recorded };
+    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
+  }
   return mapped;
 }
 function publicStatusRow({ key, name, tag, glyph, colors }) {
@@ -432,7 +592,7 @@ function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, Custom
 
 // src/status-write.js
 var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
-function valueAt(value, keyword, fallback = null) {
+function valueAt2(value, keyword, fallback = null) {
   if (!value || typeof value !== "object") return fallback;
   const plain = keyword.replace(/^:/, "");
   return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
@@ -448,13 +608,13 @@ function createFreshBlockStringReader(roamAlphaAPI) {
       BLOCK_STRING_PULL_PATTERN,
       [":block/uid", uid]
     );
-    const pulledUid = valueAt(value, ":block/uid", null);
-    const string = valueAt(value, ":block/string", null);
+    const pulledUid = valueAt2(value, ":block/uid", null);
+    const string = valueAt2(value, ":block/string", null);
     if (pulledUid !== uid || typeof string !== "string") return null;
     return string;
   };
 }
-function result(status, fields = {}) {
+function result2(status, fields = {}) {
   return { status, didWrite: status === "updated", ...fields };
 }
 async function certify({ uid, expectedString, nextString, readFresh, writeError = null }) {
@@ -462,25 +622,25 @@ async function certify({ uid, expectedString, nextString, readFresh, writeError 
   try {
     observed = await readFresh(uid);
   } catch (error) {
-    return result("unknown", {
+    return result2("unknown", {
       reason: "post-write-read-failed",
       error: writeError || error
     });
   }
   if (observed === nextString) {
-    return result("updated", {
+    return result2("updated", {
       reason: writeError ? "write-threw-after-commit" : "certified",
       string: observed
     });
   }
   if (observed === expectedString) {
-    return result("not-updated", {
+    return result2("not-updated", {
       reason: writeError ? "write-failed-before-commit" : "write-not-observed",
       error: writeError || void 0,
       string: observed
     });
   }
-  return result("conflict", {
+  return result2("conflict", {
     reason: observed == null ? "block-missing-after-write" : "third-state-after-write",
     error: writeError || void 0,
     string: observed
@@ -505,36 +665,36 @@ function createCertifiedBlockStringWriter({
       editorString
     }) {
       if (typeof uid !== "string" || !uid.trim()) {
-        return result("rejected", { reason: "invalid-uid" });
+        return result2("rejected", { reason: "invalid-uid" });
       }
       if (typeof expectedString !== "string" || typeof nextString !== "string") {
-        return result("rejected", { reason: "invalid-string" });
+        return result2("rejected", { reason: "invalid-string" });
       }
       let before;
       try {
         before = await readFresh(uid);
       } catch (error) {
-        return result("unknown", { reason: "pre-write-read-failed", error });
+        return result2("unknown", { reason: "pre-write-read-failed", error });
       }
-      if (before == null) return result("rejected", { reason: "block-not-found" });
+      if (before == null) return result2("rejected", { reason: "block-not-found" });
       if (before !== expectedString) {
-        return result("conflict", { reason: "stale-expected-string", string: before });
+        return result2("conflict", { reason: "stale-expected-string", string: before });
       }
       const hasEditorHandoff = expectedLiveEditorString !== void 0 || editorString !== void 0;
       if (hasEditorHandoff && (typeof expectedLiveEditorString !== "string" || typeof editorString !== "string")) {
-        return result("rejected", { reason: "invalid-editor-handoff" });
+        return result2("rejected", { reason: "invalid-editor-handoff" });
       }
       if (hasEditorHandoff) {
         const live = getLiveEditorString(uid);
         if (live !== expectedLiveEditorString && live !== editorString) {
-          return result("conflict", {
+          return result2("conflict", {
             reason: "active-editor-diverged",
             string: typeof live === "string" ? live : null
           });
         }
       }
       if (nextString === expectedString) {
-        return result("unchanged", { reason: "already-current", string: before });
+        return result2("unchanged", { reason: "already-current", string: before });
       }
       try {
         await updateBlock(uid, nextString);
@@ -1244,8 +1404,8 @@ function createStatusPeekController({
       });
     }
     try {
-      const result2 = remove ? await onRemove?.(intentContext) : await onOpen?.(intentContext);
-      if (!remove && result2 === false) hide();
+      const result3 = remove ? await onRemove?.(intentContext) : await onOpen?.(intentContext);
+      if (!remove && result3 === false) hide();
       return true;
     } catch (error) {
       hide();
@@ -1495,7 +1655,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.9.0" : "development";
+var BUNDLED_VERSION = true ? "0.9.1" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -2791,7 +2951,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
-    directWriter: certifiedBlockWriter
+    directWriter: certifiedBlockWriter,
+    activityRecorder: createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI })
   });
   function getCurrentStatus(text) {
     return getTextHelpers().getCurrentStatus(text);
