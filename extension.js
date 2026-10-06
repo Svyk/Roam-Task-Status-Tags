@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.8.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.9.0 | generated; edit src/ */
 
 // src/better-tasks-bridge.js
 function callable(value, name) {
@@ -187,6 +187,247 @@ function createLifecycle() {
       if (errors.length) throw new AggregateError(errors, "One or more extension cleanups failed");
     }
   };
+}
+
+// src/public-api.js
+var API_VERSION = 1;
+var GLOBAL_NAME = "RoamTaskStatusTags";
+var READY_EVENT = "roam-task-status-tags:ready";
+var UNLOAD_EVENT = "roam-task-status-tags:unload";
+var API_EVENTS = Object.freeze(["change", "statuses"]);
+var EVENT_TYPES = new Set(API_EVENTS);
+var PUBLIC_STATUSES = /* @__PURE__ */ new Set([
+  "updated",
+  "rejected",
+  "unknown",
+  "conflict",
+  "not-updated",
+  "unchanged"
+]);
+var emitters = /* @__PURE__ */ new WeakMap();
+function requiredFunction(name, value) {
+  if (typeof value !== "function") throw new TypeError(`${name} is required`);
+  return value;
+}
+function helperOptionsFromCatalog(catalog) {
+  const statuses = {};
+  const cycleOrder = [];
+  for (const row of catalog || []) {
+    if (!row?.key || !row?.name) continue;
+    cycleOrder.push(row.key);
+    const tagTitle = row.tag || `task-status/${row.name}`;
+    statuses[row.key] = {
+      name: row.name,
+      label: row.name,
+      tagTitle,
+      tagTitles: [tagTitle]
+    };
+  }
+  return { statuses, cycleOrder };
+}
+function resolveStatusKey(name, catalog) {
+  if (name === null) return { ok: true, key: null };
+  if (typeof name !== "string") return { ok: false, reason: "unknown-status" };
+  const text = name.trim();
+  if (!text) return { ok: false, reason: "unknown-status" };
+  const rows = Array.isArray(catalog) ? catalog : [];
+  const upper = text.toUpperCase();
+  for (const row of rows) {
+    if (row?.key === text || row?.key === upper) return { ok: true, key: row.key };
+  }
+  const folded = text.toLowerCase();
+  for (const row of rows) {
+    if (row?.name === text || String(row?.name ?? "").toLowerCase() === folded) {
+      return { ok: true, key: row.key };
+    }
+  }
+  return { ok: false, reason: "unknown-status" };
+}
+function mapPublicResult(outcome) {
+  if (outcome == null || typeof outcome !== "object") {
+    return { status: "unknown", didWrite: false, reason: "unmapped-result" };
+  }
+  const known = PUBLIC_STATUSES.has(outcome.status);
+  const status = known ? outcome.status : "unknown";
+  const mapped = {
+    status,
+    didWrite: status === "updated" && outcome.didWrite === true
+  };
+  if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
+  else if (!known) mapped.reason = "unmapped-result";
+  return mapped;
+}
+function publicStatusRow({ key, name, tag, glyph, colors }) {
+  return Object.freeze({
+    key: String(key),
+    name: String(name),
+    tag: String(tag),
+    glyph: String(glyph),
+    light: Object.freeze({
+      base: String(colors?.lightBackgroundCss ?? ""),
+      text: String(colors?.lightTextCss ?? "")
+    }),
+    dark: Object.freeze({
+      base: String(colors?.darkBackgroundCss ?? ""),
+      text: String(colors?.darkTextCss ?? "")
+    })
+  });
+}
+function dispatch(target, type, detail) {
+  try {
+    const Ctor = globalThis.CustomEvent;
+    if (!Ctor) return;
+    target.dispatchEvent(new Ctor(type, { detail }));
+  } catch (error) {
+    console.error("[TaskStatus] listener dispatch failed", error);
+  }
+}
+function emitStatusChange(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "change", detail);
+}
+function emitStatusCatalog(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "statuses", detail ?? { apiVersion: API_VERSION });
+}
+function emitChange(emitter, detail) {
+  dispatch(emitter, "change", detail);
+}
+function createPublicApi({
+  readCatalog,
+  readStatuses,
+  createTextHelpers,
+  setBlockStatus,
+  cycleBlockStatus
+} = {}) {
+  requiredFunction("readCatalog", readCatalog);
+  requiredFunction("readStatuses", readStatuses);
+  requiredFunction("createTextHelpers", createTextHelpers);
+  requiredFunction("setBlockStatus", setBlockStatus);
+  requiredFunction("cycleBlockStatus", cycleBlockStatus);
+  const emitter = new EventTarget();
+  const buckets = /* @__PURE__ */ new Map();
+  const api = {
+    apiVersion: API_VERSION,
+    statuses() {
+      const rows = readStatuses();
+      return Object.freeze(Array.isArray(rows) ? rows.slice() : []);
+    },
+    statusOf(text) {
+      if (typeof text !== "string" || text.length === 0) return null;
+      try {
+        const catalog = readCatalog();
+        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+        const key = helpers?.getCurrentStatus?.(text);
+        if (!key) return null;
+        const row = (catalog || []).find((entry) => entry?.key === key);
+        return typeof row?.name === "string" && row.name ? row.name : null;
+      } catch (error) {
+        console.warn("[TaskStatus] statusOf failed", error);
+        return null;
+      }
+    },
+    async setStatus(uid, name) {
+      let catalog;
+      try {
+        catalog = readCatalog();
+      } catch (error) {
+        console.warn("[TaskStatus] status list read failed", error);
+        return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
+      }
+      const resolved = resolveStatusKey(name, catalog);
+      if (!resolved.ok) {
+        return { status: "rejected", didWrite: false, reason: resolved.reason };
+      }
+      let outcome;
+      try {
+        outcome = await setBlockStatus(uid, resolved.key);
+      } catch (error) {
+        console.warn("[TaskStatus] setStatus failed", error);
+        return { status: "unknown", didWrite: false, reason: "set-status-failed" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const row = (catalog || []).find((entry) => entry?.key === resolved.key);
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: row?.name ?? null,
+        status: "updated"
+      });
+      return mapped;
+    },
+    async cycle(uid) {
+      let outcome;
+      try {
+        outcome = await cycleBlockStatus(uid);
+      } catch (error) {
+        console.warn("[TaskStatus] cycle failed", error);
+        return { status: "unknown", didWrite: false, reason: "cycle-failed" };
+      }
+      if (outcome == null || typeof outcome !== "object") {
+        return { status: "unchanged", didWrite: false, reason: "done-task" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const written = typeof outcome.string === "string" ? api.statusOf(outcome.string) : null;
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: written,
+        status: "updated"
+      });
+      return mapped;
+    },
+    addEventListener(type, cb) {
+      if (!EVENT_TYPES.has(type) || typeof cb !== "function") return;
+      let bag = buckets.get(type);
+      if (!bag) {
+        bag = /* @__PURE__ */ new Map();
+        buckets.set(type, bag);
+      }
+      if (bag.has(cb)) return;
+      const wrapped = (event) => {
+        try {
+          cb(event?.detail);
+        } catch (error) {
+          console.error("[TaskStatus] listener failed", error);
+        }
+      };
+      bag.set(cb, wrapped);
+      emitter.addEventListener(type, wrapped);
+    },
+    removeEventListener(type, cb) {
+      const bag = buckets.get(type);
+      const wrapped = bag?.get(cb);
+      if (!wrapped) return;
+      bag.delete(cb);
+      emitter.removeEventListener(type, wrapped);
+    }
+  };
+  const frozen = Object.freeze(api);
+  emitters.set(frozen, emitter);
+  return frozen;
+}
+var fire = (win, type, detail, Ctor) => {
+  try {
+    const C = Ctor ?? win.CustomEvent ?? globalThis.CustomEvent;
+    if (C) win.dispatchEvent(new C(type, { detail }));
+  } catch (error) {
+    console.warn("[TaskStatus] event dispatch failed", error);
+  }
+};
+function installPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  win[GLOBAL_NAME] = api;
+  fire(win, READY_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+}
+function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  const ours = win[GLOBAL_NAME] === api;
+  if (ours) delete win[GLOBAL_NAME];
+  fire(win, UNLOAD_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+  return ours;
 }
 
 // src/status-write.js
@@ -1254,7 +1495,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.8.0" : "development";
+var BUNDLED_VERSION = true ? "0.9.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -1666,6 +1907,8 @@ function createTaskStatusExtension({ extensionAPI }) {
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
+  let publicApi = null;
+  let publicWriteDepth = 0;
   function ensureColorProbeElement() {
     if (colorProbeEl && colorProbeEl.isConnected) return colorProbeEl;
     try {
@@ -2067,6 +2310,50 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     list: statusList
   });
   let statusTagToKey = buildTagTitleIndex(STATUSES);
+  function publishStatuses() {
+    if (!publicApi || publicWriteDepth > 0) return;
+    emitStatusCatalog(publicApi, { apiVersion: 1 });
+  }
+  function publishChange(blockUid, statusKey) {
+    if (!publicApi || publicWriteDepth > 0) return;
+    emitStatusChange(publicApi, {
+      apiVersion: 1,
+      uid: blockUid,
+      name: statusKey == null ? null : STATUSES[statusKey]?.name ?? null,
+      status: "updated"
+    });
+  }
+  function readStoredStatusList() {
+    const stored = parseMaybeJson(extensionAPI?.settings?.get?.(SETTINGS_KEYS.statusList));
+    if (Array.isArray(stored) && stored.length) return normalizeStatusList(stored);
+    if (statusList.length) return statusList.map((entry) => ({ key: entry.key, name: entry.name }));
+    return normalizeStatusList(DEFAULT_STATUS_LIST);
+  }
+  function readStatusEntries() {
+    const list = readStoredStatusList();
+    const built = buildStatuses({ list });
+    return list.map((entry) => {
+      const status = built[entry.key];
+      return {
+        key: entry.key,
+        name: status?.name || entry.name,
+        tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
+        glyph: getStatusCheckboxShape(entry.key)
+      };
+    });
+  }
+  function readStatuses() {
+    const entries = readStatusEntries();
+    const overrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+    const surfaces = resolveStatusSurfaces();
+    return entries.map((entry) => publicStatusRow({
+      key: entry.key,
+      name: entry.name,
+      tag: entry.tag,
+      glyph: entry.glyph,
+      colors: deriveStatusPillColorValues(entry.key, overrides?.[entry.key], surfaces)
+    }));
+  }
   function rebuildStatusIndexes() {
     statusList = loadStatusList();
     syncCycleOrderFromStatusList();
@@ -2076,6 +2363,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
+    publishStatuses();
   }
   function rebuildStatusIndexesFromMemory() {
     syncCycleOrderFromStatusList();
@@ -2085,6 +2373,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
+    publishStatuses();
   }
   function escapeDatalogString(text) {
     return String(text || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -2571,6 +2860,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           reason: outcome?.reason || "unknown"
         });
       }
+      if (outcome?.status === "updated") publishChange(blockUid, statusKey);
       return outcome;
     } finally {
       pendingOperations.delete(blockUid);
@@ -2590,7 +2880,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     try {
       const blockString = await readBlockStringFresh(blockUid);
       if (blockString === null) return { status: "rejected", didWrite: false, reason: "block-not-found" };
-      if (isDoneTask(blockString)) return;
+      if (isDoneTask(blockString)) {
+        return { status: "unchanged", didWrite: false, reason: "done-task" };
+      }
       const current = getCurrentStatus(blockString);
       const next = getNextStatus(current);
       return await setBlockStatus(blockUid, next);
@@ -3395,6 +3687,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
           setColorInfoByKey((prev) => ({ ...prev, [k]: "Saved." }));
+          publishStatuses();
         } catch (e) {
           const msg = e?.message || String(e);
           setColorErrorByKey((prev) => ({ ...prev, [k]: msg }));
@@ -3415,6 +3708,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
           setColorInfoByKey((prev) => ({ ...prev, [key]: "Reset." }));
+          publishStatuses();
         } catch (e) {
           const msg = e?.message || String(e);
           setColorErrorByKey((prev) => ({ ...prev, [key]: msg }));
@@ -4064,7 +4358,33 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     await unregisterAllCommands();
     console.log("[TaskStatus] Unloaded.");
   }
-  return { init, cleanup };
+  publicApi = createPublicApi({
+    readCatalog: readStatusEntries,
+    readStatuses,
+    createTextHelpers: (options) => createTaskStatusTextHelpers({
+      ...options,
+      todoPatterns: TODO_PATTERNS,
+      donePatterns: DONE_PATTERNS,
+      todoCanonical: TODO_CANONICAL
+    }),
+    setBlockStatus: async (uid, statusKey) => {
+      publicWriteDepth += 1;
+      try {
+        return await setBlockStatus(uid, statusKey);
+      } finally {
+        publicWriteDepth -= 1;
+      }
+    },
+    cycleBlockStatus: async (uid) => {
+      publicWriteDepth += 1;
+      try {
+        return await cycleBlockStatus(uid);
+      } finally {
+        publicWriteDepth -= 1;
+      }
+    }
+  });
+  return { init, cleanup, publicApi };
 }
 var activeLifecycle = null;
 async function onload({ extensionAPI, extension }) {
@@ -4082,6 +4402,8 @@ async function onload({ extensionAPI, extension }) {
   });
   activeLifecycle = lifecycle;
   window[GLOBAL_KEY] = runtime;
+  installPublicApi(instance.publicApi, { win: window });
+  lifecycle.add(() => uninstallPublicApi(instance.publicApi, { win: window }));
   lifecycle.add(async () => {
     await instance.cleanup();
     if (window[GLOBAL_KEY] === runtime) delete window[GLOBAL_KEY];

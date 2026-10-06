@@ -1,6 +1,14 @@
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
+  createPublicApi,
+  emitStatusCatalog,
+  emitStatusChange,
+  installPublicApi,
+  publicStatusRow,
+  uninstallPublicApi,
+} from "./public-api.js";
+import {
   createCertifiedBlockStringWriter,
   createFreshBlockStringReader,
 } from "./status-write.js";
@@ -11,6 +19,7 @@ import {
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
+  getStatusCheckboxShape,
   relativeLuminance,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
@@ -524,6 +533,8 @@ function createTaskStatusExtension({ extensionAPI }) {
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
+  let publicApi = null;
+  let publicWriteDepth = 0;
 
   function ensureColorProbeElement() {
     if (colorProbeEl && colorProbeEl.isConnected) return colorProbeEl;
@@ -1000,6 +1011,55 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   let statusTagToKey = buildTagTitleIndex(STATUSES);
 
+  function publishStatuses() {
+    if (!publicApi || publicWriteDepth > 0) return;
+    emitStatusCatalog(publicApi, { apiVersion: 1 });
+  }
+
+  function publishChange(blockUid, statusKey) {
+    if (!publicApi || publicWriteDepth > 0) return;
+    emitStatusChange(publicApi, {
+      apiVersion: 1,
+      uid: blockUid,
+      name: statusKey == null ? null : STATUSES[statusKey]?.name ?? null,
+      status: "updated",
+    });
+  }
+
+  function readStoredStatusList() {
+    const stored = parseMaybeJson(extensionAPI?.settings?.get?.(SETTINGS_KEYS.statusList));
+    if (Array.isArray(stored) && stored.length) return normalizeStatusList(stored);
+    if (statusList.length) return statusList.map((entry) => ({ key: entry.key, name: entry.name }));
+    return normalizeStatusList(DEFAULT_STATUS_LIST);
+  }
+
+  function readStatusEntries() {
+    const list = readStoredStatusList();
+    const built = buildStatuses({ list });
+    return list.map((entry) => {
+      const status = built[entry.key];
+      return {
+        key: entry.key,
+        name: status?.name || entry.name,
+        tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
+        glyph: getStatusCheckboxShape(entry.key),
+      };
+    });
+  }
+
+  function readStatuses() {
+    const entries = readStatusEntries();
+    const overrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+    const surfaces = resolveStatusSurfaces();
+    return entries.map((entry) => publicStatusRow({
+      key: entry.key,
+      name: entry.name,
+      tag: entry.tag,
+      glyph: entry.glyph,
+      colors: deriveStatusPillColorValues(entry.key, overrides?.[entry.key], surfaces),
+    }));
+  }
+
   function rebuildStatusIndexes() {
     statusList = loadStatusList();
     syncCycleOrderFromStatusList();
@@ -1009,6 +1069,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
+    publishStatuses();
   }
 
   function rebuildStatusIndexesFromMemory() {
@@ -1019,6 +1080,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusTagToKey = buildTagTitleIndex(STATUSES);
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
+    publishStatuses();
   }
 
   function escapeDatalogString(text) {
@@ -1622,6 +1684,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           reason: outcome?.reason || "unknown",
         });
       }
+      if (outcome?.status === "updated") publishChange(blockUid, statusKey);
       return outcome;
     } finally {
       pendingOperations.delete(blockUid);
@@ -1645,7 +1708,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const blockString = await readBlockStringFresh(blockUid);
       if (blockString === null) return { status: "rejected", didWrite: false, reason: "block-not-found" };
 
-      if (isDoneTask(blockString)) return;
+      if (isDoneTask(blockString)) {
+        return { status: "unchanged", didWrite: false, reason: "done-task" };
+      }
 
       const current = getCurrentStatus(blockString);
       const next = getNextStatus(current);
@@ -2638,6 +2703,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
           setColorInfoByKey((prev) => ({ ...prev, [k]: "Saved." }));
+          publishStatuses();
         } catch (e) {
           const msg = e?.message || String(e);
           setColorErrorByKey((prev) => ({ ...prev, [k]: msg }));
@@ -2660,6 +2726,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setSavedColorsByKey(refreshed);
           setDraftColorsByKey(refreshed);
           setColorInfoByKey((prev) => ({ ...prev, [key]: "Reset." }));
+          publishStatuses();
         } catch (e) {
           const msg = e?.message || String(e);
           setColorErrorByKey((prev) => ({ ...prev, [key]: msg }));
@@ -3395,7 +3462,34 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     console.log("[TaskStatus] Unloaded.");
   }
 
-  return { init, cleanup };
+  publicApi = createPublicApi({
+    readCatalog: readStatusEntries,
+    readStatuses,
+    createTextHelpers: (options) => createTaskStatusTextHelpers({
+      ...options,
+      todoPatterns: TODO_PATTERNS,
+      donePatterns: DONE_PATTERNS,
+      todoCanonical: TODO_CANONICAL,
+    }),
+    setBlockStatus: async (uid, statusKey) => {
+      publicWriteDepth += 1;
+      try {
+        return await setBlockStatus(uid, statusKey);
+      } finally {
+        publicWriteDepth -= 1;
+      }
+    },
+    cycleBlockStatus: async (uid) => {
+      publicWriteDepth += 1;
+      try {
+        return await cycleBlockStatus(uid);
+      } finally {
+        publicWriteDepth -= 1;
+      }
+    },
+  });
+
+  return { init, cleanup, publicApi };
 }
 
 let activeLifecycle = null;
@@ -3417,6 +3511,9 @@ export async function onload({ extensionAPI, extension }) {
   });
   activeLifecycle = lifecycle;
   window[GLOBAL_KEY] = runtime;
+
+  installPublicApi(instance.publicApi, { win: window });
+  lifecycle.add(() => uninstallPublicApi(instance.publicApi, { win: window }));
 
   lifecycle.add(async () => {
     await instance.cleanup();

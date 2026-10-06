@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 2026-10-06
+
+- Add `window.RoamTaskStatusTags` (`apiVersion` 1) so another extension can read the configured statuses and ask this extension to set or cycle one.
+- `statuses()` re-reads settings on every call and returns each status with its tag, glyph, and the same light and dark pill colours the outline uses. The default catalog includes In Review.
+- `setStatus` and `cycle` use the same certified writer as the palette, including the Better Tasks router. A plain TODO gains exactly one `#[[task-status/<Name>]]` after `{{[[TODO]]}}`; `null` removes only that tag.
+- Dispatch `roam-task-status-tags:ready` on install and `roam-task-status-tags:unload` on unload. The `statuses` event fires when a status is renamed, recoloured, or reordered. The global is removed on unload only while it is still this extension's object.
+
 ## 0.8.0 — 2026-10-06
 
 - Add a built-in **In Review** status (`#[[task-status/In Review]]`) for work waiting on someone's review or sign-off. It sits after Waiting in the default order, with its own sky-blue palette and a half-filled circle glyph on both checkbox and pill.

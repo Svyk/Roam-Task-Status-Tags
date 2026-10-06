@@ -164,6 +164,45 @@ Hotkeys note:
 
 - Roam binds hotkeys to command labels. If you rename a status, you may need to re-bind that `Task Status: Set ...` hotkey.
 
+## Public API
+
+Other extensions can call the frozen `window.RoamTaskStatusTags` object (`apiVersion` 1). It is installed with the extension and removed on unload only when the global is still this object.
+
+| Member | Call | Result |
+|---|---|---|
+| `apiVersion` | — | `1` |
+| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. |
+| `statusOf` | `statusOf(blockString)` | The status display name, or `null` when the string has no managed status tag. |
+| `setStatus` | `setStatus(uid, nameOrNull)` | Promise of `{ status, didWrite, reason? }`. `name` is the display name (`"Waiting"`, `"In Review"`); `null` clears the tag. |
+| `cycle` | `cycle(uid)` | Promise of the same result shape. |
+| `addEventListener` | `addEventListener("change" \| "statuses", callback)` | Callback receives the event detail. |
+| `removeEventListener` | `removeEventListener(type, callback)` | Removes that callback. |
+
+`status` is `"updated"`, `"rejected"`, `"unknown"`, `"conflict"`, `"not-updated"`, or `"unchanged"`. `didWrite` is true only for `"updated"`. Writes go through the same certified path as the command palette, and a Better Tasks task is handed to `window.betterTasks.v2.requestStatusTag`. This extension still owns that routing.
+
+Window events, with detail `{ apiVersion: 1 }`:
+
+- `roam-task-status-tags:ready` when the global is installed.
+- `roam-task-status-tags:unload` when the extension unloads.
+
+API events:
+
+- `"change"` after a committed status write: `{ apiVersion, uid, name, status: "updated" }`. `name` is `null` when the tag was removed.
+- `"statuses"` after a status rename, recolour, or reorder. Call `statuses()` again to re-render.
+
+```javascript
+window.addEventListener("roam-task-status-tags:ready", async () => {
+  const api = window.RoamTaskStatusTags;
+  const waiting = api.statuses().find((row) => row.name === "Waiting");
+  api.addEventListener("statuses", () => {
+    // Names, colours, or order changed. Read api.statuses() again.
+  });
+  await api.setStatus(uid, "Waiting");
+  await api.setStatus(uid, null);
+  console.log(waiting.glyph, waiting.light, waiting.dark);
+});
+```
+
 ## Install (Developer Extension)
 
 This folder is a Roam Depot-style developer extension.
@@ -215,7 +254,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-The tests cover status text transforms, Better Tasks routing, certified writes, exact
+The tests cover status text transforms, Better Tasks routing, certified writes, the public status API, exact
 checkbox and hidden-pill ownership, reveal timing and keyboard semantics, ARIA cleanup,
 light/dark contrast derivation, graph-read-free hover, zero-JavaScript native completion,
 current-bullet gutter placement and viewport fallbacks, scoped Svy Theme menu tokens,
