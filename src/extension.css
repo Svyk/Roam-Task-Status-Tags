@@ -1802,6 +1802,15 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
   background: var(--ts-menu-hover) !important;
 }
 
+.ts-status-chooser .ts-follow-up-note {
+  max-width: 190px;
+  margin: 0 4px 4px;
+  padding: 0 4px;
+  color: var(--ts-menu-muted) !important;
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
 .ts-status-chooser .ts-follow-up-skip {
   margin-top: 3px;
   border-top: 1px solid var(--ts-menu-border-subtle);

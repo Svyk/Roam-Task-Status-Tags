@@ -2195,7 +2195,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const isCurrent = () => chooser && statusChooserEl === chooser && chooser.isConnected;
     const outcome = await setBlockStatus(blockUid, statusKey);
     if (!isCurrent()) return;
-    if (outcome?.status !== "updated") {
+    // Picking Waiting again on a task that is already Waiting still asks.
+    const statusInPlace =
+      outcome?.status === "updated" ||
+      (outcome?.status === "unchanged" && outcome?.reason === "already-current");
+    if (!statusInPlace) {
       closeStatusChooser();
       return;
     }
@@ -2210,6 +2214,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       document,
       statusLabel: STATUSES[statusKey]?.label || "",
       existingDue: state.existingDue,
+      repeats: state.repeats,
       today: new Date(),
       onDecision: (decision) => {
         // A prompt closed with its chooser (click outside, scroll) is no longer
@@ -2247,7 +2252,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     chooser.classList.add("ts-follow-up-chooser");
     followUpPrompt = prompt;
     const keyGuard = (event) => {
-      if (followUpPrompt !== prompt || !chooser.contains(event.target)) return;
+      if (followUpPrompt !== prompt) return;
+      // Keys aimed at the prompt, or at nothing (focus fell to the page while
+      // the list was swapped or chrome was clicked), belong to the prompt.
+      const target = event.target;
+      const unfocused =
+        !target || target === document || target === document.body || target === document.documentElement;
+      if (!unfocused && !chooser.contains(target)) return;
       prompt.handleKey(event);
       // Roam's own shortcuts never see keys typed into the prompt; native
       // typing in the date field still happens (no preventDefault here).

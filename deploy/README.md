@@ -181,6 +181,9 @@ Pick **Waiting** or **In Review** in the status chooser on an open Better Tasks 
 - Choices: **Tomorrow**, **In 3 days**, **Next week**, a date field with **Set**, and **Skip**.
 - The date becomes the task's Better Tasks due date (`BT_attrDue`, or whatever due attribute you set in Better Tasks). It is written through Better Tasks' own `bt_modify`, which changes the existing due block in place (same uid), uses your Better Tasks date format, and logs the change in its activity log.
 - If the task already has a due date, the first choice is **Keep due <date>**. Any other choice replaces it.
+- A repeating task says so in the prompt: a new date moves the series' due date.
+- Picking Waiting on a task that is already Waiting still asks.
+- A due date stored under one of Better Tasks' due aliases gets no prompt: Better Tasks would add a second due block instead of changing it.
 - **Skip**, **Keep**, Escape, or a click outside write nothing more. The status is already set.
 - Arrow keys move, Enter picks, Escape cancels. Roam's shortcuts do not fire while the prompt has focus.
 - Only from the chooser, only for one task at a time, and only when Better Tasks is present. A DONE task, a plain block, or several selected blocks get no prompt.

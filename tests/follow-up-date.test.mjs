@@ -95,6 +95,7 @@ function makeGraph({
   modifyResult = null,
   withTools = true,
   withV2 = true,
+  recreateDue = false,
 } = {}) {
   const block = { uid: "task00001", string, children: children.map((c) => ({ ...c })) };
   const calls = { modify: [], classify: 0 };
@@ -103,7 +104,10 @@ function makeGraph({
       name: "bt_get_attributes",
       execute: async () => ({
         surface: "Child",
-        attributes: [{ id: "due", name: dueName, aliases: dueAliases }],
+        attributes: [
+          { id: "repeat", name: "BT_attrRepeat", aliases: [] },
+          { id: "due", name: dueName, aliases: dueAliases },
+        ],
       }),
     },
     {
@@ -114,7 +118,9 @@ function makeGraph({
         const due = block.children.find((child) => child.string.startsWith(`${dueName}::`));
         const d = parseIsoDate(args.attributes.due);
         const value = `${dueName}:: [[${dailyNoteTitle(d)}]]`;
-        if (due) due.string = value;
+        if (due && recreateDue) {
+          block.children.splice(block.children.indexOf(due), 1, { uid: "recreated", string: value });
+        } else if (due) due.string = value;
         else block.children.push({ uid: "newdue001", string: value });
         return { uid: args.uid, due: `[[${dailyNoteTitle(d)}]]` };
       },
@@ -317,4 +323,55 @@ test("prompt: an existing due date is shown first and can be kept", () => {
   prompt.focusFirst();
   prompt.handleKey(key(focused.node, "Enter"));
   assert.deepEqual(decisions, [{ action: "keep" }]);
+});
+
+test("a due date stored under an alias is never written (Better Tasks would add a second block)", async () => {
+  const { windowLike, calls } = makeGraph({
+    dueAliases: ["Due"],
+    children: [{ uid: "due000001", string: "Due:: [[November 20th, 2026]]" }],
+  });
+  const state = await readFollowUpState({ windowLike, uid: "task00001" });
+  assert.equal(state.eligible, false);
+  assert.equal(state.reason, "due-under-alias");
+  const written = await writeFollowUpDate({ windowLike, uid: "task00001", date: new Date(2026, 10, 14) });
+  assert.equal(written.reason, "due-under-alias");
+  assert.equal(calls.modify.length, 0);
+});
+
+test("a repeating task is flagged so the prompt can say the series moves", async () => {
+  const { windowLike } = makeGraph({ children: [{ uid: "rep000001", string: "BT_attrRepeat:: every week" }] });
+  const state = await readFollowUpState({ windowLike, uid: "task00001" });
+  assert.equal(state.eligible, true);
+  assert.equal(state.repeats, true);
+  const { prompt } = makePrompt({ repeats: true });
+  assert.match(prompt.element.querySelector(".ts-follow-up-note").textContent, /series/);
+  assert.equal(makePrompt().prompt.element.querySelector(".ts-follow-up-note"), null);
+});
+
+test("a task completed before the date is set gets nothing written", async () => {
+  const { windowLike, block, calls } = makeGraph();
+  block.string = "{{[[DONE]]}} #[[task-status/Waiting]] Call the vendor";
+  const written = await writeFollowUpDate({ windowLike, uid: "task00001", date: new Date(2026, 10, 14) });
+  assert.equal(written.reason, "not-an-open-task");
+  assert.equal(calls.modify.length, 0);
+});
+
+test("a due block that comes back with a new uid is reported, not claimed in place", async () => {
+  const { windowLike } = makeGraph({
+    recreateDue: true,
+    children: [{ uid: "due000001", string: "BT_attrDue:: [[November 20th, 2026]]" }],
+  });
+  const written = await writeFollowUpDate({ windowLike, uid: "task00001", date: new Date(2026, 10, 14) });
+  assert.equal(written.status, "unknown");
+  assert.equal(written.reason, "due-uid-changed");
+});
+
+test("prompt: Tab stays inside the prompt", () => {
+  const { prompt } = makePrompt();
+  const skip = itemByAction(prompt, "skip");
+  skip.focus();
+  const tab = key(skip, "Tab");
+  assert.equal(prompt.handleKey(tab), true);
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(focused.node, itemByAction(prompt, "tomorrow"));
 });

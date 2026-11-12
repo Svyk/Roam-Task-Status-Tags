@@ -11,6 +11,7 @@ export const FOLLOW_UP_STATUS_KEYS = Object.freeze(["WAITING", "IN_REVIEW"]);
 
 const BETTER_TASKS_TOOLS_ID = "better-tasks";
 const DEFAULT_DUE_ATTRIBUTE = "BT_attrDue";
+const DEFAULT_REPEAT_ATTRIBUTE = "BT_attrRepeat";
 const TODO_TOKEN_RE = /^\s*(?:\{\{\s*(?:\[\[\s*)?TODO(?:\s*\]\])?\s*\}\}|TODO)(?=$|[ \t\r\n])/i;
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const CHILDREN_PULL_PATTERN =
@@ -137,39 +138,62 @@ function escapeRegex(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function dueAttributeNames(surface) {
-  const names = [DEFAULT_DUE_ATTRIBUTE];
-  if (!surface.attributes) return names;
-  try {
-    const schema = await surface.attributes.execute({});
-    const due = Array.isArray(schema?.attributes)
-      ? schema.attributes.find((entry) => entry?.id === "due")
-      : null;
-    const configured = [due?.name, ...(Array.isArray(due?.aliases) ? due.aliases : [])]
-      .filter((name) => typeof name === "string" && name.trim())
-      .map((name) => name.trim());
-    if (configured.length) return [...new Set(configured)];
-  } catch (_) {}
-  return names;
+function attributeNames(schema, id, fallback) {
+  const entry = Array.isArray(schema?.attributes)
+    ? schema.attributes.find((attr) => attr?.id === id)
+    : null;
+  const clean = (name) => (typeof name === "string" && name.trim() ? name.trim() : null);
+  const primary = clean(entry?.name) || fallback;
+  const aliases = (Array.isArray(entry?.aliases) ? entry.aliases : [])
+    .map(clean)
+    .filter((name) => name && name.toLowerCase() !== String(primary).toLowerCase());
+  return { primary, aliases };
 }
 
-function findDueChild(children, names) {
-  const patterns = names.map((name) => new RegExp(`^\\s*${escapeRegex(name)}::\\s*`, "i"));
+async function attributeSchema(surface) {
+  if (!surface.attributes) return null;
+  try {
+    return await surface.attributes.execute({});
+  } catch (_) {
+    return null;
+  }
+}
+
+function findChild(children, names) {
   for (const child of Array.isArray(children) ? children : []) {
     const string = valueAt(child, ":block/string", "");
     const uid = valueAt(child, ":block/uid", null);
     if (typeof string !== "string" || typeof uid !== "string") continue;
-    const pattern = patterns.find((re) => re.test(string));
-    if (pattern) return { uid, value: string.replace(pattern, "").trim() };
+    for (const name of names) {
+      const pattern = new RegExp(`^\\s*${escapeRegex(name)}::\\s*`, "i");
+      if (pattern.test(string)) return { uid, name, value: string.replace(pattern, "").trim() };
+    }
   }
   return null;
 }
 
-async function readDueChild(surface, uid) {
+// Better Tasks' bt_modify updates only a block under the primary due name.
+// A due stored under an alias would get a second, primary block beside it,
+// so that case is reported (`aliased`) and never written.
+async function readTaskAttributes(surface, uid) {
   const block = await surface.pull(CHILDREN_PULL_PATTERN, [":block/uid", uid]);
   if (valueAt(block, ":block/uid", null) !== uid) return { block: null, due: null };
-  const names = await dueAttributeNames(surface);
-  return { block, due: findDueChild(valueAt(block, ":block/children", []), names) };
+  const schema = await attributeSchema(surface);
+  const due = attributeNames(schema, "due", DEFAULT_DUE_ATTRIBUTE);
+  const repeat = attributeNames(schema, "repeat", DEFAULT_REPEAT_ATTRIBUTE);
+  const children = valueAt(block, ":block/children", []);
+  const primaryDue = findChild(children, [due.primary]);
+  const aliasDue = primaryDue ? null : findChild(children, due.aliases);
+  return {
+    block,
+    due: primaryDue,
+    aliased: Boolean(aliasDue),
+    repeats: Boolean(findChild(children, [repeat.primary, ...repeat.aliases])),
+  };
+}
+
+function isOpenTask(block) {
+  return TODO_TOKEN_RE.test(valueAt(block, ":block/string", ""));
 }
 
 function result(eligible, reason, fields = {}) {
@@ -184,15 +208,14 @@ export async function readFollowUpState({ windowLike, uid }) {
   try {
     const classification = await surface.classifyBlock(uid);
     if (classification?.kind !== "task") return result(false, "not-a-better-tasks-task");
-    const { block, due } = await readDueChild(surface, uid);
+    const { block, due, aliased, repeats } = await readTaskAttributes(surface, uid);
     if (!block) return result(false, "block-not-found");
-    if (!TODO_TOKEN_RE.test(valueAt(block, ":block/string", ""))) {
-      return result(false, "not-an-open-task");
-    }
+    if (!isOpenTask(block)) return result(false, "not-an-open-task");
+    if (aliased) return result(false, "due-under-alias");
     const existingDue = due
       ? { uid: due.uid, value: due.value, date: parseDueValue(due.value, windowLike?.roamAlphaAPI) }
       : null;
-    return result(true, "ask", { existingDue });
+    return result(true, "ask", { existingDue, repeats });
   } catch (error) {
     return result(false, "read-failed", { error });
   }
@@ -205,10 +228,16 @@ export async function writeFollowUpDate({ windowLike, uid, date }) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return { status: "rejected", reason: "invalid-date" };
   }
-  let before = null;
+  let before;
   try {
-    before = (await readDueChild(surface, uid)).due;
-  } catch (_) {}
+    before = await readTaskAttributes(surface, uid);
+  } catch (error) {
+    return { status: "unknown", reason: "read-failed", error };
+  }
+  if (!before.block) return { status: "rejected", reason: "block-not-found" };
+  if (!isOpenTask(before.block)) return { status: "rejected", reason: "not-an-open-task" };
+  if (before.aliased) return { status: "rejected", reason: "due-under-alias" };
+  before = before.due;
   const target = localNoon(date);
   if (before && sameDay(parseDueValue(before.value, windowLike?.roamAlphaAPI) || new Date(NaN), target)) {
     return { status: "unchanged", reason: "same-date", dueUid: before.uid };
@@ -222,17 +251,20 @@ export async function writeFollowUpDate({ windowLike, uid, date }) {
   if (response?.error) return { status: "rejected", reason: "better-tasks-refused", error: response.error };
   let after = null;
   try {
-    after = (await readDueChild(surface, uid)).due;
+    after = (await readTaskAttributes(surface, uid)).due;
   } catch (_) {}
   const landed = after ? parseDueValue(after.value, windowLike?.roamAlphaAPI) : null;
   if (!after || !landed || !sameDay(landed, target)) {
     return { status: "unknown", reason: "due-not-confirmed", response };
   }
+  if (before && before.uid !== after.uid) {
+    return { status: "unknown", reason: "due-uid-changed", dueUid: after.uid, previousUid: before.uid };
+  }
   return {
     status: "updated",
     dueUid: after.uid,
     value: after.value,
-    sameUid: before ? before.uid === after.uid : null,
+    sameUid: before ? true : null,
   };
 }
 
@@ -272,7 +304,14 @@ function menuItem(documentLike, { label, hint = "", className = "", action, onCh
   return li;
 }
 
-export function createFollowUpPrompt({ document: documentLike, statusLabel, existingDue, today = new Date(), onDecision }) {
+export function createFollowUpPrompt({
+  document: documentLike,
+  statusLabel,
+  existingDue,
+  repeats = false,
+  today = new Date(),
+  onDecision,
+}) {
   let decided = false;
   const decide = (decision) => {
     if (decided) return;
@@ -292,6 +331,12 @@ export function createFollowUpPrompt({ document: documentLike, statusLabel, exis
   title.textContent = statusLabel ? `${statusLabel} · check back?` : "Check back?";
   header.append(title);
   list.append(header);
+  if (repeats) {
+    const note = documentLike.createElement("li");
+    note.className = "ts-follow-up-note";
+    note.textContent = "Repeating task: a date moves the series' due date.";
+    list.append(note);
+  }
 
   const existingDate = existingDue?.date || null;
   if (existingDue) {
@@ -379,6 +424,12 @@ export function createFollowUpPrompt({ document: documentLike, statusLabel, exis
     if (event.key === "Escape") {
       event.preventDefault();
       decide({ action: "cancel" });
+      return true;
+    }
+    if (event.key === "Tab") {
+      // Keep Tab inside the prompt; it never walks out into Roam.
+      event.preventDefault();
+      moveFocus(target, event.shiftKey ? -1 : 1);
       return true;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
