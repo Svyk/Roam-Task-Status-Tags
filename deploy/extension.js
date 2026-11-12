@@ -4831,6 +4831,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     themeRefreshFrame = requestFrame(() => {
       themeRefreshFrame = null;
       applyStatusColorOverrides(statusColorOverrides);
+      if (statusView?.isOpen()) void statusView.refresh();
     });
   }
   function startThemeObserver() {
