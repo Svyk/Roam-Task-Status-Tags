@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.10.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.11.0 | generated; edit src/ */
 
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
@@ -342,6 +342,259 @@ function createLifecycle() {
       if (errors.length) throw new AggregateError(errors, "One or more extension cleanups failed");
     }
   };
+}
+
+// src/repeat-status-reset.js
+var DEFAULT_CARRY_OVER_STATUS_NAMES = Object.freeze([
+  "Series",
+  "Movie",
+  "Watching",
+  "Watchlist",
+  "Upcoming",
+  "Rewatch",
+  "Dropped"
+]);
+var STATUS_PREFIX2 = "task-status/";
+var REVERSE_REFS_PATTERN = "[:block/_refs]";
+var OCCURRENCE_PULL_PATTERN = "[:block/uid :block/string :create/time :block/props]";
+function normalizeName(name) {
+  return String(name || "").replace(/\s+/g, " ").trim();
+}
+function parseCarryOverSetting(value) {
+  if (value === null || value === void 0) return [...DEFAULT_CARRY_OVER_STATUS_NAMES];
+  const source = Array.isArray(value) ? value.join(",") : String(value);
+  const seen = /* @__PURE__ */ new Set();
+  const names = [];
+  for (const part of source.split(/[,\n]/)) {
+    const name = normalizeName(part);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+function formatCarryOverSetting(names) {
+  return parseCarryOverSetting(names).join(", ");
+}
+function resetTagTitles(statusNames, carryOverNames) {
+  const carry = new Set(parseCarryOverSetting(carryOverNames).map((n) => n.toLowerCase()));
+  const titles = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of statusNames || []) {
+    const name = normalizeName(raw);
+    const key = name.toLowerCase();
+    if (!name || carry.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    titles.push(`${STATUS_PREFIX2}${name}`);
+  }
+  return titles;
+}
+function field(map, key) {
+  if (!map || typeof map !== "object") return void 0;
+  return map[key] ?? map[`:${key}`];
+}
+function parseProps(props) {
+  if (typeof props === "string") {
+    try {
+      return JSON.parse(props);
+    } catch (_) {
+      return null;
+    }
+  }
+  return props && typeof props === "object" ? props : null;
+}
+function seriesParentFromProps(props) {
+  const rt = field(parseProps(props), "rt");
+  const parent = field(rt, "parent");
+  return typeof parent === "string" && parent ? parent : null;
+}
+function refIds(pullResult) {
+  const refs = field(pullResult, "block/_refs");
+  if (!Array.isArray(refs)) return [];
+  return refs.map((ref) => field(ref, "db/id")).filter((id) => id != null);
+}
+function createRepeatStatusReset({
+  roamAlphaAPI,
+  windowLike,
+  getResetTagTitles,
+  now = Date.now,
+  setTimer = (fn, ms) => setTimeout(fn, ms),
+  clearTimer = (id) => clearTimeout(id),
+  // The ref must arrive with the block: a block older than this when its tag
+  // ref appears was edited (a status set by hand on a fresh occurrence, or a
+  // block synced from another device), not spawned here.
+  bornWithinMs = 2e3,
+  // How long to wait for Better Tasks to finish writing `rt` props.
+  spawnSettleMs = 1e4,
+  pollMs = 200,
+  // Tag pages created after load (typed by hand, set through Better Tasks,
+  // synced from another device) or recreated under a new uid get a watch on
+  // the next re-sync.
+  resyncMs = 6e4,
+  setRepeatingTimer = (fn, ms) => setInterval(fn, ms),
+  clearRepeatingTimer = (id) => clearInterval(id),
+  log = () => {
+  }
+}) {
+  const watches = /* @__PURE__ */ new Map();
+  const handled = /* @__PURE__ */ new Set();
+  const timers = /* @__PURE__ */ new Set();
+  let disposed = false;
+  let resetTitleSet = /* @__PURE__ */ new Set();
+  let resyncTimer = null;
+  const data = () => roamAlphaAPI?.data;
+  function pagesUidForTitle(title) {
+    try {
+      const page = data()?.pull?.("[:block/uid]", [":node/title", title]);
+      const uid = field(page, "block/uid");
+      return typeof uid === "string" ? uid : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function uidForEntityId(id) {
+    try {
+      const block = data()?.pull?.("[:block/uid]", id);
+      const uid = field(block, "block/uid");
+      return typeof uid === "string" ? uid : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function wait(ms) {
+    return new Promise((resolve) => {
+      const id = setTimer(() => {
+        timers.delete(id);
+        resolve();
+      }, ms);
+      timers.add(id);
+    });
+  }
+  async function pullOccurrence(uid) {
+    const pull = data()?.async?.pull;
+    if (typeof pull !== "function") return null;
+    const block = await pull.call(data().async, OCCURRENCE_PULL_PATTERN, [":block/uid", uid]);
+    return field(block, "block/uid") === uid ? block : null;
+  }
+  function isResetTitle(title) {
+    return typeof title === "string" && resetTitleSet.has(title.toLowerCase());
+  }
+  async function inspect(uid, observedAt) {
+    const deadline = observedAt + spawnSettleMs;
+    for (; ; ) {
+      if (disposed) return { status: "skipped", reason: "disposed" };
+      let block;
+      try {
+        block = await pullOccurrence(uid);
+      } catch (error) {
+        return { status: "skipped", reason: "read-failed", error };
+      }
+      if (!block) return { status: "skipped", reason: "block-not-found" };
+      const created = Number(field(block, "create/time"));
+      if (!Number.isFinite(created) || observedAt - created > bornWithinMs) {
+        return { status: "skipped", reason: "not-new" };
+      }
+      const string = field(block, "block/string");
+      const label = statusLabelFromTaskText(string);
+      if (!label || !/^\s*\{\{\s*(?:\[\[\s*)?TODO/i.test(String(string))) {
+        return { status: "skipped", reason: "not-a-status-todo" };
+      }
+      const title = `${STATUS_PREFIX2}${label}`;
+      if (!isResetTitle(title)) return { status: "skipped", reason: "carries-over" };
+      if (seriesParentFromProps(field(block, "block/props"))) {
+        return { status: "spawned", string, title };
+      }
+      if (now() >= deadline) return { status: "skipped", reason: "not-a-repeat-occurrence" };
+      await wait(pollMs);
+    }
+  }
+  async function handle(uid, observedAt = now()) {
+    if (disposed || typeof uid !== "string" || handled.has(uid)) {
+      return { status: "skipped", reason: "already-handled" };
+    }
+    handled.add(uid);
+    const found = await inspect(uid, observedAt);
+    if (found.status !== "spawned") return found;
+    if (disposed) return { status: "skipped", reason: "disposed" };
+    const provider = resolveBetterTasksProvider(windowLike);
+    if (provider.kind !== "v2") {
+      return { status: "skipped", reason: "better-tasks-v2-required" };
+    }
+    try {
+      const outcome = await provider.capability.requestStatusTag(uid, {
+        expectedString: found.string,
+        statusTagTitle: null,
+        source: "task-status-tags"
+      });
+      log("Repeat occurrence status reset", uid, found.title, outcome?.status);
+      return { status: outcome?.status || "unknown", reason: "repeat-reset", outcome };
+    } catch (error) {
+      return { status: "unknown", reason: "better-tasks-status-request-failed", error };
+    }
+  }
+  function onRefsChanged(before, after) {
+    if (disposed || before == null) return;
+    const observedAt = now();
+    const known = new Set(refIds(before));
+    for (const id of refIds(after)) {
+      if (known.has(id)) continue;
+      const uid = uidForEntityId(id);
+      if (!uid || handled.has(uid)) continue;
+      handle(uid, observedAt).catch((error) => log("Repeat reset failed", uid, error));
+    }
+  }
+  function unwatch(key) {
+    const entry = watches.get(key);
+    if (!entry) return;
+    watches.delete(key);
+    try {
+      data()?.removePullWatch?.(REVERSE_REFS_PATTERN, [":block/uid", entry.pageUid], entry.callback);
+    } catch (error) {
+      log("removePullWatch failed", entry.title, error);
+    }
+  }
+  function sync() {
+    if (disposed) return;
+    if (resyncTimer === null && resyncMs > 0) {
+      resyncTimer = setRepeatingTimer(() => sync(), resyncMs);
+    }
+    const titles = (getResetTagTitles?.() || []).filter((t) => typeof t === "string");
+    resetTitleSet = new Set(titles.map((t) => t.toLowerCase()));
+    for (const key of [...watches.keys()]) {
+      if (!resetTitleSet.has(key)) unwatch(key);
+    }
+    if (typeof data()?.addPullWatch !== "function") return;
+    for (const title of titles) {
+      const key = title.toLowerCase();
+      const pageUid = pagesUidForTitle(title);
+      const existing = watches.get(key);
+      if (existing && existing.pageUid === pageUid) continue;
+      if (existing) unwatch(key);
+      if (!pageUid) continue;
+      const callback = (before, after) => onRefsChanged(before, after);
+      try {
+        data().addPullWatch(REVERSE_REFS_PATTERN, [":block/uid", pageUid], callback);
+        watches.set(key, { title, pageUid, callback });
+      } catch (error) {
+        log("addPullWatch failed", title, error);
+      }
+    }
+  }
+  function dispose() {
+    disposed = true;
+    if (resyncTimer !== null) clearRepeatingTimer(resyncTimer);
+    resyncTimer = null;
+    for (const key of [...watches.keys()]) unwatch(key);
+    for (const id of timers) clearTimer(id);
+    timers.clear();
+  }
+  return Object.freeze({
+    sync,
+    dispose,
+    handle,
+    watchedTitles: () => [...watches.values()].map((entry) => entry.title)
+  });
 }
 
 // src/public-api.js
@@ -1694,7 +1947,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.10.0" : "development";
+var BUNDLED_VERSION = true ? "0.11.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -2087,7 +2340,8 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusColorOverrides: "status-color-overrides",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
-    alertBeacon: "task-status-alert-beacon"
+    alertBeacon: "task-status-alert-beacon",
+    repeatCarryOver: "task-status-repeat-carry-over"
   };
   const STATUS_LABEL_DISPLAY = Object.freeze({
     CHECKBOX_ONLY: "Checkbox only — reveal on intent",
@@ -2153,6 +2407,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   );
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
+  let repeatCarryOver = loadRepeatCarryOverSetting();
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -2424,6 +2679,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     return normalizeStatusLabelDisplay(parseMaybeJson(raw), fallback);
   }
+  function loadRepeatCarryOverSetting() {
+    const fallback = parseCarryOverSetting(null);
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.repeatCarryOver);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(
+        SETTINGS_KEYS.repeatCarryOver,
+        formatCarryOverSetting(DEFAULT_CARRY_OVER_STATUS_NAMES)
+      );
+      return fallback;
+    }
+    return parseCarryOverSetting(typeof raw === "string" ? raw : String(raw ?? ""));
+  }
   function saveSetting(key, value) {
     if (!extensionAPI?.settings?.set) return;
     try {
@@ -2623,6 +2891,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
     publishStatuses();
+    repeatStatusReset?.sync();
   }
   function escapeDatalogString(text) {
     return String(text || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -2909,6 +3178,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
     refreshStatusVisuals(document);
   }
+  function setRepeatCarryOver(value) {
+    const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+    repeatCarryOver = parseCarryOverSetting(String(candidate ?? ""));
+    repeatStatusReset.sync();
+  }
   function refreshMutationScopes(mutations) {
     const refreshed = /* @__PURE__ */ new Set();
     const isInsideExtensionUi = (node) => Boolean(
@@ -3061,6 +3335,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     updateBlock,
     getLiveEditorString: getLiveBlockInputValue
   });
+  const repeatStatusReset = createRepeatStatusReset({
+    roamAlphaAPI: window.roamAlphaAPI,
+    windowLike: window,
+    getResetTagTitles: () => resetTagTitles(
+      statusList.map((entry) => STATUSES[entry.key]?.name || entry.name),
+      repeatCarryOver
+    ),
+    log
+  });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
@@ -3133,7 +3416,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           reason: outcome?.reason || "unknown"
         });
       }
-      if (outcome?.status === "updated") publishChange(blockUid, statusKey);
+      if (outcome?.status === "updated") {
+        publishChange(blockUid, statusKey);
+        if (statusKey !== null) repeatStatusReset.sync();
+      }
       return outcome;
     } finally {
       pendingOperations.delete(blockUid);
@@ -4562,6 +4848,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.repeatCarryOver,
+          name: "Statuses kept on the next repeat",
+          description: "When Better Tasks creates the next occurrence of a repeating task, every status not listed here is removed from the new occurrence (one write, through Better Tasks). Listed statuses carry over. Comma-separated status names, any case. Empty means none carry over.",
+          action: {
+            type: "input",
+            placeholder: "Series, Movie, ...",
+            onChange: (value) => setRepeatCarryOver(value)
+          }
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -4621,6 +4917,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       await cleanup();
       return false;
     }
+    repeatStatusReset.sync();
     startStatusPillObserver();
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
@@ -4635,6 +4932,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusPeekController = null;
     stopStatusPillObserver();
     stopThemeObserver();
+    repeatStatusReset.dispose();
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;

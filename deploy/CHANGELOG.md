@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0 — 2026-11-11
+
+- A new occurrence of a repeating Better Tasks task now starts with no status. Better Tasks copies the old text, so the previous `task-status/<Name>` tag used to come along.
+- The media statuses (Series, Movie, Watching, Watchlist, Upcoming, Rewatch, Dropped) carry over by default. Change the list in the new setting "Statuses kept on the next repeat" (comma-separated, any case; empty means nothing carries over).
+- The tag is removed with one write through Better Tasks' own `requestStatusTag`. The completed block is never touched.
+- Needs Better Tasks v2. Without it nothing is written (fails closed).
+- Only a block born with the tag that also carries Better Tasks' series props is touched, so a task you type yourself keeps its status.
+
 ## 0.10.0 — 2026-11-11
 
 - Add seven media statuses for a watch list: **Series**, **Movie**, **Watching**, **Watchlist**, **Upcoming**, **Rewatch**, and **Dropped**. Each has its own checkbox glyph (TV, clapperboard, disc with play triangle, bookmark, calendar, loop arrows, eject) and a matching marker on the status pill, peek control, and settings preview.

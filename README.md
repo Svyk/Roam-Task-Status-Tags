@@ -165,6 +165,15 @@ Selected blocks:
 - Select multiple blocks in Roam, then use a `Task Status: Set ...` command, multiselect context menu command, or the status chooser.
 - The command palette supports Roam individual multiselect and drag/blue multiselect.
 
+## Repeating Better Tasks tasks
+
+When Better Tasks creates the next occurrence of a repeating task, the new task starts with no status. Better Tasks copies the completed task's text, so the old `task-status/<Name>` tag would otherwise come along.
+
+- Media statuses (Series, Movie, Watching, Watchlist, Upcoming, Rewatch, Dropped) carry over by default. Edit the setting `Statuses kept on the next repeat` (comma-separated, any case; empty means nothing carries over).
+- The tag is removed with one write through Better Tasks' own `requestStatusTag`. The completed task is never touched.
+- Requires Better Tasks v2; without it nothing is written.
+- Only a block born with the tag that also carries Better Tasks' series props is touched. A task you type yourself keeps its status.
+
 ## Settings
 
 Open `Settings -> Extensions -> Task Status Tags`.
@@ -182,6 +191,7 @@ Statuses:
 - `Reset colors` returns all statuses to their built-in defaults.
 - `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
 - `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
+- `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Hotkeys note:
 
