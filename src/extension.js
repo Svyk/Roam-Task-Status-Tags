@@ -21,6 +21,7 @@ import {
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
   getStatusCheckboxShape,
+  isMediaStatus,
   relativeLuminance,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
@@ -50,27 +51,57 @@ export function resolveTaskStatusRuntimeVersion(extensionVersion) {
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
 }
 
-export const STATUS_DEFAULTS_VERSION = 2;
+export const STATUS_DEFAULTS_VERSION = 3;
+
+export const MEDIA_STATUS_DEFAULTS = Object.freeze([
+  Object.freeze({ key: "SERIES", name: "Series" }),
+  Object.freeze({ key: "MOVIE", name: "Movie" }),
+  Object.freeze({ key: "WATCHING", name: "Watching" }),
+  Object.freeze({ key: "WATCHLIST", name: "Watchlist" }),
+  Object.freeze({ key: "UPCOMING", name: "Upcoming" }),
+  Object.freeze({ key: "REWATCH", name: "Rewatch" }),
+  Object.freeze({ key: "DROPPED", name: "Dropped" }),
+]);
 
 export function migrateStatusListDefaults(list, defaultsVersion) {
   const version = Number.isFinite(Number(defaultsVersion)) ? Number(defaultsVersion) : 1;
   if (version >= STATUS_DEFAULTS_VERSION || !Array.isArray(list)) return list;
-  const exists = list.some(
-    (entry) =>
-      entry?.key === "IN_REVIEW" ||
-      String(entry?.name || "").trim().toLowerCase() === "in review"
+  let next = list;
+  if (version < 2) {
+    const exists = list.some(
+      (entry) =>
+        entry?.key === "IN_REVIEW" ||
+        String(entry?.name || "").trim().toLowerCase() === "in review"
+    );
+    if (!exists) {
+      next = list.map((entry) => ({ ...entry }));
+      const waitingIdx = next.findIndex((entry) => entry.key === "WAITING");
+      const entry = { key: "IN_REVIEW", name: "In Review" };
+      if (waitingIdx === -1) next.push(entry);
+      else next.splice(waitingIdx + 1, 0, entry);
+    }
+  }
+  const keys = new Set(next.map((entry) => entry?.key));
+  const names = new Set(
+    next.map((entry) => String(entry?.name || "").trim().toLowerCase())
   );
-  if (exists) return list;
-  const next = list.map((entry) => ({ ...entry }));
-  const waitingIdx = next.findIndex((entry) => entry.key === "WAITING");
-  const entry = { key: "IN_REVIEW", name: "In Review" };
-  if (waitingIdx === -1) next.push(entry);
-  else next.splice(waitingIdx + 1, 0, entry);
-  return next;
+  const additions = MEDIA_STATUS_DEFAULTS.filter(
+    (entry) => !keys.has(entry.key) && !names.has(entry.name.toLowerCase())
+  ).map((entry) => ({ ...entry }));
+  if (!additions.length) return next;
+  return [...next.map((entry) => ({ ...entry })), ...additions];
+}
+
+export function nextTaskCycleStatus(cycleOrder, currentStatus, isMedia = () => false) {
+  const order = (cycleOrder || []).filter((key) => !isMedia(key));
+  if (!currentStatus) return order[0] || null;
+  const idx = order.indexOf(currentStatus);
+  if (idx === -1) return order[0] || null;
+  return idx + 1 >= order.length ? null : order[idx + 1];
 }
 
 const TEXT_HELPER_DEFAULTS = {
-  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED", "SERIES", "MOVIE", "WATCHING", "WATCHLIST", "UPCOMING", "REWATCH", "DROPPED"],
   todoPatterns: ["{{[[TODO]]}}", "{{TODO}}"],
   donePatterns: ["{{[[DONE]]}}", "{{DONE}}"],
   todoCanonical: "{{[[TODO]]}}",
@@ -83,6 +114,13 @@ const TEXT_HELPER_DEFAULTS = {
     INCUBATING: "Incubating",
     ALERT: "Alert",
     CANCELLED: "Cancelled",
+    SERIES: "Series",
+    MOVIE: "Movie",
+    WATCHING: "Watching",
+    WATCHLIST: "Watchlist",
+    UPCOMING: "Upcoming",
+    REWATCH: "Rewatch",
+    DROPPED: "Dropped",
   },
 };
 
@@ -456,7 +494,7 @@ function createTaskStatusExtension({ extensionAPI }) {
 
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
-    cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+    cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED", "SERIES", "MOVIE", "WATCHING", "WATCHLIST", "UPCOMING", "REWATCH", "DROPPED"],
     shiftClickRemoves: true,
     debug: false,
   };
@@ -489,6 +527,13 @@ function createTaskStatusExtension({ extensionAPI }) {
     INCUBATING: "Incubating",
     ALERT: "Alert",
     CANCELLED: "Cancelled",
+    SERIES: "Series",
+    MOVIE: "Movie",
+    WATCHING: "Watching",
+    WATCHLIST: "Watchlist",
+    UPCOMING: "Upcoming",
+    REWATCH: "Rewatch",
+    DROPPED: "Dropped",
   };
 
   const DEFAULT_STATUS_LIST = [
@@ -499,6 +544,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     { key: "INCUBATING", name: "Incubating" },
     { key: "ALERT", name: "Alert" },
     { key: "CANCELLED", name: "Cancelled" },
+    ...MEDIA_STATUS_DEFAULTS.map((entry) => ({ ...entry })),
   ];
 
   const DEFAULT_STATUS_BASE_COLORS = {
@@ -509,6 +555,13 @@ function createTaskStatusExtension({ extensionAPI }) {
     INCUBATING: "#6366f1",
     ALERT: "#f43f5e",
     CANCELLED: "#1e293b",
+    SERIES: "#a855f7",
+    MOVIE: "#f97316",
+    WATCHING: "#22c55e",
+    WATCHLIST: "#ec4899",
+    UPCOMING: "#06b6d4",
+    REWATCH: "#84cc16",
+    DROPPED: "#a16207",
   };
 
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
@@ -1043,7 +1096,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         key: entry.key,
         name: status?.name || entry.name,
         tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
-        glyph: getStatusCheckboxShape(entry.key),
+        glyph: getStatusCheckboxShape(entry.key, status?.name || entry.name),
       };
     });
   }
@@ -1265,6 +1318,29 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
   }
 
+  function statusIsMedia(statusKey) {
+    return isMediaStatus(statusKey, STATUSES[statusKey]?.name);
+  }
+
+  function getStatusGlyph(statusKey) {
+    if (!statusKey || !statusIsMedia(statusKey)) return null;
+    return getStatusCheckboxShape(statusKey, STATUSES[statusKey]?.name);
+  }
+
+  function getStatusNameMap() {
+    const names = {};
+    Object.keys(STATUSES || {}).forEach((key) => {
+      names[key] = STATUSES[key]?.name;
+    });
+    return names;
+  }
+
+  function setStatusGlyphAttribute(el, statusKey) {
+    const glyph = getStatusGlyph(statusKey);
+    if (glyph) el.setAttribute("data-ts-status-glyph", glyph);
+    else el.removeAttribute("data-ts-status-glyph");
+  }
+
   function containsAny(text, patterns) {
     if (!text || typeof text !== "string") return false;
     return patterns.some((p) => text.includes(p));
@@ -1296,9 +1372,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const statusKey = tagTitle ? statusTagToKey.get(tagTitle) : null;
     if (statusKey) {
       el.setAttribute("data-task-status-key", statusKey);
+      setStatusGlyphAttribute(el, statusKey);
       el.setAttribute("data-task-status-label", getStatusDisplayLabelFromTagTitle(tagTitle));
     } else {
       el.removeAttribute("data-task-status-key");
+      el.removeAttribute("data-ts-status-glyph");
       el.removeAttribute("data-task-status-label");
     }
   }
@@ -1323,6 +1401,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     ).forEach((pill) => {
       clearStatusPillPresentation(pill);
       pill.removeAttribute("data-task-status-key");
+      pill.removeAttribute("data-ts-status-glyph");
       pill.removeAttribute("data-task-status-label");
     });
   }
@@ -1368,6 +1447,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
+        statusNames: getStatusNameMap(),
         blockUid,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers,
@@ -1601,7 +1681,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function getNextStatus(currentStatus) {
-    return getTextHelpers().getNextStatus(currentStatus);
+    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsMedia);
   }
 
   function isDoneTask(text) {
@@ -1858,6 +1938,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return {
       blockUid,
       statusKey,
+      glyph: getStatusGlyph(statusKey),
       label: STATUSES[statusKey].label || statusKey,
       anchorEl: checkbox,
       returnFocusEl: input,
@@ -2046,16 +2127,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       choices.append(count);
     }
 
-    CONFIG.cycleOrder.forEach((key) => {
-      if (!STATUSES[key]?.active) return;
-      choices.append(
-        makeStatusChoiceButton({
-          statusKey: key,
-          currentStatusKey: statusKey,
-          targetUids,
-        })
-      );
-    });
+    const activeKeys = CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active);
+    const appendChoices = (keys) =>
+      keys.forEach((key) => {
+        choices.append(
+          makeStatusChoiceButton({
+            statusKey: key,
+            currentStatusKey: statusKey,
+            targetUids,
+          })
+        );
+      });
+    appendChoices(activeKeys.filter((key) => !statusIsMedia(key)));
+    const mediaKeys = activeKeys.filter((key) => statusIsMedia(key));
+    if (mediaKeys.length) {
+      const divider = document.createElement("li");
+      divider.className = "bp3-menu-divider ts-status-choice-divider";
+      divider.setAttribute("role", "separator");
+      choices.append(divider);
+      appendChoices(mediaKeys);
+    }
 
     choices.append(
       makeStatusMenuItem({
@@ -3285,6 +3376,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                         className: "ts-status-pill-preview",
                         title: k,
                         "data-task-status-key": k,
+                        "data-ts-status-glyph": getStatusGlyph(k) || undefined,
                         style: colorState.previewStyle,
                       },
                       draft || rowLabel

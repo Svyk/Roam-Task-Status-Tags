@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.9.1 | generated; edit src/ */
+/* Roam Task Status Tags v0.10.0 | generated; edit src/ */
 
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
@@ -726,8 +726,28 @@ var BUILTIN_SHAPES = Object.freeze({
   HOLDING: "holding",
   INCUBATING: "incubating",
   ALERT: "alert",
-  CANCELLED: "cancelled"
+  CANCELLED: "cancelled",
+  SERIES: "series",
+  MOVIE: "movie",
+  WATCHING: "watching",
+  WATCHLIST: "watchlist",
+  UPCOMING: "upcoming",
+  REWATCH: "rewatch",
+  DROPPED: "dropped"
 });
+var MEDIA_STATUS_SHAPES = Object.freeze({
+  series: "series",
+  movie: "movie",
+  watching: "watching",
+  watchlist: "watchlist",
+  upcoming: "upcoming",
+  rewatch: "rewatch",
+  dropped: "dropped"
+});
+function getMediaStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key) ? MEDIA_STATUS_SHAPES[key] : null;
+}
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -892,9 +912,19 @@ function buildStatusPillColors({
     darkBorderCss: rgbaCss(darkBorder, 0.62)
   });
 }
-function getStatusCheckboxShape(statusKey) {
+function getStatusCheckboxShape(statusKey, statusName) {
   const key = String(statusKey || "").trim().toUpperCase();
-  return BUILTIN_SHAPES[key] || "custom";
+  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || "custom";
+}
+function isMediaStatus(statusKey, statusName) {
+  return Object.values(MEDIA_STATUS_SHAPES).includes(
+    getStatusCheckboxShape(statusKey, statusName)
+  );
+}
+function lookupStatusName(statusNames, statusKey) {
+  if (!statusKey) return null;
+  if (statusNames instanceof Map) return statusNames.get(statusKey) || null;
+  return statusNames?.[statusKey] || null;
 }
 function lookupStatusKey(statusTagToKey, tagTitle) {
   if (!tagTitle) return null;
@@ -905,6 +935,7 @@ function decideStatusCheckboxAnnotation({
   enabled = true,
   tagTitle,
   statusTagToKey,
+  statusNames,
   blockString,
   textHelpers
 } = {}) {
@@ -919,7 +950,7 @@ function decideStatusCheckboxAnnotation({
   }
   return Object.freeze({
     statusKey,
-    shape: getStatusCheckboxShape(statusKey)
+    shape: getStatusCheckboxShape(statusKey, lookupStatusName(statusNames, statusKey))
   });
 }
 function hasClass(element, className) {
@@ -963,6 +994,7 @@ function syncStatusCheckboxForPill({
   enabled = true,
   tagTitle,
   statusTagToKey,
+  statusNames,
   blockString,
   blockUid,
   textHelpers
@@ -974,6 +1006,7 @@ function syncStatusCheckboxForPill({
     enabled,
     tagTitle,
     statusTagToKey,
+    statusNames,
     blockString,
     textHelpers
   });
@@ -1413,12 +1446,17 @@ function createStatusPeekController({
       return false;
     }
   }
+  function setGlyphAttribute(button, glyph) {
+    if (glyph) button.setAttribute("data-ts-status-glyph", glyph);
+    else button.removeAttribute("data-ts-status-glyph");
+  }
   function makePeekButton(context) {
     const button = documentLike.createElement("button");
     button.type = "button";
     button.className = STATUS_PEEK_CLASS;
     button.setAttribute("data-task-status-peek", "true");
     button.setAttribute("data-task-status-key", context.statusKey);
+    setGlyphAttribute(button, context.glyph);
     button.setAttribute("aria-haspopup", "menu");
     button.setAttribute("aria-expanded", "false");
     button.setAttribute(
@@ -1469,6 +1507,7 @@ function createStatusPeekController({
       portalRoot.appendChild(peekButton);
     } else {
       peekButton.setAttribute("data-task-status-key", context.statusKey);
+      setGlyphAttribute(peekButton, context.glyph);
       peekButton.setAttribute(
         "aria-label",
         `Change task status from ${context.label}. Shift-click to remove.`
@@ -1655,28 +1694,56 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.9.1" : "development";
+var BUNDLED_VERSION = true ? "0.10.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
 }
-var STATUS_DEFAULTS_VERSION = 2;
+var STATUS_DEFAULTS_VERSION = 3;
+var MEDIA_STATUS_DEFAULTS = Object.freeze([
+  Object.freeze({ key: "SERIES", name: "Series" }),
+  Object.freeze({ key: "MOVIE", name: "Movie" }),
+  Object.freeze({ key: "WATCHING", name: "Watching" }),
+  Object.freeze({ key: "WATCHLIST", name: "Watchlist" }),
+  Object.freeze({ key: "UPCOMING", name: "Upcoming" }),
+  Object.freeze({ key: "REWATCH", name: "Rewatch" }),
+  Object.freeze({ key: "DROPPED", name: "Dropped" })
+]);
 function migrateStatusListDefaults(list, defaultsVersion) {
   const version = Number.isFinite(Number(defaultsVersion)) ? Number(defaultsVersion) : 1;
   if (version >= STATUS_DEFAULTS_VERSION || !Array.isArray(list)) return list;
-  const exists = list.some(
-    (entry2) => entry2?.key === "IN_REVIEW" || String(entry2?.name || "").trim().toLowerCase() === "in review"
+  let next = list;
+  if (version < 2) {
+    const exists = list.some(
+      (entry) => entry?.key === "IN_REVIEW" || String(entry?.name || "").trim().toLowerCase() === "in review"
+    );
+    if (!exists) {
+      next = list.map((entry2) => ({ ...entry2 }));
+      const waitingIdx = next.findIndex((entry2) => entry2.key === "WAITING");
+      const entry = { key: "IN_REVIEW", name: "In Review" };
+      if (waitingIdx === -1) next.push(entry);
+      else next.splice(waitingIdx + 1, 0, entry);
+    }
+  }
+  const keys = new Set(next.map((entry) => entry?.key));
+  const names = new Set(
+    next.map((entry) => String(entry?.name || "").trim().toLowerCase())
   );
-  if (exists) return list;
-  const next = list.map((entry2) => ({ ...entry2 }));
-  const waitingIdx = next.findIndex((entry2) => entry2.key === "WAITING");
-  const entry = { key: "IN_REVIEW", name: "In Review" };
-  if (waitingIdx === -1) next.push(entry);
-  else next.splice(waitingIdx + 1, 0, entry);
-  return next;
+  const additions = MEDIA_STATUS_DEFAULTS.filter(
+    (entry) => !keys.has(entry.key) && !names.has(entry.name.toLowerCase())
+  ).map((entry) => ({ ...entry }));
+  if (!additions.length) return next;
+  return [...next.map((entry) => ({ ...entry })), ...additions];
+}
+function nextTaskCycleStatus(cycleOrder, currentStatus, isMedia = () => false) {
+  const order = (cycleOrder || []).filter((key) => !isMedia(key));
+  if (!currentStatus) return order[0] || null;
+  const idx = order.indexOf(currentStatus);
+  if (idx === -1) return order[0] || null;
+  return idx + 1 >= order.length ? null : order[idx + 1];
 }
 var TEXT_HELPER_DEFAULTS = {
-  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+  cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED", "SERIES", "MOVIE", "WATCHING", "WATCHLIST", "UPCOMING", "REWATCH", "DROPPED"],
   todoPatterns: ["{{[[TODO]]}}", "{{TODO}}"],
   donePatterns: ["{{[[DONE]]}}", "{{DONE}}"],
   todoCanonical: "{{[[TODO]]}}",
@@ -1688,7 +1755,14 @@ var TEXT_HELPER_DEFAULTS = {
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
-    CANCELLED: "Cancelled"
+    CANCELLED: "Cancelled",
+    SERIES: "Series",
+    MOVIE: "Movie",
+    WATCHING: "Watching",
+    WATCHLIST: "Watchlist",
+    UPCOMING: "Upcoming",
+    REWATCH: "Rewatch",
+    DROPPED: "Dropped"
   }
 };
 function buildDefaultTextStatuses() {
@@ -1999,7 +2073,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
-    cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED"],
+    cycleOrder: ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "ALERT", "CANCELLED", "SERIES", "MOVIE", "WATCHING", "WATCHLIST", "UPCOMING", "REWATCH", "DROPPED"],
     shiftClickRemoves: true,
     debug: false
   };
@@ -2026,7 +2100,14 @@ function createTaskStatusExtension({ extensionAPI }) {
     HOLDING: "Holding",
     INCUBATING: "Incubating",
     ALERT: "Alert",
-    CANCELLED: "Cancelled"
+    CANCELLED: "Cancelled",
+    SERIES: "Series",
+    MOVIE: "Movie",
+    WATCHING: "Watching",
+    WATCHLIST: "Watchlist",
+    UPCOMING: "Upcoming",
+    REWATCH: "Rewatch",
+    DROPPED: "Dropped"
   };
   const DEFAULT_STATUS_LIST = [
     { key: "ACTIVE", name: "Active" },
@@ -2035,7 +2116,8 @@ function createTaskStatusExtension({ extensionAPI }) {
     { key: "HOLDING", name: "Holding" },
     { key: "INCUBATING", name: "Incubating" },
     { key: "ALERT", name: "Alert" },
-    { key: "CANCELLED", name: "Cancelled" }
+    { key: "CANCELLED", name: "Cancelled" },
+    ...MEDIA_STATUS_DEFAULTS.map((entry) => ({ ...entry }))
   ];
   const DEFAULT_STATUS_BASE_COLORS = {
     ACTIVE: "#14b8a6",
@@ -2044,7 +2126,14 @@ function createTaskStatusExtension({ extensionAPI }) {
     HOLDING: "#94a3b8",
     INCUBATING: "#6366f1",
     ALERT: "#f43f5e",
-    CANCELLED: "#1e293b"
+    CANCELLED: "#1e293b",
+    SERIES: "#a855f7",
+    MOVIE: "#f97316",
+    WATCHING: "#22c55e",
+    WATCHLIST: "#ec4899",
+    UPCOMING: "#06b6d4",
+    REWATCH: "#84cc16",
+    DROPPED: "#a16207"
   };
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
   const STATUS_COLOR_PRESETS = [
@@ -2498,7 +2587,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         key: entry.key,
         name: status?.name || entry.name,
         tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
-        glyph: getStatusCheckboxShape(entry.key)
+        glyph: getStatusCheckboxShape(entry.key, status?.name || entry.name)
       };
     });
   }
@@ -2675,6 +2764,25 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       todoCanonical: TODO_CANONICAL
     });
   }
+  function statusIsMedia(statusKey) {
+    return isMediaStatus(statusKey, STATUSES[statusKey]?.name);
+  }
+  function getStatusGlyph(statusKey) {
+    if (!statusKey || !statusIsMedia(statusKey)) return null;
+    return getStatusCheckboxShape(statusKey, STATUSES[statusKey]?.name);
+  }
+  function getStatusNameMap() {
+    const names = {};
+    Object.keys(STATUSES || {}).forEach((key) => {
+      names[key] = STATUSES[key]?.name;
+    });
+    return names;
+  }
+  function setStatusGlyphAttribute(el, statusKey) {
+    const glyph = getStatusGlyph(statusKey);
+    if (glyph) el.setAttribute("data-ts-status-glyph", glyph);
+    else el.removeAttribute("data-ts-status-glyph");
+  }
   function containsAny(text, patterns) {
     if (!text || typeof text !== "string") return false;
     return patterns.some((p) => text.includes(p));
@@ -2701,9 +2809,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const statusKey = tagTitle ? statusTagToKey.get(tagTitle) : null;
     if (statusKey) {
       el.setAttribute("data-task-status-key", statusKey);
+      setStatusGlyphAttribute(el, statusKey);
       el.setAttribute("data-task-status-label", getStatusDisplayLabelFromTagTitle(tagTitle));
     } else {
       el.removeAttribute("data-task-status-key");
+      el.removeAttribute("data-ts-status-glyph");
       el.removeAttribute("data-task-status-label");
     }
   }
@@ -2725,6 +2835,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     ).forEach((pill) => {
       clearStatusPillPresentation(pill);
       pill.removeAttribute("data-task-status-key");
+      pill.removeAttribute("data-ts-status-glyph");
       pill.removeAttribute("data-task-status-label");
     });
   }
@@ -2761,6 +2872,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         hideManagedPill: statusLabelDisplay === STATUS_LABEL_DISPLAY.CHECKBOX_ONLY,
         tagTitle,
         statusTagToKey,
+        statusNames: getStatusNameMap(),
         blockUid,
         blockString: blockStringsByUid.get(blockUid),
         textHelpers
@@ -2958,7 +3070,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return getTextHelpers().getCurrentStatus(text);
   }
   function getNextStatus(currentStatus) {
-    return getTextHelpers().getNextStatus(currentStatus);
+    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsMedia);
   }
   function isDoneTask(text) {
     return getTextHelpers().isDoneTask(text);
@@ -3146,6 +3258,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return {
       blockUid,
       statusKey,
+      glyph: getStatusGlyph(statusKey),
       label: STATUSES[statusKey].label || statusKey,
       anchorEl: checkbox,
       returnFocusEl: input
@@ -3302,8 +3415,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       count.append(countText);
       choices.append(count);
     }
-    CONFIG.cycleOrder.forEach((key) => {
-      if (!STATUSES[key]?.active) return;
+    const activeKeys = CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active);
+    const appendChoices = (keys) => keys.forEach((key) => {
       choices.append(
         makeStatusChoiceButton({
           statusKey: key,
@@ -3312,6 +3425,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         })
       );
     });
+    appendChoices(activeKeys.filter((key) => !statusIsMedia(key)));
+    const mediaKeys = activeKeys.filter((key) => statusIsMedia(key));
+    if (mediaKeys.length) {
+      const divider = document.createElement("li");
+      divider.className = "bp3-menu-divider ts-status-choice-divider";
+      divider.setAttribute("role", "separator");
+      choices.append(divider);
+      appendChoices(mediaKeys);
+    }
     choices.append(
       makeStatusMenuItem({
         label: "Remove status",
@@ -4372,6 +4494,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                         className: "ts-status-pill-preview",
                         title: k,
                         "data-task-status-key": k,
+                        "data-ts-status-glyph": getStatusGlyph(k) || void 0,
                         style: colorState.previewStyle
                       },
                       draft || rowLabel
@@ -4588,10 +4711,12 @@ async function onunload() {
 }
 var extension_default = { onload, onunload };
 export {
+  MEDIA_STATUS_DEFAULTS,
   STATUS_DEFAULTS_VERSION,
   createTaskStatusTextHelpers,
   extension_default as default,
   migrateStatusListDefaults,
+  nextTaskCycleStatus,
   onload,
   onunload,
   resolveTaskStatusRuntimeVersion,

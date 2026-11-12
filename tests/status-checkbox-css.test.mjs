@@ -307,3 +307,49 @@ test("the reveal control carries status shapes and light, dark, focus, motion, a
   assert.match(peekSource, /isIntentCurrent/);
   assert.match(source, /typeof isIntentCurrent === "function" && !isIntentCurrent\(\)/);
 });
+
+const MEDIA_SHAPES = ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"];
+
+function ruleBody(selectorFragment) {
+  const at = css.indexOf(selectorFragment);
+  assert.notEqual(at, -1, selectorFragment);
+  return css.slice(at, css.indexOf("}", at));
+}
+
+test("each media shape has a checkbox mask rule and a pill marker rule", () => {
+  const masks = new Set();
+  for (const shape of MEDIA_SHAPES) {
+    const checkbox = ruleBody(`.rm-checkbox[data-ts-checkbox-shape="${shape}"] {`);
+    const mask = checkbox.match(/--ts-checkbox-glyph-mask: (url\("data:image\/svg\+xml[^"]+"\))/);
+    assert.ok(mask, `${shape} checkbox mask`);
+    assert.match(checkbox, /--ts-checkbox-glyph-width: 10px/);
+    assert.match(checkbox, /--ts-checkbox-glyph-background: var\(--ts-checkbox-accent\)/);
+    masks.add(mask[1]);
+    const pill = ruleBody(`[data-ts-status-glyph="${shape}"] {`);
+    assert.match(pill, /--ts-pill-marker-mask: url\("data:image\/svg\+xml/);
+    assert.match(pill, /--ts-pill-marker-background: currentColor/);
+  }
+  assert.equal(masks.size, MEDIA_SHAPES.length);
+});
+
+test("masks are wired into the shared glyph and marker rules with a none default", () => {
+  assert.match(css, /mask: var\(--ts-checkbox-glyph-mask, none\) center \/ contain no-repeat/);
+  assert.equal(
+    (css.match(/mask: var\(--ts-pill-marker-mask, none\) center \/ contain no-repeat/g) || []).length >= 6,
+    true
+  );
+  assert.match(css, /\)\[data-task-status-key\]:not\(\s*\[data-ts-status-glyph\],/);
+  assert.match(css, /\.ts-status-choice-divider \{/);
+});
+
+test("the existing shape rules are unchanged", () => {
+  assert.match(
+    ruleBody('.rm-checkbox[data-ts-checkbox-shape="active"] {'),
+    /--ts-checkbox-glyph-clip: polygon\(10% 4%, 94% 50%, 10% 96%\)/
+  );
+  assert.match(
+    ruleBody('.rm-checkbox[data-ts-checkbox-shape="custom"] {'),
+    /--ts-checkbox-glyph-transform: rotate\(45deg\)/
+  );
+  assert.doesNotMatch(ruleBody('.rm-checkbox[data-ts-checkbox-shape="alert"] {'), /glyph-mask/);
+});

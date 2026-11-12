@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 — 2026-11-11
+
+- Add seven media statuses for a watch list: **Series**, **Movie**, **Watching**, **Watchlist**, **Upcoming**, **Rewatch**, and **Dropped**. Each has its own checkbox glyph (TV, clapperboard, disc with play triangle, bookmark, calendar, loop arrows, eject) and a matching marker on the status pill, peek control, and settings preview.
+- A status you added by hand called Series, Movie, and so on gets the same glyph by name (any case). It keeps its own key, tag, and colour.
+- Existing installs get the seven once, appended after the task statuses, through `defaults-version` 3. Any whose key or name already exists is skipped, and none is re-added after you delete it. New installs start with all fourteen.
+- Click-to-cycle, the `Task Status: Cycle` command, and the API `cycle` walk the task statuses only. Media statuses are still set from the chooser, slash commands, and palette; cycling from a media status starts at the first task status.
+- The chooser lists the task statuses first, then a divider and the media statuses.
+- API `statuses()` rows carry `glyph: "series"`, `"movie"`, and so on for media statuses, including a hand-added one.
+
 ## 0.9.1 — 2026-10-06
 
 - A status change on a Better Tasks task now adds one line to that task's Better Tasks activity log (`2026-10-06 18:05 — status → Waiting`, or `status removed`), written in one step with Better Tasks' event props, so one undo takes it back. Better Tasks itself does not log status changes made through its router.

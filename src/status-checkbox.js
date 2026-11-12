@@ -20,7 +20,31 @@ const BUILTIN_SHAPES = Object.freeze({
   INCUBATING: "incubating",
   ALERT: "alert",
   CANCELLED: "cancelled",
+  SERIES: "series",
+  MOVIE: "movie",
+  WATCHING: "watching",
+  WATCHLIST: "watchlist",
+  UPCOMING: "upcoming",
+  REWATCH: "rewatch",
+  DROPPED: "dropped",
 });
+
+export const MEDIA_STATUS_SHAPES = Object.freeze({
+  series: "series",
+  movie: "movie",
+  watching: "watching",
+  watchlist: "watchlist",
+  upcoming: "upcoming",
+  rewatch: "rewatch",
+  dropped: "dropped",
+});
+
+export function getMediaStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key)
+    ? MEDIA_STATUS_SHAPES[key]
+    : null;
+}
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -217,9 +241,21 @@ export function buildStatusPillColors({
   });
 }
 
-export function getStatusCheckboxShape(statusKey) {
+export function getStatusCheckboxShape(statusKey, statusName) {
   const key = String(statusKey || "").trim().toUpperCase();
-  return BUILTIN_SHAPES[key] || "custom";
+  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || "custom";
+}
+
+export function isMediaStatus(statusKey, statusName) {
+  return Object.values(MEDIA_STATUS_SHAPES).includes(
+    getStatusCheckboxShape(statusKey, statusName)
+  );
+}
+
+function lookupStatusName(statusNames, statusKey) {
+  if (!statusKey) return null;
+  if (statusNames instanceof Map) return statusNames.get(statusKey) || null;
+  return statusNames?.[statusKey] || null;
 }
 
 function lookupStatusKey(statusTagToKey, tagTitle) {
@@ -232,6 +268,7 @@ export function decideStatusCheckboxAnnotation({
   enabled = true,
   tagTitle,
   statusTagToKey,
+  statusNames,
   blockString,
   textHelpers,
 } = {}) {
@@ -254,7 +291,7 @@ export function decideStatusCheckboxAnnotation({
 
   return Object.freeze({
     statusKey,
-    shape: getStatusCheckboxShape(statusKey),
+    shape: getStatusCheckboxShape(statusKey, lookupStatusName(statusNames, statusKey)),
   });
 }
 
@@ -306,6 +343,7 @@ export function syncStatusCheckboxForPill({
   enabled = true,
   tagTitle,
   statusTagToKey,
+  statusNames,
   blockString,
   blockUid,
   textHelpers,
@@ -318,6 +356,7 @@ export function syncStatusCheckboxForPill({
     enabled,
     tagTitle,
     statusTagToKey,
+    statusNames,
     blockString,
     textHelpers,
   });
