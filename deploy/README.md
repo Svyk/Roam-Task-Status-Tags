@@ -195,7 +195,7 @@ A task whose status is **Series**, **Watching** or **Rewatch** (open or done) sh
 
 - Click, Enter or Space: next episode. The first click on a task that has no counter creates `S1E1`.
 - Alt-click, right-click, Shift+F10 or the ContextMenu key: a menu with **Next episode**, **New season** (season + 1, episode 1), and season (S) and episode (E) fields with **Set**. Escape or a click outside writes nothing.
-- Before first use the counter is a single small `+` that appears when you hover the row (faintly visible all the time on touch screens). It keeps its size, so it leaves no gap and nothing shifts.
+- Before first use the counter is a single small `+` that appears when you hover the row (faintly visible all the time on touch screens). It takes no width (the `+` sits in the space after the status), so a task that never uses it looks as before and nothing shifts.
 - The value is a plain child block of the task: `Episode:: S2E5`, created only the first time you use the counter. Edit it by hand and the counter follows. Extra lines under the first line are kept; only the first line's value changes. A value that is not `S<number>E<number>`, or two `Episode::` blocks on one task, shows `?` and is never overwritten.
 - Better Tasks has no API for custom attributes, so this one block is written directly: created, or changed in place (same uid). Better Tasks attributes and the task text are never touched.
 - Each change adds one line to the task's existing Better Tasks activity log (`episode → S2E6`). It never creates a log and never repeats a line.

@@ -1881,13 +1881,17 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
 }
 
 /* Never used: a single small "+", invisible until the row is hovered. Its
-   box is the same size hidden or shown, so nothing shifts and no gap is left. */
+   box takes no width (the "+" sits in the space after the status), so an
+   unused task looks exactly as before and nothing shifts. */
 .ts-episode-counter[data-ts-episode-state="empty"] {
-  width: 0.6em;
+  width: 0;
   min-width: 0;
-  margin: 0 0.15em 0 0.1em;
+  margin: 0;
   padding: 0;
   border: 0;
+  overflow: visible;
+  white-space: nowrap;
+  text-indent: -0.5em;
   line-height: 1.5;
   opacity: 0;
 }
