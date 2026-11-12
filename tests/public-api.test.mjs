@@ -452,7 +452,7 @@ const PILL_SURFACES = {
   darkSurfaceRgb: { r: 32, g: 43, b: 51 },
 };
 
-test("installed api exposes seven default rows, writes a plain TODO, routes Better Tasks, and fires statuses", async () => {
+test("installed api exposes fourteen default rows, writes a plain TODO, routes Better Tasks, and fires statuses", async () => {
   const originalWindow = globalThis.window;
   const originalDocument = globalThis.document;
   const originalMutationObserver = globalThis.MutationObserver;
@@ -598,6 +598,13 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
       "INCUBATING",
       "ALERT",
       "CANCELLED",
+      "SERIES",
+      "MOVIE",
+      "WATCHING",
+      "WATCHLIST",
+      "UPCOMING",
+      "REWATCH",
+      "DROPPED",
     ]);
     const inReviewColors = buildStatusPillColors({
       baseRgb: { r: 14, g: 165, b: 233 },
@@ -627,6 +634,9 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
     assert.equal(inReview.dark.text, inReviewColors.darkTextCss);
     assert.notEqual(inReview.light.base, activeColors.lightBackgroundCss);
     assert.equal(rows.find((row) => row.key === "WAITING").glyph, "waiting");
+    for (const glyph of ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"]) {
+      assert.equal(rows.find((row) => row.key === glyph.toUpperCase()).glyph, glyph);
+    }
     assert.equal(
       api.statusOf("{{[[TODO]]}} #[[task-status/In Review]] Send SOP"),
       "In Review"
@@ -640,9 +650,13 @@ test("installed api exposes seven default rows, writes a plain TODO, routes Bett
       { key: "INCUBATING", name: "Incubating" },
       { key: "ALERT", name: "Alert" },
       { key: "CANCELLED", name: "Cancelled" },
+      { key: "CUSTOM_SERIES", name: "series" },
+      { key: "CUSTOM_TV", name: "Watchlist" },
     ]);
     const renamed = api.statuses();
-    assert.equal(renamed.length, rows.length);
+    assert.equal(renamed.length, 9);
+    assert.equal(renamed.find((row) => row.key === "CUSTOM_SERIES").glyph, "series");
+    assert.equal(renamed.find((row) => row.key === "CUSTOM_TV").glyph, "watchlist");
     assert.equal(renamed.find((row) => row.key === "WAITING").name, "Blocked");
     assert.equal(renamed.find((row) => row.key === "IN_REVIEW").glyph, "in-review");
     assert.equal(api.statusOf("{{[[TODO]]}} #[[task-status/Blocked]] Keep the rest"), "Blocked");

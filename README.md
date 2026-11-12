@@ -45,6 +45,13 @@ does not replace it, intercept it, or create another completion state.
 | Incubating | Violet dotted outline + centered ring | Adjusted violet dotted outline + centered ring | Native theme checkmark |
 | Alert | Rose strong outline + centered exclamation mark | Rose strong outline + centered exclamation mark | Native theme checkmark |
 | Cancelled | Charcoal outline + centered X | Lightened slate outline + centered X | Native theme checkmark |
+| Series | Fuchsia outline + centered TV | Fuchsia outline + centered TV | Native theme checkmark |
+| Movie | Darkened orange outline + centered clapperboard | Orange outline + centered clapperboard | Native theme checkmark |
+| Watching | Darkened green outline + centered disc with play triangle | Green outline + centered disc with play triangle | Native theme checkmark |
+| Watchlist | Pink outline + centered bookmark | Pink outline + centered bookmark | Native theme checkmark |
+| Upcoming | Azure outline + centered calendar | Azure outline + centered calendar | Native theme checkmark |
+| Rewatch | Darkened lime outline + centered loop arrows | Lime outline + centered loop arrows | Native theme checkmark |
+| Dropped | Rust-brown outline + centered eject symbol | Lightened tan outline + centered eject symbol | Native theme checkmark |
 | Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |
 
 When a task is checked, the workflow glyph disappears completely and the active
@@ -66,7 +73,7 @@ accent, radius, and font tokens; complete light/dark fallbacks keep it usable wi
 Svy Theme. This positioning and hover path performs no graph reads.
 
 Status pills use their own paired light/dark palette with at least 4.8:1 text contrast.
-The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, or diamond),
+The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, diamond, or one of the media glyphs),
 making statuses readable by shape as well as color. Dark base colors such as Cancelled
 are automatically lightened on Svy Theme's dark canvas without changing the configured
 hue used in light mode.
@@ -113,11 +120,27 @@ checkbox remain visible.
 - Alert
 - Cancelled
 
+Media statuses, listed after the task statuses:
+
+- Series
+- Movie
+- Watching
+- Watchlist
+- Upcoming
+- Rewatch
+- Dropped
+
 Default order:
 
 ```text
-Active -> Waiting -> In Review -> Holding -> Incubating -> Alert -> Cancelled
+Active -> Waiting -> In Review -> Holding -> Incubating -> Alert -> Cancelled -> Series -> Movie -> Watching -> Watchlist -> Upcoming -> Rewatch -> Dropped
 ```
+
+Click-to-cycle and `Task Status: Cycle` walk the task statuses only; media statuses are
+set from the chooser (shown below a divider), slash commands, or the palette. A status you
+add yourself named Series, Movie, Watching, Watchlist, Upcoming, Rewatch, or Dropped gets
+the matching glyph by name, keeps its own key and colour, and is left out of click-to-cycle like the other media statuses. Existing installs get the media
+statuses once, appended at the end, unless a status with that name already exists.
 
 You can add, rename, delete, and reorder statuses in settings.
 
@@ -171,7 +194,7 @@ Other extensions can call the frozen `window.RoamTaskStatusTags` object (`apiVer
 | Member | Call | Result |
 |---|---|---|
 | `apiVersion` | — | `1` |
-| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. |
+| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. `glyph` is the checkbox shape id: a built-in one, `custom`, or `series`, `movie`, `watching`, `watchlist`, `upcoming`, `rewatch`, `dropped`. |
 | `statusOf` | `statusOf(blockString)` | The status display name, or `null` when the string has no managed status tag. |
 | `setStatus` | `setStatus(uid, nameOrNull)` | Promise of `{ status, didWrite, reason? }`. `name` is the display name (`"Waiting"`, `"In Review"`); `null` clears the tag. |
 | `cycle` | `cycle(uid)` | Promise of the same result shape. |

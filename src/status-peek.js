@@ -396,12 +396,18 @@ export function createStatusPeekController({
     }
   }
 
+  function setGlyphAttribute(button, glyph) {
+    if (glyph) button.setAttribute("data-ts-status-glyph", glyph);
+    else button.removeAttribute("data-ts-status-glyph");
+  }
+
   function makePeekButton(context) {
     const button = documentLike.createElement("button");
     button.type = "button";
     button.className = STATUS_PEEK_CLASS;
     button.setAttribute("data-task-status-peek", "true");
     button.setAttribute("data-task-status-key", context.statusKey);
+    setGlyphAttribute(button, context.glyph);
     button.setAttribute("aria-haspopup", "menu");
     button.setAttribute("aria-expanded", "false");
     button.setAttribute(
@@ -457,6 +463,7 @@ export function createStatusPeekController({
       portalRoot.appendChild(peekButton);
     } else {
       peekButton.setAttribute("data-task-status-key", context.statusKey);
+      setGlyphAttribute(peekButton, context.glyph);
       peekButton.setAttribute(
         "aria-label",
         `Change task status from ${context.label}. Shift-click to remove.`

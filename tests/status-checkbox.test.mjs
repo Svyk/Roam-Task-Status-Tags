@@ -22,7 +22,10 @@ import {
   decideStatusCheckboxAnnotation,
   deriveAccessibleAccent,
   findSiblingTaskCheckbox,
+  getMediaStatusShape,
   getStatusCheckboxShape,
+  isMediaStatus,
+  MEDIA_STATUS_SHAPES,
   isExactManagedStatusPill,
   syncStatusCheckboxForPill,
   syncStatusPresentationForPill,
@@ -219,6 +222,48 @@ test("built-in shapes are stable and unknown statuses use the custom diamond", (
     ["active", "waiting", "in-review", "holding", "incubating", "alert", "cancelled"]
   );
   assert.equal(getStatusCheckboxShape("CUSTOM_DEEP_WORK"), "custom");
+  assert.equal(getStatusCheckboxShape("CUSTOM_DEEP_WORK", "Deep Work"), "custom");
+});
+
+test("media keys and names map to their own shapes", () => {
+  const media = ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"];
+  for (const shape of media) {
+    assert.equal(getStatusCheckboxShape(shape.toUpperCase()), shape);
+    assert.equal(MEDIA_STATUS_SHAPES[shape], shape);
+  }
+  assert.equal(Object.isFrozen(MEDIA_STATUS_SHAPES), true);
+  assert.equal(getMediaStatusShape("  Series "), "series");
+  assert.equal(getMediaStatusShape("Deep Work"), null);
+  assert.equal(getMediaStatusShape(undefined), null);
+  assert.equal(getStatusCheckboxShape("CUSTOM_SERIES", "Series"), "series");
+  assert.equal(getStatusCheckboxShape("CUSTOM_X", "  WATCHLIST "), "watchlist");
+  assert.equal(getStatusCheckboxShape("ACTIVE", "Movie"), "active");
+  assert.equal(isMediaStatus("CUSTOM_SERIES", "Series"), true);
+  assert.equal(isMediaStatus("MOVIE"), true);
+  assert.equal(isMediaStatus("ACTIVE", "Movie"), false);
+  assert.equal(isMediaStatus("CUSTOM_DEEP_WORK", "Deep Work"), false);
+});
+
+test("decisions take the media shape from the status name", () => {
+  const helpers = createTaskStatusTextHelpers({
+    cycleOrder: ["CUSTOM_SERIES"],
+    statuses: {
+      CUSTOM_SERIES: {
+        name: "Series",
+        label: "Series",
+        tagTitle: "task-status/Series",
+        tagTitles: ["task-status/Series"],
+      },
+    },
+  });
+  const decision = decideStatusCheckboxAnnotation({
+    tagTitle: "task-status/Series",
+    statusTagToKey: new Map([["task-status/Series", "CUSTOM_SERIES"]]),
+    statusNames: { CUSTOM_SERIES: "Series" },
+    blockString: "{{[[TODO]]}} #[[task-status/Series]] Watch the finale",
+    textHelpers: helpers,
+  });
+  assert.deepEqual(decision, { statusKey: "CUSTOM_SERIES", shape: "series" });
 });
 
 test("managed TODO and DONE prefixes produce checkbox decisions", () => {
