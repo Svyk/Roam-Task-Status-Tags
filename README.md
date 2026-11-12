@@ -210,6 +210,7 @@ A read-only panel that lists open tasks grouped by status.
 - Filter **Media** (default), **Tasks** or **All**, kept for the session. Order is by status name: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped last; Alert first and Cancelled last among task statuses. Empty groups are hidden; the most recently edited task comes first.
 - Each row shows the status icon, the task text, and the episode (`S2E5`) when the task has an `Episode::` block. An unreadable or duplicate `Episode::` shows `?`.
 - Rows act like a block ref (not a native `((ref))`, so no hover preview): click opens the task, Shift+click or Shift+Enter opens it in the sidebar below the panel. Links inside the text work as in Roam. Escape closes the view, and Roam's shortcuts do not fire while it has focus.
+- It follows Roam's light or dark theme.
 - It never writes to the graph and does not list DONE tasks.
 - It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand, or completing a task in Roam, show after **Refresh** or reopening (no polling).
 - A panel docked in the right sidebar, not a query page: nothing is added to your graph, and the order, episode and filter are not tied to a query block.

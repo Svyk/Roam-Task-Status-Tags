@@ -2146,3 +2146,53 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
     color: HighlightText;
   }
 }
+
+/* Watching now theme: resolved in JS (Roam's theme class, else the painted
+   body colour, else the OS hint) so a dark OS never paints a light Roam dark. */
+.ts-status-view[data-ts-view-theme="light"] {
+  --ts-preview-surface-bg: var(--bp3-surface, #ffffff);
+  --ts-preview-surface-border: rgba(0, 0, 0, 0.08);
+  --ts-menu-surface: var(--svy-overlay, var(--bc-raised, #ffffff));
+  --ts-menu-surface-alt: var(--svy-surface, var(--bc-surface, #f5f8fa));
+  --ts-menu-border: var(--svy-border, var(--bc-menu, #a7b6c2));
+  --ts-menu-border-subtle: var(--svy-border-subtle, #c5cbd3);
+  --ts-menu-hover: var(--svy-hover, var(--bc-hover, #f1f5f8));
+  --ts-menu-selected: var(--svy-selected, #dbeaf7);
+  --ts-menu-text: var(--svy-text, var(--cl-text-color, #182026));
+  --ts-menu-muted: var(--svy-text-muted, var(--cl-gray-550, #5c7080));
+  --ts-menu-accent: var(--svy-accent, var(--cl-blue, #137cbd));
+  --ts-menu-danger: var(--svy-danger, #a82a2a);
+  --ts-menu-shadow:
+    0 12px 30px rgba(16, 22, 26, 0.16),
+    0 2px 6px rgba(16, 22, 26, 0.1);
+}
+
+.ts-status-view[data-ts-view-theme="light"] .ts-status-pill-preview[data-task-status-key] {
+  --ts-status-bg: var(--ts-status-bg-light, rgba(100, 116, 139, 0.1));
+  --ts-status-fg: var(--ts-status-fg-light, rgb(71, 85, 105));
+  --ts-status-border: var(--ts-status-border-light, rgba(100, 116, 139, 0.48));
+}
+
+.ts-status-view[data-ts-view-theme="dark"] {
+  --ts-preview-surface-bg: #1f2428;
+  --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
+  --ts-menu-surface: var(--svy-overlay, #30404d);
+  --ts-menu-surface-alt: var(--svy-surface, #202b33);
+  --ts-menu-border: var(--svy-border, #738091);
+  --ts-menu-border-subtle: var(--svy-border-subtle, #5c7080);
+  --ts-menu-hover: var(--svy-hover, #26333d);
+  --ts-menu-selected: var(--svy-selected, #33485c);
+  --ts-menu-text: var(--svy-text, #e1e8ed);
+  --ts-menu-muted: var(--svy-text-muted, #b3c1cc);
+  --ts-menu-accent: var(--svy-accent, #48aff0);
+  --ts-menu-danger: var(--svy-danger, #ff9c9c);
+  --ts-menu-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.46),
+    0 2px 7px rgba(0, 0, 0, 0.34);
+}
+
+.ts-status-view[data-ts-view-theme="dark"] .ts-status-pill-preview[data-task-status-key] {
+  --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
+  --ts-status-fg: var(--ts-status-fg-dark, rgb(184, 194, 207));
+  --ts-status-border: var(--ts-status-border-dark, rgba(105, 121, 143, 0.62));
+}

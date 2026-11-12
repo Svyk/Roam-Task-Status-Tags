@@ -1719,6 +1719,42 @@ var DOCK_STEP_MS = 25;
 var SIDEBAR_ID = "#right-sidebar";
 var SIDEBAR_CONTENT_ID = "#roam-right-sidebar-content";
 var KEY_EVENTS = ["keydown", "keypress", "keyup"];
+function hasClass(el, name) {
+  return Boolean(el?.classList?.contains?.(name));
+}
+function parseColor(value) {
+  const numbers = String(value ?? "").match(/-?\d*\.?\d+/g);
+  if (!numbers || numbers.length < 3 || !/^\s*rgba?\(/i.test(String(value))) return null;
+  const [r, g, b] = numbers.slice(0, 3).map(Number);
+  const alpha = numbers.length > 3 ? Number(numbers[3]) : 1;
+  if (![r, g, b, alpha].every(Number.isFinite) || alpha === 0) return null;
+  return { r, g, b };
+}
+function luminance({ r, g, b }) {
+  const channel2 = (v) => {
+    const c = Math.min(255, Math.max(0, v)) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel2(r) + 0.7152 * channel2(g) + 0.0722 * channel2(b);
+}
+function resolveViewTheme({ document: documentLike, window: windowLike }) {
+  const html = documentLike?.documentElement;
+  const body = documentLike?.body;
+  if (hasClass(html, "bp3-dark") || hasClass(body, "bt-theme-dark") || hasClass(html, "rm-dark-theme") || hasClass(body, "rm-dark-theme") || hasClass(body, "roam-body") && hasClass(body, "dark")) return "dark";
+  if (hasClass(html, "bp3-light") || hasClass(body, "bt-theme-light")) return "light";
+  try {
+    const compute = windowLike?.getComputedStyle ?? globalThis.getComputedStyle;
+    const color = body && typeof compute === "function" ? parseColor(compute.call(windowLike, body)?.backgroundColor) : null;
+    if (color) return luminance(color) < 0.4 ? "dark" : "light";
+  } catch (_) {
+  }
+  try {
+    const query = windowLike?.matchMedia?.("(prefers-color-scheme: dark)");
+    if (query?.matches) return "dark";
+  } catch (_) {
+  }
+  return "light";
+}
 var INNER_LINK_SELECTOR = "a, .rm-page-ref, .rm-block-ref, [data-link-title]";
 function createStatusView({
   document: documentLike,
@@ -1825,8 +1861,14 @@ function createStatusView({
   function stateMessage(text) {
     return make("p", "ts-status-view-message", text);
   }
+  function applyTheme() {
+    const theme = resolveViewTheme({ document: documentLike, window: windowLike });
+    root?.setAttribute("data-ts-view-theme", theme);
+    dockEl?.setAttribute("data-ts-view-theme", theme);
+  }
   function renderContent() {
     if (!root || !scroller) return;
+    applyTheme();
     const scrollTop = scroller.scrollTop;
     unmountRendered();
     content?.remove();
@@ -2020,6 +2062,8 @@ function createStatusView({
       dockEl.setAttribute("data-task-status-portal", "true");
       dockEl.append(root);
       container.prepend(dockEl);
+      applyTheme();
+      container.scrollTop = 0;
       const host = query(SIDEBAR_ID);
       if (host && typeof MutationObserverCtor === "function") {
         observer = new MutationObserverCtor(() => {
@@ -2720,14 +2764,14 @@ function decideStatusCheckboxAnnotation({
     shape: getStatusCheckboxShape(statusKey, lookupStatusName(statusNames, statusKey))
   });
 }
-function hasClass(element, className) {
+function hasClass2(element, className) {
   return Boolean(element?.classList?.contains?.(className));
 }
 function findSiblingTaskCheckbox(statusPill) {
   const parent = statusPill?.parentElement;
   if (!parent) return null;
   const children = Array.from(parent.children || []);
-  const candidates = children.filter((child) => hasClass(child, "rm-checkbox"));
+  const candidates = children.filter((child) => hasClass2(child, "rm-checkbox"));
   if (candidates.length !== 1) return null;
   const checkbox = candidates[0];
   const input = checkbox.querySelector?.('input[type="checkbox"]');

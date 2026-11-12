@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { episodeStateFromChildren, readEpisodeStateSync } from "../src/episode-counter.js";
 import { createTaskStatusTextHelpers } from "../src/extension.js";
-import { createStatusView, orderStatusGroups, queryStatusTasks } from "../src/status-view.js";
+import { createStatusView, orderStatusGroups, queryStatusTasks, resolveViewTheme } from "../src/status-view.js";
 
 const CATALOG = [
   ["ACTIVE", "Active", false],
@@ -293,6 +293,8 @@ function setup({
   sidebarOpen = false,
   windows = [],
   waitMs = 20,
+  htmlClasses = [],
+  bodyClasses = [],
 } = {}) {
   FakeObserver.instances = [];
   const sidebarState = { host: new FakeEl("div"), content: null, windows };
@@ -300,6 +302,7 @@ function setup({
   const makeContent = () => {
     const content = new FakeEl("div");
     content.setAttribute("id", "roam-right-sidebar-content");
+    content.scrollTop = 79;
     sidebarState.host.append(content);
     sidebarState.content = content;
   };
@@ -318,6 +321,8 @@ function setup({
     },
   };
   document.body.isConnected = true;
+  document.body.classList = { contains: (name) => bodyClasses.includes(name) };
+  document.documentElement = { classList: { contains: (name) => htmlClasses.includes(name) } };
   const portalRoot = new FakeEl("div");
   document.body.append(portalRoot);
   const calls = { q: [], open: [], sidebar: [], write: [], render: [], unmount: [], sidebarOpen: 0, sidebarClose: 0 };
@@ -651,4 +656,70 @@ test("double open during the mount wait mounts once; close during the wait mount
   assert.equal(aborted.portalRoot.children.length, 0);
   assert.equal(aborted.view.isOpen(), false);
   assert.equal(aborted.win.count(), 0);
+});
+
+// --- scroll and theme -------------------------------------------------------
+
+test("docked mount scrolls the sidebar to the top once, not on refresh", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const content = ctx.sidebarState.content;
+  assert.equal(content.scrollTop, 0);
+  content.scrollTop = 40;
+  await tick();
+  await ctx.view.refresh();
+  content.children[0].remove();
+  FakeObserver.instances[0].callback();
+  assert.equal(content.scrollTop, 40);
+});
+
+function themeEnv({ html = [], body = [], background = null, dark = null } = {}) {
+  return {
+    document: {
+      documentElement: { classList: { contains: (name) => html.includes(name) } },
+      body: { classList: { contains: (name) => body.includes(name) } },
+    },
+    window: {
+      getComputedStyle: () => ({ backgroundColor: background }),
+      ...(dark == null ? {} : { matchMedia: () => ({ matches: dark }) }),
+    },
+  };
+}
+
+test("resolveViewTheme: classes, body luminance, OS hint, then light", () => {
+  assert.equal(resolveViewTheme(themeEnv({ html: ["bp3-dark"], background: "rgb(255, 255, 255)" })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["bt-theme-dark"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ html: ["rm-dark-theme"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["roam-body", "dark"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["roam-body"] })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ html: ["bp3-light"], background: "rgb(0, 0, 0)", dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["bt-theme-light"], dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgb(30, 36, 40)", dark: false })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgb(255, 255, 255)", dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgba(0, 0, 0, 0)", dark: true })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ background: "transparent", dark: false })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "transparent" })), "light");
+});
+
+test("the view root and dock wrapper carry the resolved theme", async () => {
+  const dark = setup({ dock: true, htmlClasses: ["bp3-dark"] });
+  await dark.view.open();
+  const wrapper = dark.sidebarState.content.children[0];
+  assert.equal(wrapper.getAttribute("data-ts-view-theme"), "dark");
+  assert.equal(wrapper.children[0].getAttribute("data-ts-view-theme"), "dark");
+  const light = setup({ htmlClasses: ["bp3-light"] });
+  light.view.open();
+  assert.equal(light.portalRoot.children[0].getAttribute("data-ts-view-theme"), "light");
+});
+
+test("theme override rules exist and follow the prefers-color-scheme portal rule", () => {
+  const css = readFileSync(new URL("../src/extension.css", import.meta.url), "utf8");
+  const osRule = css.indexOf(":root:not(.bp3-light) :where(.ts-status-portal");
+  for (const theme of ["light", "dark"]) {
+    const menu = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] {`);
+    const pill = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] .ts-status-pill-preview[data-task-status-key] {`);
+    assert.ok(osRule > -1 && menu > osRule && pill > menu, `${theme} rules come after the OS rule`);
+    assert.match(css.slice(menu, pill), /--ts-menu-surface: var\(--svy-overlay/);
+    assert.match(css.slice(pill, pill + 500), new RegExp(`--ts-status-bg: var\\(--ts-status-bg-${theme}`));
+  }
 });
