@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.11.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.12.0 | generated; edit src/ */
 
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
@@ -264,8 +264,8 @@ function isPromiseLike(value) {
   return value != null && typeof value.then === "function";
 }
 async function callSafely(disposer) {
-  const result3 = disposer();
-  if (isPromiseLike(result3)) await result3;
+  const result4 = disposer();
+  if (isPromiseLike(result4)) await result4;
 }
 function createLifecycle() {
   let disposed = false;
@@ -340,6 +340,364 @@ function createLifecycle() {
         }
       }
       if (errors.length) throw new AggregateError(errors, "One or more extension cleanups failed");
+    }
+  };
+}
+
+// src/follow-up-date.js
+var FOLLOW_UP_STATUS_KEYS = Object.freeze(["WAITING", "IN_REVIEW"]);
+var BETTER_TASKS_TOOLS_ID = "better-tasks";
+var DEFAULT_DUE_ATTRIBUTE = "BT_attrDue";
+var TODO_TOKEN_RE = /^\s*(?:\{\{\s*(?:\[\[\s*)?TODO(?:\s*\]\])?\s*\}\}|TODO)(?=$|[ \t\r\n])/i;
+var ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+var CHILDREN_PULL_PATTERN = "[:block/uid :block/string {:block/children [:block/uid :block/string]}]";
+var MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
+var SHORT_MONTHS = MONTHS.map((month) => month.slice(0, 3));
+var SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function isFollowUpStatusKey(statusKey) {
+  return FOLLOW_UP_STATUS_KEYS.includes(statusKey);
+}
+function localNoon(date) {
+  const d = new Date(date);
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
+function addDays(date, days) {
+  const d = localNoon(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function toIsoDate(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+function parseIsoDate(value) {
+  const match = typeof value === "string" ? value.trim().match(ISO_DATE_RE) : null;
+  if (!match) return null;
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  if (toIsoDate(d) !== match[0]) return null;
+  return d;
+}
+function sameDay(a, b) {
+  return toIsoDate(a) === toIsoDate(b);
+}
+function shortDateLabel(date, today = /* @__PURE__ */ new Date()) {
+  const base = `${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}`;
+  return date.getFullYear() === today.getFullYear() ? base : `${base}, ${date.getFullYear()}`;
+}
+function quickPicks(today = /* @__PURE__ */ new Date()) {
+  const tomorrow = addDays(today, 1);
+  const inThree = addDays(today, 3);
+  const nextWeek = addDays(today, 7);
+  return [
+    { id: "tomorrow", label: "Tomorrow", hint: SHORT_DAYS[tomorrow.getDay()], date: tomorrow },
+    { id: "in-3-days", label: "In 3 days", hint: SHORT_DAYS[inThree.getDay()], date: inThree },
+    { id: "next-week", label: "Next week", hint: shortDateLabel(nextWeek, today), date: nextWeek }
+  ];
+}
+function parseDueValue(value, roamAlphaAPI = null) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return null;
+  const inner = raw.startsWith("[[") && raw.endsWith("]]") ? raw.slice(2, -2).trim() : raw;
+  const iso = parseIsoDate(inner);
+  if (iso) return iso;
+  const toDate = roamAlphaAPI?.util?.pageTitleToDate;
+  if (typeof toDate === "function") {
+    try {
+      const d2 = toDate.call(roamAlphaAPI.util, inner);
+      if (d2 instanceof Date && !Number.isNaN(d2.getTime())) return localNoon(d2);
+    } catch (_) {
+    }
+  }
+  const match = inner.match(/^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s*(\d{4})$/);
+  if (!match) return null;
+  const month = MONTHS.findIndex((name) => name.toLowerCase() === match[1].toLowerCase());
+  if (month < 0) return null;
+  const d = new Date(Number(match[3]), month, Number(match[2]), 12);
+  return d.getMonth() === month ? d : null;
+}
+function findTool(windowLike, name) {
+  const tools = windowLike?.RoamExtensionTools?.[BETTER_TASKS_TOOLS_ID]?.tools;
+  if (!Array.isArray(tools)) return null;
+  const tool = tools.find((entry) => entry?.name === name);
+  return typeof tool?.execute === "function" ? tool : null;
+}
+function resolveFollowUpSurface(windowLike) {
+  const classifyBlock = windowLike?.betterTasks?.v2?.classifyBlock;
+  const pull = windowLike?.roamAlphaAPI?.data?.async?.pull;
+  const modify = findTool(windowLike, "bt_modify");
+  if (typeof classifyBlock !== "function" || typeof pull !== "function" || !modify) return null;
+  return {
+    classifyBlock: (uid) => classifyBlock.call(windowLike.betterTasks.v2, uid),
+    pull: (pattern, eid) => pull.call(windowLike.roamAlphaAPI.data.async, pattern, eid),
+    modify,
+    attributes: findTool(windowLike, "bt_get_attributes")
+  };
+}
+function valueAt2(value, key, fallback = null) {
+  if (!value || typeof value !== "object") return fallback;
+  const plain = key.replace(/^:/, "");
+  return value[key] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
+}
+function escapeRegex(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+async function dueAttributeNames(surface) {
+  const names = [DEFAULT_DUE_ATTRIBUTE];
+  if (!surface.attributes) return names;
+  try {
+    const schema = await surface.attributes.execute({});
+    const due = Array.isArray(schema?.attributes) ? schema.attributes.find((entry) => entry?.id === "due") : null;
+    const configured = [due?.name, ...Array.isArray(due?.aliases) ? due.aliases : []].filter((name) => typeof name === "string" && name.trim()).map((name) => name.trim());
+    if (configured.length) return [...new Set(configured)];
+  } catch (_) {
+  }
+  return names;
+}
+function findDueChild(children, names) {
+  const patterns = names.map((name) => new RegExp(`^\\s*${escapeRegex(name)}::\\s*`, "i"));
+  for (const child of Array.isArray(children) ? children : []) {
+    const string = valueAt2(child, ":block/string", "");
+    const uid = valueAt2(child, ":block/uid", null);
+    if (typeof string !== "string" || typeof uid !== "string") continue;
+    const pattern = patterns.find((re) => re.test(string));
+    if (pattern) return { uid, value: string.replace(pattern, "").trim() };
+  }
+  return null;
+}
+async function readDueChild(surface, uid) {
+  const block = await surface.pull(CHILDREN_PULL_PATTERN, [":block/uid", uid]);
+  if (valueAt2(block, ":block/uid", null) !== uid) return { block: null, due: null };
+  const names = await dueAttributeNames(surface);
+  return { block, due: findDueChild(valueAt2(block, ":block/children", []), names) };
+}
+function result2(eligible, reason, fields = {}) {
+  return { eligible, reason, ...fields };
+}
+async function readFollowUpState({ windowLike, uid }) {
+  const surface = resolveFollowUpSurface(windowLike);
+  if (!surface) return result2(false, "better-tasks-unavailable");
+  if (typeof uid !== "string" || !uid) return result2(false, "invalid-uid");
+  try {
+    const classification = await surface.classifyBlock(uid);
+    if (classification?.kind !== "task") return result2(false, "not-a-better-tasks-task");
+    const { block, due } = await readDueChild(surface, uid);
+    if (!block) return result2(false, "block-not-found");
+    if (!TODO_TOKEN_RE.test(valueAt2(block, ":block/string", ""))) {
+      return result2(false, "not-an-open-task");
+    }
+    const existingDue = due ? { uid: due.uid, value: due.value, date: parseDueValue(due.value, windowLike?.roamAlphaAPI) } : null;
+    return result2(true, "ask", { existingDue });
+  } catch (error) {
+    return result2(false, "read-failed", { error });
+  }
+}
+async function writeFollowUpDate({ windowLike, uid, date }) {
+  const surface = resolveFollowUpSurface(windowLike);
+  if (!surface) return { status: "rejected", reason: "better-tasks-unavailable" };
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return { status: "rejected", reason: "invalid-date" };
+  }
+  let before = null;
+  try {
+    before = (await readDueChild(surface, uid)).due;
+  } catch (_) {
+  }
+  const target = localNoon(date);
+  if (before && sameDay(parseDueValue(before.value, windowLike?.roamAlphaAPI) || /* @__PURE__ */ new Date(NaN), target)) {
+    return { status: "unchanged", reason: "same-date", dueUid: before.uid };
+  }
+  let response;
+  try {
+    response = await surface.modify.execute({ uid, attributes: { due: toIsoDate(target) } });
+  } catch (error) {
+    return { status: "unknown", reason: "better-tasks-modify-threw", error };
+  }
+  if (response?.error) return { status: "rejected", reason: "better-tasks-refused", error: response.error };
+  let after = null;
+  try {
+    after = (await readDueChild(surface, uid)).due;
+  } catch (_) {
+  }
+  const landed = after ? parseDueValue(after.value, windowLike?.roamAlphaAPI) : null;
+  if (!after || !landed || !sameDay(landed, target)) {
+    return { status: "unknown", reason: "due-not-confirmed", response };
+  }
+  return {
+    status: "updated",
+    dueUid: after.uid,
+    value: after.value,
+    sameUid: before ? before.uid === after.uid : null
+  };
+}
+var FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date";
+function menuItem(documentLike, { label, hint = "", className = "", action, onChoose }) {
+  const li = documentLike.createElement("li");
+  const item = documentLike.createElement("a");
+  item.className = `ts-status-choice ts-follow-up-item bp3-menu-item ${className}`.trim();
+  item.setAttribute("role", "menuitem");
+  item.setAttribute("tabindex", "0");
+  item.setAttribute("data-follow-up-action", action);
+  const text = documentLike.createElement("div");
+  text.className = "ts-status-choice-label bp3-fill bp3-text-overflow-ellipsis";
+  text.textContent = label;
+  item.append(text);
+  if (hint) {
+    const hintEl = documentLike.createElement("span");
+    hintEl.className = "ts-follow-up-hint bp3-menu-item-label";
+    hintEl.textContent = hint;
+    item.append(hintEl);
+  }
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onChoose();
+  });
+  item.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  item._followUpChoose = onChoose;
+  li.append(item);
+  return li;
+}
+function createFollowUpPrompt({ document: documentLike, statusLabel, existingDue, today = /* @__PURE__ */ new Date(), onDecision }) {
+  let decided = false;
+  const decide = (decision) => {
+    if (decided) return;
+    decided = true;
+    onDecision(decision);
+  };
+  const list = documentLike.createElement("ul");
+  list.className = "ts-status-choice-list ts-follow-up bp3-menu";
+  list.setAttribute("role", "menu");
+  list.setAttribute("aria-label", "Follow-up date");
+  list.setAttribute("data-task-status-follow-up", "true");
+  const header = documentLike.createElement("li");
+  header.className = "ts-status-chooser-count ts-follow-up-header bp3-menu-header";
+  const title = documentLike.createElement("h6");
+  title.textContent = statusLabel ? `${statusLabel} · check back?` : "Check back?";
+  header.append(title);
+  list.append(header);
+  const existingDate = existingDue?.date || null;
+  if (existingDue) {
+    const shown = existingDate ? shortDateLabel(existingDate, today) : existingDue.value;
+    list.append(
+      menuItem(documentLike, {
+        label: `Keep due ${shown}`,
+        className: "ts-follow-up-keep",
+        action: "keep",
+        onChoose: () => decide({ action: "keep" })
+      })
+    );
+  }
+  for (const pick of quickPicks(today)) {
+    const replacing = existingDate && sameDay(existingDate, pick.date);
+    if (replacing) continue;
+    list.append(
+      menuItem(documentLike, {
+        label: pick.label,
+        hint: pick.hint,
+        action: pick.id,
+        onChoose: () => decide({ action: "set", date: pick.date })
+      })
+    );
+  }
+  const dateRow = documentLike.createElement("li");
+  dateRow.className = "ts-follow-up-date-row";
+  const input = documentLike.createElement("input");
+  input.className = "ts-follow-up-date bp3-input bp3-small";
+  input.setAttribute("type", "date");
+  input.setAttribute("aria-label", "Pick a date");
+  input.setAttribute("min", toIsoDate(today));
+  input.setAttribute("value", toIsoDate(existingDate || addDays(today, 1)));
+  input.value = toIsoDate(existingDate || addDays(today, 1));
+  const setButton = documentLike.createElement("button");
+  setButton.className = "ts-follow-up-set bp3-button bp3-small";
+  setButton.setAttribute("type", "button");
+  setButton.textContent = "Set";
+  const chooseInputDate = () => {
+    const date = parseIsoDate(input.value);
+    if (!date) {
+      input.setAttribute("aria-invalid", "true");
+      return;
+    }
+    if (existingDate && sameDay(existingDate, date)) decide({ action: "keep" });
+    else decide({ action: "set", date });
+  };
+  setButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    chooseInputDate();
+  });
+  input._followUpChoose = chooseInputDate;
+  dateRow.append(input, setButton);
+  list.append(dateRow);
+  list.append(
+    menuItem(documentLike, {
+      label: "Skip",
+      className: "ts-follow-up-skip",
+      action: "skip",
+      onChoose: () => decide({ action: "skip" })
+    })
+  );
+  function focusables() {
+    return Array.from(list.querySelectorAll(FOCUSABLE));
+  }
+  function moveFocus(target, delta) {
+    const items = focusables();
+    if (!items.length) return;
+    const index = items.indexOf(target);
+    const next = items[(index + delta + items.length) % items.length] || items[0];
+    next.focus?.({ preventScroll: true });
+  }
+  function handleKey(event) {
+    if (event.type !== "keydown") return false;
+    const target = event.target;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      decide({ action: "cancel" });
+      return true;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (target === input) return false;
+      event.preventDefault();
+      moveFocus(target, event.key === "ArrowDown" ? 1 : -1);
+      return true;
+    }
+    if (event.key === "Enter" || event.key === " " && target !== input) {
+      const choose = target?._followUpChoose || (target === setButton ? chooseInputDate : null);
+      if (!choose) return false;
+      event.preventDefault();
+      choose();
+      return true;
+    }
+    return false;
+  }
+  return {
+    element: list,
+    handleKey,
+    focusFirst() {
+      focusables()[0]?.focus?.({ preventScroll: true });
+    },
+    cancel() {
+      decide({ action: "cancel" });
+    },
+    get decided() {
+      return decided;
     }
   };
 }
@@ -845,7 +1203,7 @@ function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, Custom
 
 // src/status-write.js
 var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
-function valueAt2(value, keyword, fallback = null) {
+function valueAt3(value, keyword, fallback = null) {
   if (!value || typeof value !== "object") return fallback;
   const plain = keyword.replace(/^:/, "");
   return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
@@ -861,13 +1219,13 @@ function createFreshBlockStringReader(roamAlphaAPI) {
       BLOCK_STRING_PULL_PATTERN,
       [":block/uid", uid]
     );
-    const pulledUid = valueAt2(value, ":block/uid", null);
-    const string = valueAt2(value, ":block/string", null);
+    const pulledUid = valueAt3(value, ":block/uid", null);
+    const string = valueAt3(value, ":block/string", null);
     if (pulledUid !== uid || typeof string !== "string") return null;
     return string;
   };
 }
-function result2(status, fields = {}) {
+function result3(status, fields = {}) {
   return { status, didWrite: status === "updated", ...fields };
 }
 async function certify({ uid, expectedString, nextString, readFresh, writeError = null }) {
@@ -875,25 +1233,25 @@ async function certify({ uid, expectedString, nextString, readFresh, writeError 
   try {
     observed = await readFresh(uid);
   } catch (error) {
-    return result2("unknown", {
+    return result3("unknown", {
       reason: "post-write-read-failed",
       error: writeError || error
     });
   }
   if (observed === nextString) {
-    return result2("updated", {
+    return result3("updated", {
       reason: writeError ? "write-threw-after-commit" : "certified",
       string: observed
     });
   }
   if (observed === expectedString) {
-    return result2("not-updated", {
+    return result3("not-updated", {
       reason: writeError ? "write-failed-before-commit" : "write-not-observed",
       error: writeError || void 0,
       string: observed
     });
   }
-  return result2("conflict", {
+  return result3("conflict", {
     reason: observed == null ? "block-missing-after-write" : "third-state-after-write",
     error: writeError || void 0,
     string: observed
@@ -918,36 +1276,36 @@ function createCertifiedBlockStringWriter({
       editorString
     }) {
       if (typeof uid !== "string" || !uid.trim()) {
-        return result2("rejected", { reason: "invalid-uid" });
+        return result3("rejected", { reason: "invalid-uid" });
       }
       if (typeof expectedString !== "string" || typeof nextString !== "string") {
-        return result2("rejected", { reason: "invalid-string" });
+        return result3("rejected", { reason: "invalid-string" });
       }
       let before;
       try {
         before = await readFresh(uid);
       } catch (error) {
-        return result2("unknown", { reason: "pre-write-read-failed", error });
+        return result3("unknown", { reason: "pre-write-read-failed", error });
       }
-      if (before == null) return result2("rejected", { reason: "block-not-found" });
+      if (before == null) return result3("rejected", { reason: "block-not-found" });
       if (before !== expectedString) {
-        return result2("conflict", { reason: "stale-expected-string", string: before });
+        return result3("conflict", { reason: "stale-expected-string", string: before });
       }
       const hasEditorHandoff = expectedLiveEditorString !== void 0 || editorString !== void 0;
       if (hasEditorHandoff && (typeof expectedLiveEditorString !== "string" || typeof editorString !== "string")) {
-        return result2("rejected", { reason: "invalid-editor-handoff" });
+        return result3("rejected", { reason: "invalid-editor-handoff" });
       }
       if (hasEditorHandoff) {
         const live = getLiveEditorString(uid);
         if (live !== expectedLiveEditorString && live !== editorString) {
-          return result2("conflict", {
+          return result3("conflict", {
             reason: "active-editor-diverged",
             string: typeof live === "string" ? live : null
           });
         }
       }
       if (nextString === expectedString) {
-        return result2("unchanged", { reason: "already-current", string: before });
+        return result3("unchanged", { reason: "already-current", string: before });
       }
       try {
         await updateBlock(uid, nextString);
@@ -1288,12 +1646,12 @@ function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {})
   else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
   return true;
 }
-function escapeRegex(text) {
+function escapeRegex2(text) {
   return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function countExactStatusTagOccurrences(blockString, tagTitle) {
   if (typeof blockString !== "string" || !tagTitle) return 0;
-  const title = escapeRegex(tagTitle);
+  const title = escapeRegex2(tagTitle);
   const matcher = new RegExp(
     `#\\[\\[${title}\\]\\]|#${title}(?=$|\\s|[\\.,;:!\\?\\)\\]\\}])`,
     "g"
@@ -1690,8 +2048,8 @@ function createStatusPeekController({
       });
     }
     try {
-      const result3 = remove ? await onRemove?.(intentContext) : await onOpen?.(intentContext);
-      if (!remove && result3 === false) hide();
+      const result4 = remove ? await onRemove?.(intentContext) : await onOpen?.(intentContext);
+      if (!remove && result4 === false) hide();
       return true;
     } catch (error) {
       hide();
@@ -1947,7 +2305,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.11.0" : "development";
+var BUNDLED_VERSION = true ? "0.12.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -2055,7 +2413,7 @@ function createTaskStatusTextHelpers(options = {}) {
     });
     return out;
   }
-  function escapeRegex2(text) {
+  function escapeRegex3(text) {
     return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function containsAny(text, patterns) {
@@ -2073,7 +2431,7 @@ function createTaskStatusTextHelpers(options = {}) {
   }
   function hasPlainHashtagToken(text, tagTitle) {
     if (!text || typeof text !== "string") return false;
-    const t = escapeRegex2(tagTitle);
+    const t = escapeRegex3(tagTitle);
     const re = new RegExp(`(^|\\s)#${t}(?=\\s|$|[\\.,;:!\\?\\)\\]\\}])`, "g");
     return re.test(text);
   }
@@ -2341,7 +2699,8 @@ function createTaskStatusExtension({ extensionAPI }) {
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
-    repeatCarryOver: "task-status-repeat-carry-over"
+    repeatCarryOver: "task-status-repeat-carry-over",
+    followUpPrompt: "task-status-follow-up-prompt"
   };
   const STATUS_LABEL_DISPLAY = Object.freeze({
     CHECKBOX_ONLY: "Checkbox only — reveal on intent",
@@ -2408,6 +2767,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
+  let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -3020,6 +3380,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let statusChooserEl = null;
   let statusChooserTeardown = null;
   let statusChooserReturnFocusEl = null;
+  let statusChooserAnchorEl = null;
+  let followUpPrompt = null;
   let statusPeekController = null;
   function log(...args) {
     if (CONFIG.debug) console.log("[TaskStatus]", ...args);
@@ -3177,6 +3539,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
     refreshStatusVisuals(document);
+  }
+  function setFollowUpPromptEnabled(nextValue) {
+    followUpPromptEnabled = normalizeBooleanSetting(nextValue, followUpPromptEnabled);
   }
   function setRepeatCarryOver(value) {
     const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
@@ -3553,6 +3918,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function closeStatusChooser({ restoreFocus = false } = {}) {
     const hadChooser = Boolean(statusChooserEl || statusChooserTeardown);
     const returnFocusEl = statusChooserReturnFocusEl;
+    const openPrompt = followUpPrompt;
+    followUpPrompt = null;
+    if (openPrompt && !openPrompt.decided) {
+      try {
+        openPrompt.cancel();
+      } catch (_) {
+      }
+    }
     if (statusChooserTeardown) {
       try {
         statusChooserTeardown();
@@ -3568,6 +3941,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     statusChooserEl = null;
     statusChooserReturnFocusEl = null;
+    statusChooserAnchorEl = null;
     if (hadChooser) statusPeekController?.chooserClosed?.();
     if (restoreFocus && returnFocusEl?.isConnected) {
       try {
@@ -3667,12 +4041,100 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       label: status?.label || statusKey,
       ariaCurrent: statusKey === currentStatusKey,
       onChoose: () => {
+        if (wantsFollowUpPrompt(statusKey, targetUids)) {
+          void chooseStatusWithFollowUp(targetUids[0], statusKey).catch((err) => {
+            log("Status chooser follow-up error:", err);
+            closeStatusChooser();
+          });
+          return;
+        }
         void setStatusForBlockUids(targetUids, statusKey).catch((err) => log("Status chooser set error:", err)).finally(closeStatusChooser);
       }
     });
     const choice = item.querySelector(".ts-status-choice");
     if (choice) choice.setAttribute("data-task-status-choice", statusKey);
     return item;
+  }
+  function findBlockGutterAnchor(blockUid) {
+    if (!/^[A-Za-z0-9_-]+$/.test(String(blockUid || ""))) return null;
+    const blockEl = document.querySelector(
+      `[id^="block-input-"][id$="-${blockUid}"], .roam-block[data-uid="${blockUid}"]`
+    );
+    return blockEl ? resolveBlockGutterAnchor(blockEl) : null;
+  }
+  function wantsFollowUpPrompt(statusKey, targetUids) {
+    return followUpPromptEnabled && isFollowUpStatusKey(statusKey) && Array.isArray(targetUids) && targetUids.length === 1;
+  }
+  async function chooseStatusWithFollowUp(blockUid, statusKey) {
+    const chooser = statusChooserEl;
+    const isCurrent = () => chooser && statusChooserEl === chooser && chooser.isConnected;
+    const outcome = await setBlockStatus(blockUid, statusKey);
+    if (!isCurrent()) return;
+    if (outcome?.status !== "updated") {
+      closeStatusChooser();
+      return;
+    }
+    const state = await readFollowUpState({ windowLike: window, uid: blockUid });
+    if (!isCurrent()) return;
+    if (!state.eligible) {
+      closeStatusChooser();
+      return;
+    }
+    const prompt = createFollowUpPrompt({
+      document,
+      statusLabel: STATUSES[statusKey]?.label || "",
+      existingDue: state.existingDue,
+      today: /* @__PURE__ */ new Date(),
+      onDecision: (decision) => {
+        const live = followUpPrompt === prompt && statusChooserEl === chooser;
+        if (followUpPrompt === prompt) followUpPrompt = null;
+        if (!live) return;
+        if (decision.action !== "set") {
+          closeStatusChooser({ restoreFocus: true });
+          return;
+        }
+        chooser.setAttribute("aria-busy", "true");
+        void writeFollowUpDate({ windowLike: window, uid: blockUid, date: decision.date }).then((written) => {
+          if (!["updated", "unchanged"].includes(written?.status)) {
+            console.warn("[TaskStatus] Follow-up date not written", {
+              uid: blockUid,
+              reason: written?.reason || "unknown"
+            });
+          }
+        }).catch((err) => log("Follow-up date error:", err)).finally(() => {
+          if (statusChooserEl === chooser) closeStatusChooser({ restoreFocus: true });
+        });
+      }
+    });
+    const content = chooser.querySelector(".bp3-popover-content");
+    if (!content) {
+      closeStatusChooser();
+      return;
+    }
+    content.replaceChildren(prompt.element);
+    chooser.classList.add("ts-follow-up-chooser");
+    followUpPrompt = prompt;
+    const keyGuard = (event) => {
+      if (followUpPrompt !== prompt || !chooser.contains(event.target)) return;
+      prompt.handleKey(event);
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    };
+    const keyEvents = ["keydown", "keypress", "keyup"];
+    keyEvents.forEach((type) => window.addEventListener(type, keyGuard, true));
+    const previousTeardown = statusChooserTeardown;
+    statusChooserTeardown = () => {
+      keyEvents.forEach((type) => window.removeEventListener(type, keyGuard, true));
+      previousTeardown?.();
+    };
+    const anchor = statusChooserAnchorEl?.isConnected ? statusChooserAnchorEl : findBlockGutterAnchor(blockUid);
+    if (anchor) {
+      statusChooserAnchorEl = anchor;
+      positionStatusChooser(chooser, anchor);
+    }
+    window.requestAnimationFrame(() => {
+      if (followUpPrompt === prompt) prompt.focusFirst();
+    });
   }
   async function openStatusChooser({
     blockUid,
@@ -3737,10 +4199,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
     statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
-    positionStatusChooser(
-      chooser,
-      placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl
-    );
+    statusChooserAnchorEl = placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl;
+    positionStatusChooser(chooser, statusChooserAnchorEl);
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true
     });
@@ -4845,6 +5305,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           action: {
             type: "switch",
             onChange: (value) => setAlertBeaconEnabled(value)
+          }
+        },
+        {
+          id: SETTINGS_KEYS.followUpPrompt,
+          name: "Ask for a follow-up date on Waiting / In Review",
+          description: "When the status chooser sets Waiting or In Review on one open Better Tasks task, it asks when to check back: Tomorrow, In 3 days, Next week, a date, or Skip. The date is written as the task's Better Tasks due date, through Better Tasks, in place. An existing due date is shown and can be kept. Needs Better Tasks; Escape cancels without writing.",
+          action: {
+            type: "switch",
+            onChange: (value) => setFollowUpPromptEnabled(value)
           }
         },
         {
