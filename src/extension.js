@@ -507,7 +507,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     "a.rm-page-ref[data-task-status-key]",
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
-  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter";
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
 
   const CONFIG = {

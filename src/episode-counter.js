@@ -86,8 +86,9 @@ function stateFromBlock(block, uid) {
 
 // Only the first line's value changes; any further lines stay byte-for-byte.
 function replaceFirstLine(childString, value) {
+  const prefix = childString.match(/^[ \t]*Episode::[ \t]*/i)?.[0] ?? `${EPISODE_ATTRIBUTE}:: `;
   const rest = childString.slice(childString.search(/[\r\n]|$/));
-  return `${EPISODE_ATTRIBUTE}:: ${value}${rest}`;
+  return `${prefix}${value}${rest}`;
 }
 
 export async function readEpisodeState({ roamAlphaAPI, uid }) {
@@ -324,11 +325,15 @@ export function createEpisodeCounterController({
   function openMenu(counter) {
     const uid = counter.getAttribute(EPISODE_UID_ATTRIBUTE);
     if (!uid) return;
-    if (counter._episodeKind === "invalid") {
-      warnOnce(uid, "invalid-existing-value", {});
+    const state = readEpisodeStateSync({ roamAlphaAPI, uid });
+    if (!state.found) return;
+    if (state.invalid) {
+      warnOnce(uid, state.duplicate ? "duplicate-episode-blocks" : "invalid-existing-value", {});
+      if (!inFlight.get(uid)) render(counter, state);
       return;
     }
-    onOpenMenu({ counter, uid, current: counter._episode || null });
+    if (!inFlight.get(uid)) render(counter, state);
+    onOpenMenu({ counter, uid, current: state.episode || null });
   }
 
   function applyDecision({ counter, decision }) {
@@ -426,12 +431,24 @@ export function createEpisodeCounterController({
     });
   }
 
-  // Maps a mutated Episode attribute node to the closest ancestor task uid.
+  // Maps a mutated Episode attribute node to its task uid. A removed node is
+  // disconnected, so its mutation target (the task's children container) is the anchor.
   function taskUidForAttributeNode(node, fallbackTarget = null) {
     const anchor = node?.isConnected ? node : fallbackTarget;
-    const child = anchor?.closest?.(".roam-block-container");
-    const taskContainer = child?.parentElement?.closest?.(".roam-block-container");
-    const input = taskContainer?.querySelector?.(".rm-block__input");
+    const container = anchor?.closest?.(".roam-block-container");
+    if (!container) return null;
+    const zone = anchor.closest(".rm-block-children, .rm-block-main");
+    const inOwnChildren =
+      zone && String(zone.className || "").split(/\s+/).includes("rm-block-children") &&
+      zone.closest(".roam-block-container") === container;
+    const taskContainer = inOwnChildren
+      ? container
+      : container.parentElement?.closest?.(".roam-block-container");
+    if (!taskContainer) return null;
+    const main = Array.from(taskContainer.children || []).find((child) =>
+      String(child.className || "").split(/\s+/).includes("rm-block-main")
+    );
+    const input = main?.querySelector?.(".rm-block__input");
     return input ? getBlockUid(input) : null;
   }
 

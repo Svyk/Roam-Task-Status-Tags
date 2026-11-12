@@ -621,6 +621,87 @@ test("a hand edit of the Episode block re-syncs the counter of its task", () => 
   assert.ok(doc.body);
 });
 
+function cls(name, ...kids) {
+  const el = new FakeEl("div");
+  el.className = name;
+  el.append(...kids);
+  return el;
+}
+
+function taskTree(taskUid, { episodeAttr = null } = {}) {
+  const taskInput = cls("rm-block__input");
+  taskInput.setAttribute("data-uid", taskUid);
+  const epInput = cls("rm-block__input");
+  epInput.setAttribute("data-uid", "ep");
+  if (episodeAttr) epInput.append(episodeAttr);
+  const epContainer = cls("roam-block-container", cls("rm-block-main", epInput));
+  const kids = cls("rm-block-children", epContainer);
+  const task = cls("roam-block-container", cls("rm-block-main", taskInput), kids);
+  const outer = cls("roam-block-container", cls("rm-block-children", task));
+  const top = cls("page");
+  top.append(outer);
+  const root = new FakeEl("div");
+  root.setConnected(true);
+  root.append(top);
+  return { task, kids, epInput, epContainer, outer };
+}
+
+function uidController() {
+  return createEpisodeCounterController({
+    document: fakeDocument(),
+    roamAlphaAPI: fakeGraph({}).roamAlphaAPI,
+    getBlockUid: (el) => el.getAttribute("data-uid"),
+  });
+}
+
+test("a hand edit inside the Episode block resolves to its task, not the task's parent", () => {
+  const controller = uidController();
+  const attr = new FakeEl("span");
+  attr.className = "rm-attr-ref";
+  const { epInput } = taskTree("task");
+  epInput.append(attr);
+  assert.equal(controller.taskUidForAttributeNode(attr, epInput), "task");
+});
+
+test("a hand delete (disconnected node, target is the task's children) resolves to that task", () => {
+  const controller = uidController();
+  const attr = new FakeEl("span");
+  attr.className = "rm-attr-ref";
+  const { kids } = taskTree("task");
+  assert.equal(attr.isConnected, false);
+  assert.equal(controller.taskUidForAttributeNode(attr, kids), "task");
+});
+
+test("a top-level task resolves on both paths", () => {
+  const controller = uidController();
+  const { task, kids, epInput } = taskTree("task");
+  task.parentElement.remove();
+  task.parentElement = null;
+  const attr = new FakeEl("span");
+  attr.className = "rm-attr-ref";
+  assert.equal(controller.taskUidForAttributeNode(attr, kids), "task");
+  epInput.append(attr);
+  attr.setConnected(true);
+  assert.equal(controller.taskUidForAttributeNode(attr, epInput), "task");
+});
+
+test("the task uid comes from the task's own input, not a descendant's", () => {
+  const controller = uidController();
+  const attr = new FakeEl("span");
+  attr.className = "rm-attr-ref";
+  const { kids } = taskTree("task");
+  assert.equal(controller.taskUidForAttributeNode(attr, kids), "task");
+  assert.notEqual(controller.taskUidForAttributeNode(attr, kids), "ep");
+});
+
+test("a write keeps the user's original prefix and only swaps the value", async () => {
+  const graph = taskGraph({ ep: { string: "  episode::S2E5" } });
+  graph.byUid.get("task").children.push("ep");
+  const result = await writeEpisode({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task", compute: nextEpisode });
+  assert.equal(result.status, "updated");
+  assert.equal(graph.byUid.get("ep").string, "  episode::S2E6");
+});
+
 // --- menu -------------------------------------------------------------------
 
 function makeMenu(current) {
@@ -705,4 +786,23 @@ test("extension wiring: refresh, mutation observer, shared chooser state and cle
   assert.match(source, /function openEpisodeMenu\(/);
   assert.match(source, /episodeCounter\.destroyAll\(document\)/);
   assert.match(source, /activityRecorder,/);
+});
+
+test("the menu reads the graph fresh when it opens", () => {
+  const { controller, pill, graph, menus, warnings } = setup({ blocks: { ep: { string: "Episode:: S1E1" } } });
+  graph.byUid.get("task").children.push("ep");
+  const counter = controller.sync({ pill, uid: "task", kept: new Set() });
+  graph.byUid.get("ep").string = "Episode:: S3E4";
+  counter.dispatchEvent(mouse("contextmenu"));
+  assert.deepEqual(menus[0].current, { season: 3, episode: 4 });
+
+  graph.byUid.get("ep").string = "Episode:: junk";
+  counter.dispatchEvent(mouse("contextmenu"));
+  assert.equal(menus.length, 1);
+  assert.equal(warnings.length, 1);
+
+  graph.byUid.get("task").children = [];
+  graph.byUid.get("ep").string = "Episode:: S1E1";
+  counter.dispatchEvent(mouse("contextmenu"));
+  assert.equal(menus[1].current, null);
 });
