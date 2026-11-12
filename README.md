@@ -45,11 +45,11 @@ does not replace it, intercept it, or create another completion state.
 | Incubating | Violet dotted outline + centered ring | Adjusted violet dotted outline + centered ring | Native theme checkmark |
 | Alert | Rose strong outline + centered exclamation mark | Rose strong outline + centered exclamation mark | Native theme checkmark |
 | Cancelled | Charcoal outline + centered X | Lightened slate outline + centered X | Native theme checkmark |
-| Series | Purple outline + centered TV | Purple outline + centered TV | Native theme checkmark |
+| Series | Fuchsia outline + centered TV | Fuchsia outline + centered TV | Native theme checkmark |
 | Movie | Orange outline + centered clapperboard | Orange outline + centered clapperboard | Native theme checkmark |
 | Watching | Green outline + centered disc with play triangle | Green outline + centered disc with play triangle | Native theme checkmark |
 | Watchlist | Pink outline + centered bookmark | Pink outline + centered bookmark | Native theme checkmark |
-| Upcoming | Cyan outline + centered calendar | Cyan outline + centered calendar | Native theme checkmark |
+| Upcoming | Royal blue outline + centered calendar | Royal blue outline + centered calendar | Native theme checkmark |
 | Rewatch | Lime outline + centered loop arrows | Lime outline + centered loop arrows | Native theme checkmark |
 | Dropped | Brown outline + centered eject symbol | Brown outline + centered eject symbol | Native theme checkmark |
 | Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |

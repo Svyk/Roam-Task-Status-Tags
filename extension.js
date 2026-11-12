@@ -2127,11 +2127,11 @@ function createTaskStatusExtension({ extensionAPI }) {
     INCUBATING: "#6366f1",
     ALERT: "#f43f5e",
     CANCELLED: "#1e293b",
-    SERIES: "#a855f7",
+    SERIES: "#c026d3",
     MOVIE: "#f97316",
     WATCHING: "#22c55e",
     WATCHLIST: "#ec4899",
-    UPCOMING: "#06b6d4",
+    UPCOMING: "#2626d9",
     REWATCH: "#84cc16",
     DROPPED: "#a16207"
   };
@@ -3425,13 +3425,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         })
       );
     });
-    appendChoices(activeKeys.filter((key) => !statusIsMedia(key)));
+    const taskKeys = activeKeys.filter((key) => !statusIsMedia(key));
+    appendChoices(taskKeys);
     const mediaKeys = activeKeys.filter((key) => statusIsMedia(key));
     if (mediaKeys.length) {
-      const divider = document.createElement("li");
-      divider.className = "bp3-menu-divider ts-status-choice-divider";
-      divider.setAttribute("role", "separator");
-      choices.append(divider);
+      if (taskKeys.length) {
+        const divider = document.createElement("li");
+        divider.className = "bp3-menu-divider ts-status-choice-divider";
+        divider.setAttribute("role", "separator");
+        choices.append(divider);
+      }
       appendChoices(mediaKeys);
     }
     choices.append(

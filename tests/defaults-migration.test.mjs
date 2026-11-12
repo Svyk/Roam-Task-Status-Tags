@@ -98,7 +98,8 @@ test("the runtime wrapper and chooser use the media-aware helpers", async () => 
   assert.match(source, /nextTaskCycleStatus\(CONFIG\.cycleOrder, currentStatus, statusIsMedia\)/);
   assert.match(source, /bp3-menu-divider ts-status-choice-divider/);
   assert.match(source, /setAttribute\("role", "separator"\)/);
-  assert.match(source, /appendChoices\(activeKeys\.filter\(\(key\) => !statusIsMedia\(key\)\)\)/);
+  assert.match(source, /const taskKeys = activeKeys\.filter\(\(key\) => !statusIsMedia\(key\)\)/);
+  assert.match(source, /if \(taskKeys\.length\) \{\n\s*const divider/);
   assert.match(source, /statusNames: getStatusNameMap\(\)/);
 });
 
