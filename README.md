@@ -46,12 +46,12 @@ does not replace it, intercept it, or create another completion state.
 | Alert | Rose strong outline + centered exclamation mark | Rose strong outline + centered exclamation mark | Native theme checkmark |
 | Cancelled | Charcoal outline + centered X | Lightened slate outline + centered X | Native theme checkmark |
 | Series | Fuchsia outline + centered TV | Fuchsia outline + centered TV | Native theme checkmark |
-| Movie | Orange outline + centered clapperboard | Orange outline + centered clapperboard | Native theme checkmark |
-| Watching | Green outline + centered disc with play triangle | Green outline + centered disc with play triangle | Native theme checkmark |
+| Movie | Darkened orange outline + centered clapperboard | Orange outline + centered clapperboard | Native theme checkmark |
+| Watching | Darkened green outline + centered disc with play triangle | Green outline + centered disc with play triangle | Native theme checkmark |
 | Watchlist | Pink outline + centered bookmark | Pink outline + centered bookmark | Native theme checkmark |
 | Upcoming | Azure outline + centered calendar | Azure outline + centered calendar | Native theme checkmark |
-| Rewatch | Lime outline + centered loop arrows | Lime outline + centered loop arrows | Native theme checkmark |
-| Dropped | Brown outline + centered eject symbol | Brown outline + centered eject symbol | Native theme checkmark |
+| Rewatch | Darkened lime outline + centered loop arrows | Lime outline + centered loop arrows | Native theme checkmark |
+| Dropped | Rust-brown outline + centered eject symbol | Lightened tan outline + centered eject symbol | Native theme checkmark |
 | Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |
 
 When a task is checked, the workflow glyph disappears completely and the active
