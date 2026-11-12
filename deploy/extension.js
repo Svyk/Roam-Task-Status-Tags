@@ -568,7 +568,7 @@ async function writeFollowUpDate({ windowLike, uid, date }) {
     sameUid: before ? true : null
   };
 }
-var FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date";
+var FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date, .ts-follow-up-set";
 function menuItem(documentLike, { label, hint = "", className = "", action, onChoose }) {
   const li = documentLike.createElement("li");
   const item = documentLike.createElement("a");
@@ -710,18 +710,23 @@ function createFollowUpPrompt({
       decide({ action: "cancel" });
       return true;
     }
-    if (event.key === "Tab") {
+    if (event.key === "Tab" && target !== input) {
       event.preventDefault();
       moveFocus(target, event.shiftKey ? -1 : 1);
       return true;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (target === input) return false;
+      if (target === setButton) return true;
       event.preventDefault();
       moveFocus(target, event.key === "ArrowDown" ? 1 : -1);
       return true;
     }
     if (event.key === "Enter" || event.key === " " && target !== input) {
+      if (event.repeat) {
+        event.preventDefault();
+        return true;
+      }
       const choose = target?._followUpChoose || (target === setButton ? chooseInputDate : null);
       if (!choose) return false;
       event.preventDefault();
@@ -4124,6 +4129,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       closeStatusChooser();
       return;
     }
+    let writingDate = false;
     const prompt = createFollowUpPrompt({
       document,
       statusLabel: STATUSES[statusKey]?.label || "",
@@ -4139,6 +4145,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           return;
         }
         chooser.setAttribute("aria-busy", "true");
+        writingDate = true;
         void writeFollowUpDate({ windowLike: window, uid: blockUid, date: decision.date }).then((written) => {
           if (!["updated", "unchanged"].includes(written?.status)) {
             console.warn("[TaskStatus] Follow-up date not written", {
@@ -4160,7 +4167,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     chooser.classList.add("ts-follow-up-chooser");
     followUpPrompt = prompt;
     const keyGuard = (event) => {
-      if (followUpPrompt !== prompt) return;
+      if (followUpPrompt !== prompt && !(writingDate && statusChooserEl === chooser)) return;
       const target = event.target;
       const unfocused = !target || target === document || target === document.body || target === document.documentElement;
       if (!unfocused && !chooser.contains(target)) return;

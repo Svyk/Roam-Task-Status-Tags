@@ -2210,6 +2210,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return;
     }
 
+    let writingDate = false;
     const prompt = createFollowUpPrompt({
       document,
       statusLabel: STATUSES[statusKey]?.label || "",
@@ -2227,6 +2228,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           return;
         }
         chooser.setAttribute("aria-busy", "true");
+        writingDate = true;
         void writeFollowUpDate({ windowLike: window, uid: blockUid, date: decision.date })
           .then((written) => {
             if (!["updated", "unchanged"].includes(written?.status)) {
@@ -2252,7 +2254,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     chooser.classList.add("ts-follow-up-chooser");
     followUpPrompt = prompt;
     const keyGuard = (event) => {
-      if (followUpPrompt !== prompt) return;
+      if (followUpPrompt !== prompt && !(writingDate && statusChooserEl === chooser)) return;
       // Keys aimed at the prompt, or at nothing (focus fell to the page while
       // the list was swapped or chrome was clicked), belong to the prompt.
       const target = event.target;

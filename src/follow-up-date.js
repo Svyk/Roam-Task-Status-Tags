@@ -271,7 +271,7 @@ export async function writeFollowUpDate({ windowLike, uid, date }) {
 // ---------------------------------------------------------------------------
 // The prompt: menu items that replace the chooser's status list.
 
-const FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date";
+const FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date, .ts-follow-up-set";
 
 function menuItem(documentLike, { label, hint = "", className = "", action, onChoose }) {
   const li = documentLike.createElement("li");
@@ -426,7 +426,7 @@ export function createFollowUpPrompt({
       decide({ action: "cancel" });
       return true;
     }
-    if (event.key === "Tab") {
+    if (event.key === "Tab" && target !== input) {
       // Keep Tab inside the prompt; it never walks out into Roam.
       event.preventDefault();
       moveFocus(target, event.shiftKey ? -1 : 1);
@@ -434,11 +434,17 @@ export function createFollowUpPrompt({
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (target === input) return false;
+      if (target === setButton) return true;
       event.preventDefault();
       moveFocus(target, event.key === "ArrowDown" ? 1 : -1);
       return true;
     }
     if (event.key === "Enter" || (event.key === " " && target !== input)) {
+      // A held key must not pick the first choice the moment the prompt opens.
+      if (event.repeat) {
+        event.preventDefault();
+        return true;
+      }
       const choose = target?._followUpChoose || (target === setButton ? chooseInputDate : null);
       if (!choose) return false;
       event.preventDefault();

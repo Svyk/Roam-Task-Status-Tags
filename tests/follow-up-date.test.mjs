@@ -375,3 +375,17 @@ test("prompt: Tab stays inside the prompt", () => {
   assert.equal(tab.defaultPrevented, true);
   assert.equal(focused.node, itemByAction(prompt, "tomorrow"));
 });
+
+test("prompt: Set is reachable by Tab and a held Enter picks nothing", () => {
+  const { prompt, decisions } = makePrompt();
+  const input = prompt.element.querySelector(".ts-follow-up-date");
+  const set = prompt.element.querySelector(".ts-follow-up-set");
+  assert.equal(prompt.handleKey(key(input, "Tab")), false);
+  set.focus();
+  prompt.handleKey(key(set, "Tab"));
+  assert.equal(focused.node, itemByAction(prompt, "skip"));
+  const held = key(itemByAction(prompt, "tomorrow"), "Enter");
+  Object.defineProperty(held, "repeat", { value: true });
+  assert.equal(prompt.handleKey(held), true);
+  assert.equal(decisions.length, 0);
+});
