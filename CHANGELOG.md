@@ -2,13 +2,14 @@
 
 ## 0.14.0 — 2026-11-11
 
-- New read-only **Watching now** panel: open tasks grouped by status, each row showing the task, its status icon, and its episode (`S2E5`) when it has an `Episode::` block.
+- New read-only **Watching now** panel: open tasks grouped by status, each row showing the task, its status icon, and its episode (`S2E5`) when it has an `Episode::` block. An unreadable or duplicate `Episode::` shows `?`.
+- It opens at the top of Roam's right sidebar, opening the sidebar if needed. Closing the sidebar closes the view; if the view opened the sidebar and no other window is there, closing the view closes the sidebar again. If the sidebar cannot be used, it floats at the right edge instead.
 - Open it with the command palette entry `Task Status: Watching now` (toggles it) or the chooser item `Watching now…` below Remove status.
-- Filter: **Media** (default), **Tasks** or **All**, kept for the session. Media order: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped. Tasks order: Alert, the other task statuses in your order, Cancelled. Groups with no open tasks are hidden; newest edit first inside a group.
-- Click a row (or press Enter) to open the task in the main window, Shift+click or Shift+Enter for the right sidebar. A click on a link inside the text is left to Roam. The panel stays open.
-- Read-only: it never writes to the graph. DONE tasks are not listed. Escape or the close button closes it; Roam's shortcuts do not fire while it has focus.
-- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand show after Refresh or reopening the panel.
-- A custom panel, not a query page: a query page would write blocks into your graph, could not follow the status order, show the episode, or switch filters without editing the query.
+- Filter: **Media** (default), **Tasks** or **All**, kept for the session. Order is by status name: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped last; Alert first and Cancelled last among task statuses. Empty groups are hidden; newest edit first inside a group.
+- Rows act like a block ref: click opens the task in the main window, Shift+click (or Shift+Enter) opens it in the sidebar, below the panel. Links inside the text work as in Roam. It is not a native `((ref))` (no hover preview).
+- Read-only: it never writes to the graph. DONE tasks are not listed. Escape or the close button closes it. Roam's shortcuts do not fire while it has focus.
+- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand, or completing a task in Roam, show after Refresh or reopening (no polling).
+- A panel docked in the right sidebar, not a query page: a query page would write blocks into your graph, could not follow the status order or show the episode, and the filter would mean editing the query.
 
 ## 0.13.0 — 2026-11-11
 

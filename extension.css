@@ -2111,6 +2111,17 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
   font-variant-numeric: tabular-nums;
 }
 
+.ts-status-view--docked {
+  position: static;
+  width: auto;
+  max-width: none;
+  margin: 8px 8px 4px;
+}
+
+.ts-status-view--docked .ts-status-view-scroll {
+  overflow: visible;
+}
+
 @media (forced-colors: active) {
   .ts-status-view,
   .ts-status-view-header,

@@ -232,6 +232,15 @@ class FakeEl {
     return event;
   }
   focus() { this.focused += 1; }
+  prepend(node) {
+    node.parentNode = this;
+    node.setConnected(this.isConnected);
+    this.children.unshift(node);
+  }
+  contains(node) {
+    for (let current = node; current; current = current.parentNode) if (current === this) return true;
+    return false;
+  }
   hasClass(name) { return this.className.split(/\s+/).includes(name); }
   all(predicate, out = []) {
     for (const child of this.children) {
@@ -243,17 +252,75 @@ class FakeEl {
   byClass(name) { return this.all((el) => el.hasClass(name)); }
 }
 
-function setup({ tasks, children = [], statuses = CATALOG, withRender = false } = {}) {
+class FakeWindow {
+  constructor() { this.handlers = []; }
+  addEventListener(type, handler, capture) { this.handlers.push({ type, handler, capture }); }
+  removeEventListener(type, handler, capture) {
+    this.handlers = this.handlers.filter((h) => !(h.type === type && h.handler === handler && h.capture === capture));
+  }
+  count() { return this.handlers.length; }
+  dispatch(type, target, extra = {}) {
+    const event = {
+      type,
+      target,
+      stopped: false,
+      immediate: false,
+      prevented: false,
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.immediate = true; },
+      preventDefault() { this.prevented = true; },
+      ...extra,
+    };
+    this.handlers.filter((h) => h.type === type && h.capture === true).forEach((h) => h.handler(event));
+    return event;
+  }
+}
+
+class FakeObserver {
+  static instances = [];
+  constructor(callback) { this.callback = callback; this.disconnected = false; FakeObserver.instances.push(this); }
+  observe() {}
+  disconnect() { this.disconnected = true; }
+}
+
+function setup({
+  tasks,
+  children = [],
+  statuses = CATALOG,
+  withRender = false,
+  dock = false,
+  contentAppears = true,
+  sidebarOpen = false,
+  windows = [],
+  waitMs = 20,
+} = {}) {
+  FakeObserver.instances = [];
+  const sidebarState = { host: new FakeEl("div"), content: null, windows };
+  sidebarState.host.setConnected(true);
+  const makeContent = () => {
+    const content = new FakeEl("div");
+    content.setAttribute("id", "roam-right-sidebar-content");
+    sidebarState.host.append(content);
+    sidebarState.content = content;
+  };
+  if (sidebarOpen) makeContent();
   const document = {
     body: new FakeEl("body"),
     activeElement: null,
     createElement: (tag) => new FakeEl(tag),
-    querySelector: () => null,
+    querySelector: (selector) => {
+      if (!dock) return null;
+      if (selector === "#right-sidebar") return sidebarState.host;
+      if (selector === "#roam-right-sidebar-content") {
+        return sidebarState.content?.isConnected ? sidebarState.content : null;
+      }
+      return null;
+    },
   };
   document.body.isConnected = true;
   const portalRoot = new FakeEl("div");
   document.body.append(portalRoot);
-  const calls = { q: [], open: [], sidebar: [], write: [], render: [], unmount: [] };
+  const calls = { q: [], open: [], sidebar: [], write: [], render: [], unmount: [], sidebarOpen: 0, sidebarClose: 0 };
   let pending = null;
   const taskRows = tasks ?? [
     ["w1", "{{[[TODO]]}} #[[task-status/Watching]] Severance", "task-status/Watching", 20],
@@ -274,7 +341,22 @@ function setup({ tasks, children = [], statuses = CATALOG, withRender = false } 
     updateBlock: () => calls.write.push("updateBlock"),
     ui: {
       mainWindow: { openBlock: (arg) => calls.open.push(arg) },
-      rightSidebar: { addWindow: (arg) => calls.sidebar.push(arg) },
+      rightSidebar: {
+        addWindow: (arg) => calls.sidebar.push(arg),
+        ...(dock
+          ? {
+              open: () => {
+                calls.sidebarOpen += 1;
+                if (contentAppears && !sidebarState.content?.isConnected) makeContent();
+              },
+              close: () => {
+                calls.sidebarClose += 1;
+                sidebarState.content?.remove();
+              },
+              getWindows: () => sidebarState.windows,
+            }
+          : {}),
+      },
       components: withRender
         ? {
             renderString: ({ el, string }) => calls.render.push({ el, string }),
@@ -284,14 +366,15 @@ function setup({ tasks, children = [], statuses = CATALOG, withRender = false } 
     },
   };
   const logs = [];
-  let filterSaved = null;
+  const win = new FakeWindow();
   const view = createStatusView({
     document,
-    window: {},
+    window: win,
     roamAlphaAPI,
     portalRoot,
     readGroups: () => ({ statuses, helpers }),
-    onFilterChange: (value) => { filterSaved = value; },
+    waitMs,
+    MutationObserverCtor: FakeObserver,
     log: (...args) => logs.push(args),
   });
   const gate = () => {
@@ -300,7 +383,7 @@ function setup({ tasks, children = [], statuses = CATALOG, withRender = false } 
     pending = { promise, release };
     return () => { const current = pending; pending = null; current.release(); };
   };
-  return { view, document, portalRoot, calls, logs, gate, get filterSaved() { return filterSaved; } };
+  return { view, document, portalRoot, calls, logs, gate, win, sidebarState };
 }
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -340,7 +423,6 @@ test("filter switch re-renders from the last query without a new one", async () 
   radios[1].dispatch("click");
   assert.deepEqual(groupNames(root), ["Active"]);
   assert.equal(radios[1].getAttribute("aria-checked"), "true");
-  assert.equal(ctx.filterSaved, "tasks");
   radios[2].dispatch("click");
   assert.deepEqual(groupNames(root), ["Watching", "Series", "Active"]);
   assert.equal(ctx.calls.q.length, queries);
@@ -362,7 +444,7 @@ test("empty and failure states", async () => {
   failing.view.close();
   const view2 = createStatusView({
     document: failing.document,
-    window: {},
+    window: new FakeWindow(),
     roamAlphaAPI: { data: { async: { q: async () => { throw new Error("boom"); } } }, ui: {} },
     portalRoot: failing.portalRoot,
     readGroups: () => ({ statuses: CATALOG, helpers }),
@@ -411,13 +493,10 @@ test("click opens the main window, shift-click the sidebar, inner page refs do n
   assert.deepEqual(ctx.calls.sidebar, [{ window: { type: "block", "block-uid": "w1" } }]);
   row.dispatch("click", { target: { closest: (selector) => (selector.includes(".rm-page-ref") ? {} : null) } });
   assert.equal(ctx.calls.open.length, 1);
-  const enter = row.dispatch("keydown", { key: "Enter", shiftKey: true });
-  assert.equal(enter.prevented, true);
-  assert.equal(ctx.calls.sidebar.length, 2);
   assert.equal(ctx.view.isOpen(), true);
 });
 
-test("Escape closes and restores focus; other keys stop at the view", async () => {
+test("key guard: Escape closes, Enter opens, outside keys pass, guard removed after close", async () => {
   const ctx = setup();
   const before = new FakeEl("div");
   before.setConnected(true);
@@ -425,13 +504,29 @@ test("Escape closes and restores focus; other keys stop at the view", async () =
   ctx.view.open();
   await tick();
   const root = ctx.portalRoot.children[0];
-  const other = root.dispatch("keydown", { key: "j" });
+  assert.equal(ctx.win.count(), 3);
+  const row = root.byClass("ts-status-view-row")[0];
+  const other = ctx.win.dispatch("keydown", row, { key: "j" });
   assert.equal(other.stopped, true);
+  assert.equal(other.immediate, true);
+  assert.equal(other.prevented, false);
+  const enter = ctx.win.dispatch("keydown", row, { key: "Enter" });
+  assert.equal(enter.prevented, true);
+  assert.deepEqual(ctx.calls.open, [{ block: { uid: "w1" } }]);
+  ctx.win.dispatch("keydown", row, { key: "Enter", shiftKey: true });
+  assert.deepEqual(ctx.calls.sidebar, [{ window: { type: "block", "block-uid": "w1" } }]);
+  const outside = ctx.win.dispatch("keydown", new FakeEl("div"), { key: "Escape" });
+  assert.equal(outside.stopped, false);
   assert.equal(ctx.view.isOpen(), true);
-  const escape = root.dispatch("keydown", { key: "Escape" });
+  const button = root.byClass("ts-status-view-button")[0];
+  const tab = ctx.win.dispatch("keydown", button, { key: "Enter" });
+  assert.equal(tab.prevented, false);
+  assert.equal(tab.stopped, true);
+  const escape = ctx.win.dispatch("keydown", row, { key: "Escape" });
   assert.equal(escape.stopped, true);
   assert.equal(ctx.view.isOpen(), false);
   assert.equal(before.focused, 1);
+  assert.equal(ctx.win.count(), 0);
 });
 
 test("dispose removes the element and unmounts rendered text; renderString is used when present", async () => {
@@ -474,4 +569,86 @@ test("extension wiring: palette command, listeners, chooser item and cleanup", (
   assert.match(source, /Watching now\\u2026/);
   assert.match(source, /statusView\?\.dispose\(\)/);
   assert.match(source, /onChange: \(\) =>/);
+});
+
+// --- docking ---------------------------------------------------------------
+
+test("docked: wrapper is the first child of the sidebar content", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const content = ctx.sidebarState.content;
+  assert.equal(ctx.portalRoot.children.length, 0);
+  const wrapper = content.children[0];
+  assert.equal(wrapper.hasClass("ts-status-portal"), true);
+  assert.equal(wrapper.hasClass("ts-status-view-dock"), true);
+  assert.equal(wrapper.getAttribute("data-task-status-portal"), "true");
+  assert.equal(wrapper.children[0].hasClass("ts-status-view--docked"), true);
+  await tick();
+  assert.deepEqual(groupNames(wrapper.children[0]), ["Watching", "Series"]);
+});
+
+test("falls back to the floating panel without the API or when the content never appears", async () => {
+  const none = setup();
+  await none.view.open();
+  assert.equal(none.portalRoot.children.length, 1);
+
+  const late = setup({ dock: true, contentAppears: false });
+  await late.view.open();
+  assert.equal(late.portalRoot.children.length, 1);
+  assert.equal(late.portalRoot.children[0].hasClass("ts-status-view--docked"), false);
+  assert.equal(late.calls.sidebarClose, 1);
+});
+
+test("observer re-prepends a removed wrapper and closes the view when the sidebar went away", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const observer = FakeObserver.instances[0];
+  const content = ctx.sidebarState.content;
+  const wrapper = content.children[0];
+  wrapper.remove();
+  observer.callback();
+  assert.equal(content.children[0], wrapper);
+  assert.equal(ctx.view.isOpen(), true);
+
+  content.remove();
+  observer.callback();
+  assert.equal(ctx.view.isOpen(), false);
+  assert.equal(observer.disconnected, true);
+  assert.equal(ctx.calls.sidebarClose, 0);
+});
+
+test("closing closes the sidebar only when the view opened it and no window is left", async () => {
+  const ours = setup({ dock: true });
+  await ours.view.open();
+  ours.view.close();
+  assert.equal(ours.calls.sidebarClose, 1);
+  assert.equal(FakeObserver.instances[0].disconnected, true);
+
+  const withWindow = setup({ dock: true, windows: [{}] });
+  await withWindow.view.open();
+  withWindow.view.close();
+  assert.equal(withWindow.calls.sidebarClose, 0);
+
+  const already = setup({ dock: true, sidebarOpen: true });
+  await already.view.open();
+  assert.equal(already.sidebarState.content.children[0].hasClass("ts-status-view-dock"), true);
+  already.view.close();
+  assert.equal(already.calls.sidebarClose, 0);
+});
+
+test("double open during the mount wait mounts once; close during the wait mounts nothing", async () => {
+  const ctx = setup({ dock: true, contentAppears: false, waitMs: 60 });
+  const first = ctx.view.open();
+  const second = ctx.view.open();
+  await Promise.all([first, second]);
+  assert.equal(ctx.portalRoot.children.length, 1);
+  assert.equal(ctx.win.count(), 3);
+
+  const aborted = setup({ dock: true, contentAppears: false, waitMs: 60 });
+  const pending = aborted.view.open();
+  aborted.view.close();
+  await pending;
+  assert.equal(aborted.portalRoot.children.length, 0);
+  assert.equal(aborted.view.isOpen(), false);
+  assert.equal(aborted.win.count(), 0);
 });

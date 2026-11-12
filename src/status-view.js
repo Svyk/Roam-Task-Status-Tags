@@ -115,6 +115,12 @@ export async function queryStatusTasks({ roamAlphaAPI, statuses, helpers }) {
   return rows;
 }
 
+const DOCK_WAIT_MS = 1000;
+const DOCK_STEP_MS = 25;
+const SIDEBAR_ID = "#right-sidebar";
+const SIDEBAR_CONTENT_ID = "#roam-right-sidebar-content";
+const KEY_EVENTS = ["keydown", "keypress", "keyup"];
+
 const INNER_LINK_SELECTOR = "a, .rm-page-ref, .rm-block-ref, [data-link-title]";
 
 export function createStatusView({
@@ -123,8 +129,8 @@ export function createStatusView({
   roamAlphaAPI,
   portalRoot,
   readGroups,
-  getFilter = null,
-  onFilterChange = null,
+  waitMs = DOCK_WAIT_MS,
+  MutationObserverCtor = windowLike?.MutationObserver ?? globalThis.MutationObserver,
   log = () => {},
 }) {
   let filter = "media";
@@ -141,9 +147,11 @@ export function createStatusView({
   let disposed = false;
   let returnFocusEl = null;
   let listeners = [];
-
-  const initialFilter = typeof getFilter === "function" ? getFilter() : null;
-  if (STATUS_VIEW_FILTERS.includes(initialFilter)) filter = initialFilter;
+  let dockEl = null;
+  let observer = null;
+  let openedSidebar = false;
+  let opening = false;
+  let openToken = 0;
 
   function make(tag, className, text) {
     const el = documentLike.createElement(tag);
@@ -220,11 +228,6 @@ export function createStatusView({
       if (event.target?.closest?.(INNER_LINK_SELECTOR)) return;
       openRow(row.uid, Boolean(event.shiftKey));
     });
-    listen(li, "keydown", (event) => {
-      if (event.key !== "Enter" || event.target !== li) return;
-      event.preventDefault?.();
-      openRow(row.uid, Boolean(event.shiftKey));
-    });
     return li;
   }
 
@@ -283,7 +286,6 @@ export function createStatusView({
     if (value === filter || !STATUS_VIEW_FILTERS.includes(value)) return;
     filter = value;
     syncRadios();
-    onFilterChange?.(value);
     renderContent();
   }
 
@@ -294,12 +296,23 @@ export function createStatusView({
     root.style.top = `${top}px`;
   }
 
-  function stopKey(event) {
-    event.stopPropagation?.();
-    if (event.type === "keydown" && event.key === "Escape") {
-      event.preventDefault?.();
-      close({ restoreFocus: true });
+  // Window-capture guard (same pattern as the episode menu): keys aimed at the
+  // view never reach Roam's shortcuts. Element listeners are not reached once
+  // the event is stopped here, so Escape and Enter are handled in the guard.
+  function keyGuard(event) {
+    const target = event.target;
+    if (!root || !target || !root.contains?.(target)) return;
+    if (event.type === "keydown") {
+      if (event.key === "Escape") {
+        event.preventDefault?.();
+        close({ restoreFocus: true });
+      } else if (event.key === "Enter" && String(target.className).split(/\s+/).includes("ts-status-view-row")) {
+        event.preventDefault?.();
+        openRow(target.getAttribute("data-ts-view-uid"), Boolean(event.shiftKey));
+      }
     }
+    event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
   }
 
   function build() {
@@ -335,14 +348,18 @@ export function createStatusView({
 
     scroller = make("div", "ts-status-view-scroll");
     root.append(header, group, scroller);
-    for (const type of ["keydown", "keyup", "keypress"]) listen(root, type, stopKey);
     renderContent();
   }
 
   function teardown() {
+    KEY_EVENTS.forEach((type) => windowLike?.removeEventListener?.(type, keyGuard, true));
+    observer?.disconnect?.();
+    observer = null;
     unmountRendered();
     for (const [el, type, handler] of listeners) el.removeEventListener(type, handler);
     listeners = [];
+    dockEl?.remove();
+    dockEl = null;
     root?.remove();
     root = null;
     scroller = null;
@@ -395,37 +412,138 @@ export function createStatusView({
     return runRefresh();
   }
 
-  function open() {
-    if (disposed || root) return;
-    returnFocusEl = documentLike.activeElement || null;
-    rows = null;
-    groups = null;
-    loadError = false;
+  function query(selector) {
+    return documentLike.querySelector?.(selector) ?? null;
+  }
+
+  function closeSidebarIfOurs() {
+    if (!openedSidebar) return;
+    openedSidebar = false;
+    const sidebar = roamAlphaAPI?.ui?.rightSidebar;
+    try {
+      const windows = sidebar?.getWindows?.();
+      if (Array.isArray(windows) && windows.length === 0) sidebar.close?.();
+    } catch (error) {
+      log("Watching now could not close the sidebar:", error);
+    }
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function waitForSidebarContent() {
+    let waited = 0;
+    for (;;) {
+      const content = query(SIDEBAR_CONTENT_ID);
+      if (content) return content;
+      if (waited >= waitMs) return null;
+      await wait(DOCK_STEP_MS);
+      waited += DOCK_STEP_MS;
+    }
+  }
+
+  function mount(container) {
     build();
-    (portalRoot || documentLike.body).appendChild(root);
-    placement();
+    if (container) {
+      root.className = `${root.className} ts-status-view--docked`;
+      dockEl = make("div", "ts-status-portal ts-status-view-dock");
+      dockEl.setAttribute("data-task-status-portal", "true");
+      dockEl.append(root);
+      container.prepend(dockEl);
+      const host = query(SIDEBAR_ID);
+      if (host && typeof MutationObserverCtor === "function") {
+        observer = new MutationObserverCtor(() => {
+          if (!root || !dockEl || dockEl.isConnected) return;
+          const content = query(SIDEBAR_CONTENT_ID);
+          if (content) content.prepend(dockEl);
+          else {
+            openedSidebar = false;
+            close();
+          }
+        });
+        observer.observe(host, { childList: true, subtree: true });
+      }
+    } else {
+      (portalRoot || documentLike.body).appendChild(root);
+      placement();
+    }
+    KEY_EVENTS.forEach((type) => windowLike?.addEventListener?.(type, keyGuard, true));
     void refresh();
   }
 
+  function resetData() {
+    rows = null;
+    groups = null;
+    loadError = false;
+  }
+
+  async function openDocked(token) {
+    const sidebar = roamAlphaAPI.ui.rightSidebar;
+    const wasOpen = Boolean(query(SIDEBAR_CONTENT_ID));
+    let content = null;
+    try {
+      const result = sidebar.open();
+      if (result && typeof result.then === "function") await result;
+      if (!wasOpen) openedSidebar = true;
+      content = await waitForSidebarContent();
+    } catch (error) {
+      log("Watching now could not open the sidebar:", error);
+    }
+    if (disposed || token !== openToken) {
+      closeSidebarIfOurs();
+      return;
+    }
+    opening = false;
+    mount(content);
+    if (!content) closeSidebarIfOurs();
+  }
+
+  function open() {
+    if (disposed || root || opening) return Promise.resolve();
+    returnFocusEl = documentLike.activeElement || null;
+    resetData();
+    const sidebar = roamAlphaAPI?.ui?.rightSidebar;
+    if (typeof sidebar?.open === "function" && query(SIDEBAR_ID)) {
+      opening = true;
+      const token = ++openToken;
+      return openDocked(token).finally(() => {
+        if (token === openToken) opening = false;
+      });
+    }
+    mount(null);
+    return Promise.resolve();
+  }
+
   function close({ restoreFocus = false } = {}) {
+    if (opening) {
+      opening = false;
+      openToken += 1;
+      return;
+    }
     if (!root) return;
     const target = returnFocusEl;
     returnFocusEl = null;
     teardown();
+    closeSidebarIfOurs();
     if (restoreFocus && target?.isConnected && typeof target.focus === "function") {
       target.focus({ preventScroll: true });
     }
   }
 
   function toggle() {
-    if (root) close({ restoreFocus: true });
-    else open();
+    if (root || opening) close({ restoreFocus: true });
+    else void open();
   }
 
   function dispose() {
     disposed = true;
+    openToken += 1;
+    opening = false;
     returnFocusEl = null;
+    const had = Boolean(root);
     teardown();
+    if (had) closeSidebarIfOurs();
   }
 
   return { open, close, toggle, refresh, isOpen, dispose };

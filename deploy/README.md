@@ -206,12 +206,13 @@ A task whose status is **Series**, **Watching** or **Rewatch** (open or done) sh
 A read-only panel that lists open tasks grouped by status.
 
 - Open it with the command palette entry `Task Status: Watching now` (toggles it), or the chooser item `Watching now…` under Remove status.
-- Filter **Media** (default), **Tasks** or **All**, kept for the session. Media order: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped. Tasks order: Alert, the other task statuses in your order, Cancelled. Empty groups are hidden; the most recently edited task comes first.
-- Each row shows the status icon, the task text, and the episode (`S2E5`) when the task has an `Episode::` block.
-- Click or Enter opens the task in the main window; Shift+click or Shift+Enter opens it in the right sidebar. Links inside the text still work as in Roam. The panel stays open. Escape closes it.
+- It sits at the top of Roam's right sidebar, opening the sidebar if needed. Closing the sidebar closes the view; if the view opened the sidebar and no other window is there, closing the view closes the sidebar again. If the sidebar cannot be used it floats at the right edge.
+- Filter **Media** (default), **Tasks** or **All**, kept for the session. Order is by status name: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped last; Alert first and Cancelled last among task statuses. Empty groups are hidden; the most recently edited task comes first.
+- Each row shows the status icon, the task text, and the episode (`S2E5`) when the task has an `Episode::` block. An unreadable or duplicate `Episode::` shows `?`.
+- Rows act like a block ref (not a native `((ref))`, so no hover preview): click opens the task, Shift+click or Shift+Enter opens it in the sidebar below the panel. Links inside the text work as in Roam. Escape closes the view, and Roam's shortcuts do not fire while it has focus.
 - It never writes to the graph and does not list DONE tasks.
-- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand show after **Refresh** or reopening.
-- It is a custom panel, not a query page, so nothing is added to your graph and the order, episode and filter are not tied to a query block.
+- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand, or completing a task in Roam, show after **Refresh** or reopening (no polling).
+- A panel docked in the right sidebar, not a query page: nothing is added to your graph, and the order, episode and filter are not tied to a query block.
 
 ## Settings
 

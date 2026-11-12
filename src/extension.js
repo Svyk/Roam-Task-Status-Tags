@@ -2189,7 +2189,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       className: "ts-status-choice-view",
       onChoose: () => {
         closeStatusChooser();
-        statusView?.open();
+        void statusView?.open();
       },
     });
   }
