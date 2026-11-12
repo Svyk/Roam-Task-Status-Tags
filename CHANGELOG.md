@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0 — 2026-11-11
+
+- Picking **Waiting** or **In Review** in the status chooser on an open Better Tasks task now asks when to check back: **Tomorrow**, **In 3 days**, **Next week**, a date field, or **Skip**.
+- The date is written as the task's Better Tasks due date through Better Tasks' own `bt_modify`: the existing due block changes in place (same uid), in your Better Tasks date format, with its own activity-log line. One call; the due block is read again to confirm.
+- An existing due date is shown first as **Keep due <date>**; any other choice replaces it. A repeating task says that a date moves the series' due date.
+- No prompt when the due date sits under a Better Tasks alias name (Better Tasks would add a second due block), and nothing is written if the task was completed before a date was picked.
+- Skip, Keep, Escape, or a click outside write nothing more. Roam's shortcuts do not fire while the prompt has focus.
+- No prompt without Better Tasks, for a DONE task, a plain block, several selected blocks, or a slash command or palette command.
+- New setting `Ask for a follow-up date on Waiting / In Review` (on by default).
+
 ## 0.11.0 — 2026-11-11
 
 - A new occurrence of a repeating Better Tasks task now starts with no status. Better Tasks copies the old text, so the previous `task-status/<Name>` tag used to come along.

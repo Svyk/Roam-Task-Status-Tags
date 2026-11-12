@@ -2,6 +2,12 @@ import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
+  createFollowUpPrompt,
+  isFollowUpStatusKey,
+  readFollowUpState,
+  writeFollowUpDate,
+} from "./follow-up-date.js";
+import {
   DEFAULT_CARRY_OVER_STATUS_NAMES,
   createRepeatStatusReset,
   formatCarryOverSetting,
@@ -520,6 +526,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
     repeatCarryOver: "task-status-repeat-carry-over",
+    followUpPrompt: "task-status-follow-up-prompt",
   };
 
   const STATUS_LABEL_DISPLAY = Object.freeze({
@@ -593,6 +600,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
+  let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -1326,6 +1334,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let statusChooserEl = null;
   let statusChooserTeardown = null;
   let statusChooserReturnFocusEl = null;
+  let statusChooserAnchorEl = null;
+  let followUpPrompt = null;
   let statusPeekController = null;
 
   function log(...args) {
@@ -1515,6 +1525,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
     refreshStatusVisuals(document);
+  }
+
+  function setFollowUpPromptEnabled(nextValue) {
+    followUpPromptEnabled = normalizeBooleanSetting(nextValue, followUpPromptEnabled);
   }
 
   function setRepeatCarryOver(value) {
@@ -1994,6 +2008,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function closeStatusChooser({ restoreFocus = false } = {}) {
     const hadChooser = Boolean(statusChooserEl || statusChooserTeardown);
     const returnFocusEl = statusChooserReturnFocusEl;
+    const openPrompt = followUpPrompt;
+    followUpPrompt = null;
+    if (openPrompt && !openPrompt.decided) {
+      try {
+        openPrompt.cancel();
+      } catch (_) {}
+    }
     if (statusChooserTeardown) {
       try {
         statusChooserTeardown();
@@ -2008,6 +2029,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     statusChooserEl = null;
     statusChooserReturnFocusEl = null;
+    statusChooserAnchorEl = null;
     if (hadChooser) statusPeekController?.chooserClosed?.();
 
     if (restoreFocus && returnFocusEl?.isConnected) {
@@ -2130,6 +2152,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       label: status?.label || statusKey,
       ariaCurrent: statusKey === currentStatusKey,
       onChoose: () => {
+        if (wantsFollowUpPrompt(statusKey, targetUids)) {
+          void chooseStatusWithFollowUp(targetUids[0], statusKey).catch((err) => {
+            log("Status chooser follow-up error:", err);
+            closeStatusChooser();
+          });
+          return;
+        }
         void setStatusForBlockUids(targetUids, statusKey)
           .catch((err) => log("Status chooser set error:", err))
           .finally(closeStatusChooser);
@@ -2139,6 +2168,125 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (choice) choice.setAttribute("data-task-status-choice", statusKey);
 
     return item;
+  }
+
+  function findBlockGutterAnchor(blockUid) {
+    if (!/^[A-Za-z0-9_-]+$/.test(String(blockUid || ""))) return null;
+    const blockEl = document.querySelector(
+      `[id^="block-input-"][id$="-${blockUid}"], .roam-block[data-uid="${blockUid}"]`
+    );
+    return blockEl ? resolveBlockGutterAnchor(blockEl) : null;
+  }
+
+  function wantsFollowUpPrompt(statusKey, targetUids) {
+    return (
+      followUpPromptEnabled &&
+      isFollowUpStatusKey(statusKey) &&
+      Array.isArray(targetUids) &&
+      targetUids.length === 1
+    );
+  }
+
+  // Waiting / In Review on one Better Tasks task: set the status, then turn
+  // the open chooser into "when to check back?". Nothing else is written
+  // unless a date is picked; Escape, Skip, Keep or a click outside write nothing.
+  async function chooseStatusWithFollowUp(blockUid, statusKey) {
+    const chooser = statusChooserEl;
+    const isCurrent = () => chooser && statusChooserEl === chooser && chooser.isConnected;
+    const outcome = await setBlockStatus(blockUid, statusKey);
+    if (!isCurrent()) return;
+    // Picking Waiting again on a task that is already Waiting still asks.
+    const statusInPlace =
+      outcome?.status === "updated" ||
+      (outcome?.status === "unchanged" && outcome?.reason === "already-current");
+    if (!statusInPlace) {
+      closeStatusChooser();
+      return;
+    }
+    const state = await readFollowUpState({ windowLike: window, uid: blockUid });
+    if (!isCurrent()) return;
+    if (!state.eligible) {
+      closeStatusChooser();
+      return;
+    }
+
+    let writingDate = false;
+    const prompt = createFollowUpPrompt({
+      document,
+      statusLabel: STATUSES[statusKey]?.label || "",
+      existingDue: state.existingDue,
+      repeats: state.repeats,
+      today: new Date(),
+      onDecision: (decision) => {
+        // A prompt closed with its chooser (click outside, scroll) is no longer
+        // live: it decides nothing and writes nothing.
+        const live = followUpPrompt === prompt && statusChooserEl === chooser;
+        if (followUpPrompt === prompt) followUpPrompt = null;
+        if (!live) return;
+        if (decision.action !== "set") {
+          closeStatusChooser({ restoreFocus: true });
+          return;
+        }
+        chooser.setAttribute("aria-busy", "true");
+        writingDate = true;
+        void writeFollowUpDate({ windowLike: window, uid: blockUid, date: decision.date })
+          .then((written) => {
+            if (!["updated", "unchanged"].includes(written?.status)) {
+              console.warn("[TaskStatus] Follow-up date not written", {
+                uid: blockUid,
+                reason: written?.reason || "unknown",
+              });
+            }
+          })
+          .catch((err) => log("Follow-up date error:", err))
+          .finally(() => {
+            if (statusChooserEl === chooser) closeStatusChooser({ restoreFocus: true });
+          });
+      },
+    });
+
+    const content = chooser.querySelector(".bp3-popover-content");
+    if (!content) {
+      closeStatusChooser();
+      return;
+    }
+    content.replaceChildren(prompt.element);
+    chooser.classList.add("ts-follow-up-chooser");
+    followUpPrompt = prompt;
+    const keyGuard = (event) => {
+      if (followUpPrompt !== prompt && !(writingDate && statusChooserEl === chooser)) return;
+      // Keys aimed at the prompt, or at nothing (focus fell to the page while
+      // the list was swapped or chrome was clicked), belong to the prompt.
+      const target = event.target;
+      const unfocused =
+        !target || target === document || target === document.body || target === document.documentElement;
+      if (!unfocused && !chooser.contains(target)) return;
+      prompt.handleKey(event);
+      // Roam's own shortcuts never see keys typed into the prompt; native
+      // typing in the date field still happens (no preventDefault here).
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    };
+    const keyEvents = ["keydown", "keypress", "keyup"];
+    keyEvents.forEach((type) => window.addEventListener(type, keyGuard, true));
+    const previousTeardown = statusChooserTeardown;
+    statusChooserTeardown = () => {
+      keyEvents.forEach((type) => window.removeEventListener(type, keyGuard, true));
+      previousTeardown?.();
+    };
+    // Roam re-renders the block after the status write; find it again if the
+    // original anchor went away, otherwise keep the chooser where it is.
+    const anchor = statusChooserAnchorEl?.isConnected
+      ? statusChooserAnchorEl
+      : findBlockGutterAnchor(blockUid);
+    if (anchor) {
+      statusChooserAnchorEl = anchor;
+      positionStatusChooser(chooser, anchor);
+    }
+    // Positioning hides the chooser until its next frame; focus after that.
+    window.requestAnimationFrame(() => {
+      if (followUpPrompt === prompt) prompt.focusFirst();
+    });
   }
 
   async function openStatusChooser({
@@ -2214,10 +2362,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     (portalRoot || document.body).appendChild(chooser);
     statusChooserEl = chooser;
     statusChooserReturnFocusEl = returnFocusEl || anchorEl || null;
-    positionStatusChooser(
-      chooser,
-      placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl
-    );
+    statusChooserAnchorEl =
+      placementAnchorEl || resolveBlockGutterAnchor(anchorEl) || anchorEl;
+    positionStatusChooser(chooser, statusChooserAnchorEl);
     chooser.querySelector(".ts-status-choice[aria-current='true']")?.focus?.({
       preventScroll: true,
     });
@@ -3498,6 +3645,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           action: {
             type: "switch",
             onChange: (value) => setAlertBeaconEnabled(value),
+          },
+        },
+        {
+          id: SETTINGS_KEYS.followUpPrompt,
+          name: "Ask for a follow-up date on Waiting / In Review",
+          description:
+            "When the status chooser sets Waiting or In Review on one open Better Tasks task, it asks when to check back: Tomorrow, In 3 days, Next week, a date, or Skip. The date is written as the task's Better Tasks due date, through Better Tasks, in place. An existing due date is shown and can be kept. Needs Better Tasks; Escape cancels without writing.",
+          action: {
+            type: "switch",
+            onChange: (value) => setFollowUpPromptEnabled(value),
           },
         },
         {

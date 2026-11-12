@@ -1716,3 +1716,119 @@ body.bp5-dark .ts-status-color-swatch-dot {
 .ts-status-color-commit-button {
   width: 30px;
 }
+
+/* Waiting / In Review follow-up prompt (replaces the chooser's status list). */
+.ts-status-chooser .ts-follow-up {
+  min-width: 168px;
+}
+
+.ts-status-chooser .ts-follow-up-item {
+  gap: 10px;
+}
+
+.ts-status-chooser .ts-follow-up-hint {
+  margin-left: auto;
+  color: var(--ts-menu-muted) !important;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.ts-status-chooser .ts-follow-up-keep {
+  font-weight: 600;
+}
+
+.ts-status-chooser .ts-follow-up-date-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 3px 0 0;
+  padding: 3px 4px;
+}
+
+.ts-status-chooser .ts-follow-up-date {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--ts-menu-border) !important;
+  border-radius: var(--svy-tag-radius, 5px);
+  background: transparent !important;
+  color: var(--ts-menu-text) !important;
+  box-shadow: none !important;
+  color-scheme: light;
+  font: inherit;
+  font-size: 12px;
+}
+
+:root.bp3-dark .ts-status-chooser .ts-follow-up-date,
+body.bt-theme-dark .ts-status-chooser .ts-follow-up-date,
+.rm-dark-theme .ts-status-chooser .ts-follow-up-date,
+body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.bp3-light) .ts-status-chooser .ts-follow-up-date {
+    color-scheme: dark;
+  }
+}
+
+.ts-status-chooser .ts-follow-up-date:focus-visible,
+.ts-status-chooser .ts-follow-up-set:focus-visible {
+  outline: 2px solid var(--ts-menu-accent);
+  outline-offset: -1px;
+}
+
+.ts-status-chooser .ts-follow-up-date[aria-invalid="true"] {
+  border-color: var(--ts-menu-danger) !important;
+}
+
+.ts-status-chooser .ts-follow-up-set {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ts-menu-border) !important;
+  border-radius: var(--svy-tag-radius, 5px);
+  background: transparent !important;
+  color: var(--ts-menu-text) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.ts-status-chooser .ts-follow-up-set:hover {
+  background: var(--ts-menu-hover) !important;
+}
+
+.ts-status-chooser .ts-follow-up-note {
+  max-width: 190px;
+  margin: 0 4px 4px;
+  padding: 0 4px;
+  color: var(--ts-menu-muted) !important;
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
+.ts-status-chooser .ts-follow-up-skip {
+  margin-top: 3px;
+  border-top: 1px solid var(--ts-menu-border-subtle);
+  border-radius: 0 0 var(--svy-tag-radius, 5px) var(--svy-tag-radius, 5px);
+  color: var(--ts-menu-muted) !important;
+}
+
+.ts-status-chooser[aria-busy="true"] .ts-follow-up {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@media (forced-colors: active) {
+  .ts-status-chooser .ts-follow-up-date,
+  .ts-status-chooser .ts-follow-up-set {
+    border-color: CanvasText !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+    forced-color-adjust: auto;
+  }
+}

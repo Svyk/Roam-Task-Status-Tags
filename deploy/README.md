@@ -174,6 +174,21 @@ When Better Tasks creates the next occurrence of a repeating task, the new task 
 - Requires Better Tasks v2; without it nothing is written.
 - Only a block born with the tag that also carries Better Tasks' series props is touched. A task you type yourself keeps its status.
 
+## Follow-up date for Waiting and In Review
+
+Pick **Waiting** or **In Review** in the status chooser on an open Better Tasks task, and the chooser asks when to check back.
+
+- Choices: **Tomorrow**, **In 3 days**, **Next week**, a date field with **Set**, and **Skip**.
+- The date becomes the task's Better Tasks due date (`BT_attrDue`, or whatever due attribute you set in Better Tasks). It is written through Better Tasks' own `bt_modify`, which changes the existing due block in place (same uid), uses your Better Tasks date format, and logs the change in its activity log.
+- If the task already has a due date, the first choice is **Keep due <date>**. Any other choice replaces it.
+- A repeating task says so in the prompt: a new date moves the series' due date.
+- Picking Waiting on a task that is already Waiting still asks.
+- A due date stored under one of Better Tasks' due aliases gets no prompt: Better Tasks would add a second due block instead of changing it.
+- **Skip**, **Keep**, Escape, or a click outside write nothing more. The status is already set.
+- Arrow keys move, Enter picks, Escape cancels. Roam's shortcuts do not fire while the prompt has focus.
+- Only from the chooser, only for one task at a time, and only when Better Tasks is present. A DONE task, a plain block, or several selected blocks get no prompt.
+- Turn it off with the setting `Ask for a follow-up date on Waiting / In Review`.
+
 ## Settings
 
 Open `Settings -> Extensions -> Task Status Tags`.
@@ -191,6 +206,7 @@ Statuses:
 - `Reset colors` returns all statuses to their built-in defaults.
 - `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
 - `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
+- `Ask for a follow-up date on Waiting / In Review` (on by default) turns the follow-up date prompt on or off.
 - `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Hotkeys note:
