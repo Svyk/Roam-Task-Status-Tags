@@ -189,6 +189,18 @@ Pick **Waiting** or **In Review** in the status chooser on an open Better Tasks 
 - Only from the chooser, only for one task at a time, and only when Better Tasks is present. A DONE task, a plain block, or several selected blocks get no prompt.
 - Turn it off with the setting `Ask for a follow-up date on Waiting / In Review`.
 
+## Episode counter for Series, Watching and Rewatch
+
+A task whose status is **Series**, **Watching** or **Rewatch** (open or done) shows a small counter such as `S2E5` right after its status.
+
+- Click, Enter or Space: next episode. The first click on a task that has no counter creates `S1E1`.
+- Alt-click, right-click, Shift+F10 or the ContextMenu key: a menu with **Next episode**, **New season** (season + 1, episode 1), and season and episode fields with **Set**. Escape or a click outside writes nothing.
+- Before first use the counter is a faint `+ep` that appears when you hover the row (faintly visible all the time on touch screens). It keeps its width, so nothing shifts.
+- The value is a plain child block of the task: `Episode:: S2E5`, created only the first time you use the counter. Edit it by hand and the counter follows. A value that is not `S<number>E<number>` shows `?` and is never overwritten.
+- Better Tasks has no API for custom attributes, so this one block is written directly: created, or changed in place (same uid). Better Tasks attributes and the task text are never touched.
+- Each change adds one line to the task's existing Better Tasks activity log (`episode → S2E6`). It never creates a log and never repeats a line.
+- Fast double clicks count twice. A write that cannot be confirmed puts the counter back to what the graph says.
+
 ## Settings
 
 Open `Settings -> Extensions -> Task Status Tags`.

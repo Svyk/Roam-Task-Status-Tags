@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.12.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.13.0 | generated; edit src/ */
 
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
@@ -64,11 +64,17 @@ function renderStatusActivityLine({ to, ts }) {
   const label = to ? `${ACTIVITY_FIELD} → ${to}` : `${ACTIVITY_FIELD} removed`;
   return `${formatActivityTimestamp(ts)} — ${label}`;
 }
-function buildStatusActivityProps({ from, to, ts }) {
-  const bt = { kind: "event", event: "attr_change", ts, field: ACTIVITY_FIELD, source: ACTIVITY_SOURCE };
+function buildAttributeActivityProps({ field: field2, from, to, ts }) {
+  const bt = { kind: "event", event: "attr_change", ts, field: field2, source: ACTIVITY_SOURCE };
   if (from) bt.from = from;
   if (to) bt.to = to;
   return { bt };
+}
+function buildStatusActivityProps({ from, to, ts }) {
+  return buildAttributeActivityProps({ field: ACTIVITY_FIELD, from, to, ts });
+}
+function renderAttributeActivityLine({ field: field2, to, ts }) {
+  return `${formatActivityTimestamp(ts)} — ${field2} → ${to}`;
 }
 function result(recorded, fields = {}) {
   return { recorded, ...fields };
@@ -90,6 +96,35 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
     if (valueAt(block, ":block/uid", null) !== uid) return null;
     return orderedChildren(block);
   }
+  async function appendLine(uid, roam, buildLine) {
+    let containerUid;
+    let siblings;
+    try {
+      const taskChildren = await pullChildren(roam, uid);
+      if (!taskChildren) return result(false, { reason: "block-not-found" });
+      const container = taskChildren.find((child) => isActivityLogContainerString(child.string));
+      if (!container) return result(false, { reason: "no-activity-log" });
+      containerUid = container.uid;
+      siblings = await pullChildren(roam, containerUid) || [];
+    } catch (error) {
+      return result(false, { reason: "activity-read-failed", error });
+    }
+    const { text, props } = buildLine(now());
+    const last = siblings[siblings.length - 1];
+    if (last && last.string === text) {
+      return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
+    }
+    const entryUid = roam.generateUID();
+    try {
+      await roam.create({
+        location: { "parent-uid": containerUid, order: "last" },
+        block: { uid: entryUid, string: text, props }
+      });
+    } catch (error) {
+      return result(false, { reason: "activity-write-failed", error, containerUid });
+    }
+    return result(true, { reason: "recorded", containerUid, entryUid, text });
+  }
   return Object.freeze({
     async record({ uid, previousString, nextString, statusTagTitle }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
@@ -98,34 +133,23 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
       const from = statusLabelFromTaskText(previousString);
       const to = statusTagTitle == null ? statusLabelFromTaskText(nextString) : statusLabelFromTagTitle(statusTagTitle);
       if ((from || null) === (to || null)) return result(false, { reason: "status-unchanged" });
-      let containerUid;
-      let siblings;
-      try {
-        const taskChildren = await pullChildren(roam, uid);
-        if (!taskChildren) return result(false, { reason: "block-not-found" });
-        const container = taskChildren.find((child) => isActivityLogContainerString(child.string));
-        if (!container) return result(false, { reason: "no-activity-log" });
-        containerUid = container.uid;
-        siblings = await pullChildren(roam, containerUid) || [];
-      } catch (error) {
-        return result(false, { reason: "activity-read-failed", error });
+      return appendLine(uid, roam, (ts) => ({
+        text: renderStatusActivityLine({ to, ts }),
+        props: buildStatusActivityProps({ from, to, ts })
+      }));
+    },
+    async recordAttributeChange({ uid, field: field2, from, to }) {
+      if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
+      if (typeof field2 !== "string" || !field2.trim() || typeof to !== "string" || !to) {
+        return result(false, { reason: "invalid-change" });
       }
-      const ts = now();
-      const text = renderStatusActivityLine({ to, ts });
-      const last = siblings[siblings.length - 1];
-      if (last && last.string === text) {
-        return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
-      }
-      const entryUid = roam.generateUID();
-      try {
-        await roam.create({
-          location: { "parent-uid": containerUid, order: "last" },
-          block: { uid: entryUid, string: text, props: buildStatusActivityProps({ from, to, ts }) }
-        });
-      } catch (error) {
-        return result(false, { reason: "activity-write-failed", error, containerUid });
-      }
-      return result(true, { reason: "recorded", containerUid, entryUid, text });
+      const roam = resolveRoamSurface(roamAlphaAPI);
+      if (!roam) return result(false, { reason: "roam-api-unavailable" });
+      if ((from || null) === to) return result(false, { reason: "attribute-unchanged" });
+      return appendLine(uid, roam, (ts) => ({
+        text: renderAttributeActivityLine({ field: field2, to, ts }),
+        props: buildAttributeActivityProps({ field: field2, from, to, ts })
+      }));
     }
   });
 }
@@ -344,6 +368,555 @@ function createLifecycle() {
   };
 }
 
+// src/episode-counter.js
+var EPISODE_ATTRIBUTE = "Episode";
+var EPISODE_GLYPHS = Object.freeze(["series", "watching", "rewatch"]);
+var EPISODE_COUNTER_CLASS = "ts-episode-counter";
+var EPISODE_UID_ATTRIBUTE = "data-ts-episode-uid";
+var EPISODE_MAX = 9999;
+var EPISODE_VALUE_RE = /^\s*S(\d+)E(\d+)\s*$/i;
+var EPISODE_CHILD_RE = /^\s*Episode::\s*(.*)$/i;
+var CHILDREN_PULL_PATTERN = "[:block/uid :block/string {:block/children [:block/uid :block/string :block/order]}]";
+function validPart(value) {
+  return Number.isInteger(value) && value >= 1 && value <= EPISODE_MAX;
+}
+function isValidEpisode(value) {
+  return Boolean(value) && validPart(value.season) && validPart(value.episode);
+}
+function parseEpisode(text) {
+  const match = typeof text === "string" ? text.match(EPISODE_VALUE_RE) : null;
+  if (!match) return null;
+  const parsed = { season: Number(match[1]), episode: Number(match[2]) };
+  return isValidEpisode(parsed) ? parsed : null;
+}
+function formatEpisode({ season, episode }) {
+  return `S${season}E${episode}`;
+}
+function nextEpisode({ season, episode }) {
+  return { season, episode: episode + 1 };
+}
+function newSeason({ season }) {
+  return { season: season + 1, episode: 1 };
+}
+function sameEpisode(a, b) {
+  return Boolean(a) && Boolean(b) && a.season === b.season && a.episode === b.episode;
+}
+function valueAt2(value, key, fallback = null) {
+  if (!value || typeof value !== "object") return fallback;
+  const plain = key.replace(/^:/, "");
+  return value[key] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
+}
+function orderedChildren2(block) {
+  const children = valueAt2(block, ":block/children", []);
+  if (!Array.isArray(children)) return [];
+  return children.map((child) => ({
+    uid: valueAt2(child, ":block/uid", null),
+    string: valueAt2(child, ":block/string", null),
+    order: Number(valueAt2(child, ":block/order", 0)) || 0
+  })).filter((child) => typeof child.uid === "string" && typeof child.string === "string").sort((a, b) => a.order - b.order);
+}
+function stateFromBlock(block, uid) {
+  if (valueAt2(block, ":block/uid", null) !== uid) return { found: false };
+  const child = orderedChildren2(block).find((entry) => EPISODE_CHILD_RE.test(entry.string));
+  if (!child) return { found: true, episode: null, childUid: null, childString: null, invalid: false };
+  const episode = parseEpisode(child.string.match(EPISODE_CHILD_RE)[1]);
+  return {
+    found: true,
+    episode,
+    childUid: child.uid,
+    childString: child.string,
+    invalid: !episode
+  };
+}
+async function readEpisodeState({ roamAlphaAPI, uid }) {
+  const pull = roamAlphaAPI?.data?.async?.pull;
+  if (typeof pull !== "function") throw new Error("roamAlphaAPI.data.async.pull is unavailable");
+  const block = await pull.call(roamAlphaAPI.data.async, CHILDREN_PULL_PATTERN, [":block/uid", uid]);
+  return stateFromBlock(block, uid);
+}
+function readEpisodeStateSync({ roamAlphaAPI, uid }) {
+  try {
+    const block = roamAlphaAPI.data.pull(CHILDREN_PULL_PATTERN, [":block/uid", uid]);
+    return stateFromBlock(block, uid);
+  } catch (_) {
+    return { found: false };
+  }
+}
+var writeQueues = /* @__PURE__ */ new Map();
+function enqueue(uid, task) {
+  const previous = writeQueues.get(uid) || Promise.resolve();
+  const run = previous.then(task, task);
+  const tail = run.then(() => {
+  }, () => {
+  });
+  writeQueues.set(uid, tail);
+  tail.then(() => {
+    if (writeQueues.get(uid) === tail) writeQueues.delete(uid);
+  });
+  return run;
+}
+async function writeEpisodeNow({ roamAlphaAPI, uid, compute, activityRecorder }) {
+  let before;
+  try {
+    before = await readEpisodeState({ roamAlphaAPI, uid });
+  } catch (error) {
+    return { status: "unknown", reason: "read-failed", error };
+  }
+  if (!before.found) return { status: "rejected", reason: "block-not-found" };
+  if (before.invalid) return { status: "rejected", reason: "invalid-existing-value" };
+  const next = compute(before.episode);
+  if (!isValidEpisode(next)) return { status: "rejected", reason: "invalid-episode-value" };
+  if (before.episode && sameEpisode(before.episode, next)) {
+    return { status: "unchanged", reason: "same-value", value: formatEpisode(next), childUid: before.childUid };
+  }
+  const string = `${EPISODE_ATTRIBUTE}:: ${formatEpisode(next)}`;
+  try {
+    if (before.childUid) {
+      await roamAlphaAPI.data.block.update({ block: { uid: before.childUid, string } });
+    } else {
+      const childUid = roamAlphaAPI.util.generateUID();
+      await roamAlphaAPI.data.block.create({
+        location: { "parent-uid": uid, order: "last" },
+        block: { uid: childUid, string }
+      });
+    }
+  } catch (error) {
+    return { status: "unknown", reason: "write-failed", error };
+  }
+  let after;
+  try {
+    after = await readEpisodeState({ roamAlphaAPI, uid });
+  } catch (error) {
+    return { status: "unknown", reason: "certify-read-failed", error };
+  }
+  if (!after.found || after.childString !== string || before.childUid && after.childUid !== before.childUid) {
+    return { status: "unknown", reason: "not-confirmed", value: formatEpisode(next), childUid: after.childUid };
+  }
+  const value = formatEpisode(next);
+  if (typeof activityRecorder?.recordAttributeChange === "function") {
+    try {
+      await activityRecorder.recordAttributeChange({
+        uid,
+        field: "episode",
+        from: before.episode ? formatEpisode(before.episode) : void 0,
+        to: value
+      });
+    } catch (_) {
+    }
+  }
+  return { status: "updated", value, childUid: after.childUid };
+}
+function writeEpisode(options) {
+  if (typeof options?.uid !== "string" || !options.uid) {
+    return Promise.resolve({ status: "rejected", reason: "invalid-uid" });
+  }
+  if (typeof options.compute !== "function") {
+    return Promise.resolve({ status: "rejected", reason: "invalid-compute" });
+  }
+  return enqueue(options.uid, () => writeEpisodeNow(options));
+}
+function computeFromDecision(decision) {
+  switch (decision?.action) {
+    case "next":
+    case "start":
+      return (current) => current ? nextEpisode(current) : { season: 1, episode: 1 };
+    case "season":
+      return (current) => current ? newSeason(current) : { season: 1, episode: 1 };
+    case "set":
+      return () => ({ season: decision.season, episode: decision.episode });
+    default:
+      return null;
+  }
+}
+var PLACEHOLDER = "+ep";
+function setAttr(el, name, value) {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+}
+function elementsIncludingRoot(root, selector) {
+  const nodes = [];
+  if (root?.matches?.(selector)) nodes.push(root);
+  if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
+  return nodes;
+}
+function stopEvent(event) {
+  event.preventDefault?.();
+  event.stopPropagation?.();
+  event.stopImmediatePropagation?.();
+}
+function createEpisodeCounterController({
+  document: documentLike,
+  roamAlphaAPI,
+  activityRecorder = null,
+  onOpenMenu = () => {
+  },
+  getBlockUid = () => null,
+  warn = (...args) => console.warn(...args)
+}) {
+  const inFlight = /* @__PURE__ */ new Map();
+  const warned = /* @__PURE__ */ new Set();
+  const isCounter = (node) => Boolean(node?.getAttribute?.(EPISODE_UID_ATTRIBUTE) != null) && String(node.className || "").split(/\s+/).includes(EPISODE_COUNTER_CLASS);
+  function warnOnce(uid, reason, detail) {
+    const key = `${uid}:${reason}`;
+    if (warned.has(key)) return;
+    warned.add(key);
+    warn("[TaskStatus] Episode counter not written", { uid, reason, ...detail });
+  }
+  function render(counter, state) {
+    let text;
+    let kind;
+    if (state.invalid) {
+      kind = "invalid";
+      text = "?";
+      counter._episode = null;
+    } else if (state.episode) {
+      kind = "set";
+      text = formatEpisode(state.episode);
+      counter._episode = state.episode;
+    } else {
+      kind = "empty";
+      text = PLACEHOLDER;
+      counter._episode = null;
+    }
+    counter._episodeKind = kind;
+    if (counter.textContent !== text) counter.textContent = text;
+    setAttr(counter, "data-ts-episode-state", kind);
+    if (kind === "set") {
+      const label = `Episode ${text}. Click for next episode. Alt-click or right-click for more.`;
+      setAttr(counter, "aria-label", label);
+      setAttr(counter, "title", label);
+    } else if (kind === "invalid") {
+      const label = "Episode value not recognised. Edit the Episode:: block.";
+      setAttr(counter, "aria-label", label);
+      setAttr(counter, "title", label);
+    } else {
+      setAttr(counter, "aria-label", "Start episode counter");
+      setAttr(counter, "title", "Start episode counter");
+    }
+  }
+  function countersFor(uid) {
+    return Array.from(documentLike.querySelectorAll(`.${EPISODE_COUNTER_CLASS}`)).filter(
+      (counter) => counter.getAttribute(EPISODE_UID_ATTRIBUTE) === uid
+    );
+  }
+  async function apply(counter, uid, compute) {
+    if (counter._episodeKind !== "invalid") {
+      const optimistic = compute(counter._episode || null);
+      if (isValidEpisode(optimistic)) render(counter, { episode: optimistic });
+    }
+    inFlight.set(uid, (inFlight.get(uid) || 0) + 1);
+    let result4;
+    try {
+      result4 = await writeEpisode({ roamAlphaAPI, uid, compute, activityRecorder });
+    } catch (error) {
+      result4 = { status: "unknown", reason: "write-threw", error };
+    }
+    const remaining = (inFlight.get(uid) || 1) - 1;
+    if (remaining > 0) inFlight.set(uid, remaining);
+    else inFlight.delete(uid);
+    if (remaining > 0) return result4;
+    if (result4.status === "updated" || result4.status === "unchanged") {
+      const settled = parseEpisode(result4.value);
+      if (settled) countersFor(uid).forEach((el) => render(el, { episode: settled }));
+    } else {
+      warnOnce(uid, result4.reason || "unknown", { status: result4.status });
+      resyncUid(uid);
+    }
+    return result4;
+  }
+  function resyncUid(uid) {
+    if (inFlight.get(uid)) return;
+    const state = readEpisodeStateSync({ roamAlphaAPI, uid });
+    if (!state.found) return;
+    countersFor(uid).forEach((counter) => render(counter, state));
+  }
+  function openMenu(counter) {
+    const uid = counter.getAttribute(EPISODE_UID_ATTRIBUTE);
+    if (!uid) return;
+    if (counter._episodeKind === "invalid") {
+      warnOnce(uid, "invalid-existing-value", {});
+      return;
+    }
+    onOpenMenu({ counter, uid, current: counter._episode || null });
+  }
+  function applyDecision({ counter, decision }) {
+    const uid = counter?.getAttribute?.(EPISODE_UID_ATTRIBUTE);
+    const compute = computeFromDecision(decision);
+    if (!uid || !compute) return Promise.resolve(null);
+    return apply(counter, uid, compute);
+  }
+  function increment(counter) {
+    const uid = counter.getAttribute(EPISODE_UID_ATTRIBUTE);
+    if (!uid) return Promise.resolve(null);
+    return apply(counter, uid, computeFromDecision({ action: "next" }));
+  }
+  function build() {
+    const counter = documentLike.createElement("span");
+    counter.className = EPISODE_COUNTER_CLASS;
+    counter.setAttribute("role", "button");
+    counter.setAttribute("tabindex", "0");
+    counter.setAttribute("contenteditable", "false");
+    const swallow = (event) => stopEvent(event);
+    const onClick = (event) => {
+      stopEvent(event);
+      if (event.altKey) openMenu(counter);
+      else void increment(counter);
+    };
+    const onContextMenu = (event) => {
+      stopEvent(event);
+      openMenu(counter);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        stopEvent(event);
+        if (!event.repeat) void increment(counter);
+      } else if (event.key === "ContextMenu" || event.key === "F10" && event.shiftKey) {
+        stopEvent(event);
+        openMenu(counter);
+      }
+    };
+    const onTouchStart = (event) => event.stopPropagation?.();
+    counter._tsListeners = [
+      ["mousedown", swallow],
+      ["mouseup", swallow],
+      ["dblclick", swallow],
+      ["touchstart", onTouchStart],
+      ["click", onClick],
+      ["contextmenu", onContextMenu],
+      ["keydown", onKeyDown]
+    ];
+    counter._tsListeners.forEach(([type, handler]) => counter.addEventListener(type, handler));
+    return counter;
+  }
+  function destroy(counter) {
+    (counter._tsListeners || []).forEach(([type, handler]) => counter.removeEventListener(type, handler));
+    counter._tsListeners = [];
+    counter.remove();
+  }
+  function sync({ pill, uid, kept }) {
+    const parent = pill?.parentElement;
+    if (!parent || typeof uid !== "string" || !uid) return null;
+    const state = readEpisodeStateSync({ roamAlphaAPI, uid });
+    if (!state.found) return null;
+    let counter = pill.nextElementSibling;
+    if (!isCounter(counter)) {
+      counter = build();
+      parent.insertBefore(counter, pill.nextSibling || null);
+    }
+    setAttr(counter, EPISODE_UID_ATTRIBUTE, uid);
+    if (!inFlight.get(uid)) render(counter, state);
+    kept?.add(counter);
+    return counter;
+  }
+  function sweep(scope, kept = /* @__PURE__ */ new Set()) {
+    elementsIncludingRoot(scope, `.${EPISODE_COUNTER_CLASS}`).filter((counter) => !kept.has(counter)).forEach(destroy);
+  }
+  function isEpisodeAttributeNode(node) {
+    if (node?.nodeType !== 1) return false;
+    const candidates = elementsIncludingRoot(node, ".rm-attr-ref");
+    return candidates.some((el) => {
+      const title = el.getAttribute?.("data-link-title") ?? el.textContent ?? "";
+      return String(title).replace(/:+\s*$/, "").trim().toLowerCase() === EPISODE_ATTRIBUTE.toLowerCase();
+    });
+  }
+  function taskUidForAttributeNode(node, fallbackTarget = null) {
+    const anchor = node?.isConnected ? node : fallbackTarget;
+    const child = anchor?.closest?.(".roam-block-container");
+    const taskContainer = child?.parentElement?.closest?.(".roam-block-container");
+    const input = taskContainer?.querySelector?.(".rm-block__input");
+    return input ? getBlockUid(input) : null;
+  }
+  function destroyAll(root = documentLike) {
+    sweep(root, /* @__PURE__ */ new Set());
+  }
+  return Object.freeze({
+    sync,
+    sweep,
+    destroyAll,
+    resyncUid,
+    applyDecision,
+    isEpisodeAttributeNode,
+    taskUidForAttributeNode,
+    isCounter
+  });
+}
+var FOCUSABLE = ".ts-episode-item, .ts-episode-input, .ts-episode-set";
+function menuItem(documentLike, { label, hint = "", action, onChoose }) {
+  const li = documentLike.createElement("li");
+  const item = documentLike.createElement("a");
+  item.className = "ts-status-choice ts-follow-up-item ts-episode-item bp3-menu-item";
+  item.setAttribute("role", "menuitem");
+  item.setAttribute("tabindex", "0");
+  item.setAttribute("data-episode-action", action);
+  const text = documentLike.createElement("div");
+  text.className = "ts-status-choice-label bp3-fill bp3-text-overflow-ellipsis";
+  text.textContent = label;
+  item.append(text);
+  if (hint) {
+    const hintEl = documentLike.createElement("span");
+    hintEl.className = "ts-follow-up-hint bp3-menu-item-label";
+    hintEl.textContent = hint;
+    item.append(hintEl);
+  }
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onChoose();
+  });
+  item.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  item._episodeChoose = onChoose;
+  li.append(item);
+  return li;
+}
+function parseField(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d+$/.test(text)) return null;
+  const number = Number(text);
+  return validPart(number) ? number : null;
+}
+function createEpisodeMenu({ document: documentLike, current = null, onDecision }) {
+  let decided = false;
+  const decide = (decision) => {
+    if (decided) return;
+    decided = true;
+    onDecision(decision);
+  };
+  const list = documentLike.createElement("ul");
+  list.className = "ts-status-choice-list ts-follow-up ts-episode-menu bp3-menu";
+  list.setAttribute("role", "menu");
+  list.setAttribute("aria-label", "Episode counter");
+  list.setAttribute("data-task-status-episode-menu", "true");
+  const header = documentLike.createElement("li");
+  header.className = "ts-status-chooser-count ts-follow-up-header bp3-menu-header";
+  const title = documentLike.createElement("h6");
+  title.textContent = current ? `Episode · ${formatEpisode(current)}` : "Episode";
+  header.append(title);
+  list.append(header);
+  if (current) {
+    list.append(
+      menuItem(documentLike, {
+        label: "Next episode",
+        hint: formatEpisode(nextEpisode(current)),
+        action: "next",
+        onChoose: () => decide({ action: "next" })
+      }),
+      menuItem(documentLike, {
+        label: "New season",
+        hint: formatEpisode(newSeason(current)),
+        action: "season",
+        onChoose: () => decide({ action: "season" })
+      })
+    );
+  } else {
+    list.append(
+      menuItem(documentLike, {
+        label: "Start S1E1",
+        action: "start",
+        onChoose: () => decide({ action: "start" })
+      })
+    );
+  }
+  const row = documentLike.createElement("li");
+  row.className = "ts-follow-up-date-row ts-episode-row";
+  const makeInput = (label, value) => {
+    const input = documentLike.createElement("input");
+    input.className = "ts-follow-up-date ts-episode-input bp3-input bp3-small";
+    input.setAttribute("type", "number");
+    input.setAttribute("min", "1");
+    input.setAttribute("max", String(EPISODE_MAX));
+    input.setAttribute("step", "1");
+    input.setAttribute("inputmode", "numeric");
+    input.setAttribute("aria-label", label);
+    input.setAttribute("value", String(value));
+    input.value = String(value);
+    return input;
+  };
+  const seasonInput = makeInput("Season", current ? current.season : 1);
+  const episodeInput = makeInput("Episode", current ? current.episode : 1);
+  const setButton = documentLike.createElement("button");
+  setButton.className = "ts-follow-up-set ts-episode-set bp3-button bp3-small";
+  setButton.setAttribute("type", "button");
+  setButton.textContent = "Set";
+  const chooseInputs = () => {
+    const season = parseField(seasonInput.value);
+    const episode = parseField(episodeInput.value);
+    seasonInput.setAttribute("aria-invalid", season ? "false" : "true");
+    episodeInput.setAttribute("aria-invalid", episode ? "false" : "true");
+    if (!season || !episode) return;
+    decide({ action: "set", season, episode });
+  };
+  setButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    chooseInputs();
+  });
+  seasonInput._episodeChoose = chooseInputs;
+  episodeInput._episodeChoose = chooseInputs;
+  row.append(seasonInput, episodeInput, setButton);
+  list.append(row);
+  function focusables() {
+    return Array.from(list.querySelectorAll(FOCUSABLE));
+  }
+  function moveFocus(target, delta) {
+    const items = focusables();
+    if (!items.length) return;
+    const index = items.indexOf(target);
+    const next = items[(index + delta + items.length) % items.length] || items[0];
+    next.focus?.({ preventScroll: true });
+  }
+  function isInput(target) {
+    return target === seasonInput || target === episodeInput;
+  }
+  function handleKey(event) {
+    if (event.type !== "keydown") return false;
+    const target = event.target;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      decide({ action: "cancel" });
+      return true;
+    }
+    if (event.key === "Tab") {
+      event.preventDefault();
+      moveFocus(target, event.shiftKey ? -1 : 1);
+      return true;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (isInput(target)) return false;
+      if (target === setButton) return true;
+      event.preventDefault();
+      moveFocus(target, event.key === "ArrowDown" ? 1 : -1);
+      return true;
+    }
+    if (event.key === "Enter" || event.key === " " && !isInput(target)) {
+      if (event.repeat) {
+        event.preventDefault();
+        return true;
+      }
+      const choose = target?._episodeChoose || (target === setButton ? chooseInputs : null);
+      if (!choose) return false;
+      event.preventDefault();
+      choose();
+      return true;
+    }
+    return false;
+  }
+  return {
+    element: list,
+    handleKey,
+    focusFirst() {
+      focusables()[0]?.focus?.({ preventScroll: true });
+    },
+    cancel() {
+      decide({ action: "cancel" });
+    },
+    get decided() {
+      return decided;
+    }
+  };
+}
+
 // src/follow-up-date.js
 var FOLLOW_UP_STATUS_KEYS = Object.freeze(["WAITING", "IN_REVIEW"]);
 var BETTER_TASKS_TOOLS_ID = "better-tasks";
@@ -351,7 +924,7 @@ var DEFAULT_DUE_ATTRIBUTE = "BT_attrDue";
 var DEFAULT_REPEAT_ATTRIBUTE = "BT_attrRepeat";
 var TODO_TOKEN_RE = /^\s*(?:\{\{\s*(?:\[\[\s*)?TODO(?:\s*\]\])?\s*\}\}|TODO)(?=$|[ \t\r\n])/i;
 var ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-var CHILDREN_PULL_PATTERN = "[:block/uid :block/string {:block/children [:block/uid :block/string]}]";
+var CHILDREN_PULL_PATTERN2 = "[:block/uid :block/string {:block/children [:block/uid :block/string]}]";
 var MONTHS = [
   "January",
   "February",
@@ -448,7 +1021,7 @@ function resolveFollowUpSurface(windowLike) {
     attributes: findTool(windowLike, "bt_get_attributes")
   };
 }
-function valueAt2(value, key, fallback = null) {
+function valueAt3(value, key, fallback = null) {
   if (!value || typeof value !== "object") return fallback;
   const plain = key.replace(/^:/, "");
   return value[key] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
@@ -473,8 +1046,8 @@ async function attributeSchema(surface) {
 }
 function findChild(children, names) {
   for (const child of Array.isArray(children) ? children : []) {
-    const string = valueAt2(child, ":block/string", "");
-    const uid = valueAt2(child, ":block/uid", null);
+    const string = valueAt3(child, ":block/string", "");
+    const uid = valueAt3(child, ":block/uid", null);
     if (typeof string !== "string" || typeof uid !== "string") continue;
     for (const name of names) {
       const pattern = new RegExp(`^\\s*${escapeRegex(name)}::\\s*`, "i");
@@ -484,12 +1057,12 @@ function findChild(children, names) {
   return null;
 }
 async function readTaskAttributes(surface, uid) {
-  const block = await surface.pull(CHILDREN_PULL_PATTERN, [":block/uid", uid]);
-  if (valueAt2(block, ":block/uid", null) !== uid) return { block: null, due: null };
+  const block = await surface.pull(CHILDREN_PULL_PATTERN2, [":block/uid", uid]);
+  if (valueAt3(block, ":block/uid", null) !== uid) return { block: null, due: null };
   const schema = await attributeSchema(surface);
   const due = attributeNames(schema, "due", DEFAULT_DUE_ATTRIBUTE);
   const repeat = attributeNames(schema, "repeat", DEFAULT_REPEAT_ATTRIBUTE);
-  const children = valueAt2(block, ":block/children", []);
+  const children = valueAt3(block, ":block/children", []);
   const primaryDue = findChild(children, [due.primary]);
   const aliasDue = primaryDue ? null : findChild(children, due.aliases);
   return {
@@ -500,7 +1073,7 @@ async function readTaskAttributes(surface, uid) {
   };
 }
 function isOpenTask(block) {
-  return TODO_TOKEN_RE.test(valueAt2(block, ":block/string", ""));
+  return TODO_TOKEN_RE.test(valueAt3(block, ":block/string", ""));
 }
 function result2(eligible, reason, fields = {}) {
   return { eligible, reason, ...fields };
@@ -568,8 +1141,8 @@ async function writeFollowUpDate({ windowLike, uid, date }) {
     sameUid: before ? true : null
   };
 }
-var FOCUSABLE = ".ts-follow-up-item, .ts-follow-up-date, .ts-follow-up-set";
-function menuItem(documentLike, { label, hint = "", className = "", action, onChoose }) {
+var FOCUSABLE2 = ".ts-follow-up-item, .ts-follow-up-date, .ts-follow-up-set";
+function menuItem2(documentLike, { label, hint = "", className = "", action, onChoose }) {
   const li = documentLike.createElement("li");
   const item = documentLike.createElement("a");
   item.className = `ts-status-choice ts-follow-up-item bp3-menu-item ${className}`.trim();
@@ -634,7 +1207,7 @@ function createFollowUpPrompt({
   if (existingDue) {
     const shown = existingDate ? shortDateLabel(existingDate, today) : existingDue.value;
     list.append(
-      menuItem(documentLike, {
+      menuItem2(documentLike, {
         label: `Keep due ${shown}`,
         className: "ts-follow-up-keep",
         action: "keep",
@@ -646,7 +1219,7 @@ function createFollowUpPrompt({
     const replacing = existingDate && sameDay(existingDate, pick.date);
     if (replacing) continue;
     list.append(
-      menuItem(documentLike, {
+      menuItem2(documentLike, {
         label: pick.label,
         hint: pick.hint,
         action: pick.id,
@@ -685,7 +1258,7 @@ function createFollowUpPrompt({
   dateRow.append(input, setButton);
   list.append(dateRow);
   list.append(
-    menuItem(documentLike, {
+    menuItem2(documentLike, {
       label: "Skip",
       className: "ts-follow-up-skip",
       action: "skip",
@@ -693,7 +1266,7 @@ function createFollowUpPrompt({
     })
   );
   function focusables() {
-    return Array.from(list.querySelectorAll(FOCUSABLE));
+    return Array.from(list.querySelectorAll(FOCUSABLE2));
   }
   function moveFocus(target, delta) {
     const items = focusables();
@@ -1251,7 +1824,7 @@ function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, Custom
 
 // src/status-write.js
 var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
-function valueAt3(value, keyword, fallback = null) {
+function valueAt4(value, keyword, fallback = null) {
   if (!value || typeof value !== "object") return fallback;
   const plain = keyword.replace(/^:/, "");
   return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
@@ -1267,8 +1840,8 @@ function createFreshBlockStringReader(roamAlphaAPI) {
       BLOCK_STRING_PULL_PATTERN,
       [":block/uid", uid]
     );
-    const pulledUid = valueAt3(value, ":block/uid", null);
-    const string = valueAt3(value, ":block/string", null);
+    const pulledUid = valueAt4(value, ":block/uid", null);
+    const string = valueAt4(value, ":block/string", null);
     if (pulledUid !== uid || typeof string !== "string") return null;
     return string;
   };
@@ -2353,7 +2926,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.12.0" : "development";
+var BUNDLED_VERSION = true ? "0.13.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
@@ -3496,7 +4069,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       el.removeAttribute("data-task-status-label");
     }
   }
-  function elementsIncludingRoot(root, selector) {
+  function elementsIncludingRoot2(root, selector) {
     const nodes = [];
     if (root?.matches?.(selector)) nodes.push(root);
     if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
@@ -3508,7 +4081,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return root.closest?.(RENDER_SCOPE_SELECTOR) || root;
   }
   function clearStatusPillAnnotations(root = document) {
-    elementsIncludingRoot(
+    elementsIncludingRoot2(
       root,
       "span.rm-page-ref[data-task-status-key], a.rm-page-ref[data-task-status-key]"
     ).forEach((pill) => {
@@ -3523,14 +4096,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!scope?.querySelectorAll && !scope?.matches) return;
     clearOwnedStatusPillPresentations(scope);
     clearOwnedStatusCheckboxes(scope);
-    const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
+    const pills = elementsIncludingRoot2(scope, STATUS_PILL_SELECTOR);
     pills.forEach(annotateStatusPillElement);
     if (!checkboxStylingEnabled) {
+      episodeCounter.sweep(scope);
       statusPeekController?.refresh?.();
       return;
     }
     const blockStringsByUid = /* @__PURE__ */ new Map();
     const textHelpers = getTextHelpers();
+    const keptEpisodeCounters = /* @__PURE__ */ new Set();
     pills.forEach((pill) => {
       const tagTitle = pill.getAttribute?.("data-tag");
       const statusKey = pill.getAttribute?.("data-task-status-key");
@@ -3544,7 +4119,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           typeof liveValue === "string" ? liveValue : getBlockString(blockUid)
         );
       }
-      syncStatusPresentationForPill({
+      const presentation = syncStatusPresentationForPill({
         statusPill: pill,
         enabled: checkboxStylingEnabled,
         alertBeaconEnabled,
@@ -3556,7 +4131,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         blockString: blockStringsByUid.get(blockUid),
         textHelpers
       });
+      if (presentation?.managed && EPISODE_GLYPHS.includes(getStatusGlyph(statusKey))) {
+        episodeCounter.sync({ pill, uid: blockUid, kept: keptEpisodeCounters });
+      }
     });
+    episodeCounter.sweep(scope, keptEpisodeCounters);
     statusPeekController?.refresh?.();
   }
   function isStatusPeekEnabled() {
@@ -3611,6 +4190,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       refreshed.add(scope);
       refreshStatusVisuals(scope);
     };
+    const episodeUids = /* @__PURE__ */ new Set();
+    const noteEpisodeAttribute = (node, target) => {
+      if (!node || isInsideExtensionUi(node) || !episodeCounter.isEpisodeAttributeNode(node)) return;
+      const uid = episodeCounter.taskUidForAttributeNode(node, target);
+      if (uid) episodeUids.add(uid);
+    };
     for (const mutation of mutations || []) {
       if (isInsideExtensionUi(mutation.target)) continue;
       if (mutation.type === "attributes") {
@@ -3621,6 +4206,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
       for (const node of mutation.addedNodes || []) {
         if (containsStatusVisual(node)) refreshOnce(node);
+        noteEpisodeAttribute(node, mutation.target);
+      }
+      for (const node of mutation.removedNodes || []) {
+        noteEpisodeAttribute(node, mutation.target);
       }
       const removedStatusVisual = Array.from(mutation.removedNodes || []).some(
         containsStatusVisual
@@ -3629,6 +4218,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         refreshOnce(mutation.target);
       }
     }
+    episodeUids.forEach((uid) => episodeCounter.resyncUid(uid));
   }
   function startStatusPillObserver() {
     if (pillObserver) return;
@@ -3757,10 +4347,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     ),
     log
   });
+  const activityRecorder = createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
-    activityRecorder: createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI })
+    activityRecorder
+  });
+  const episodeCounter = createEpisodeCounterController({
+    document,
+    roamAlphaAPI: window.roamAlphaAPI,
+    activityRecorder,
+    getBlockUid: (element) => getBlockUidFromElement(element),
+    onOpenMenu: (context) => openEpisodeMenu(context)
   });
   function getCurrentStatus(text) {
     return getTextHelpers().getCurrentStatus(text);
@@ -4189,6 +4787,60 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     window.requestAnimationFrame(() => {
       if (followUpPrompt === prompt) prompt.focusFirst();
+    });
+  }
+  function openEpisodeMenu({ counter, current }) {
+    closeStatusChooser();
+    const chooser = document.createElement("div");
+    chooser.className = "ts-status-chooser ts-episode-chooser bp3-popover";
+    const content = document.createElement("div");
+    content.className = "bp3-popover-content";
+    const menu = createEpisodeMenu({
+      document,
+      current,
+      onDecision: (decision) => {
+        if (statusChooserEl !== chooser) return;
+        closeStatusChooser({ restoreFocus: true });
+        if (decision.action === "cancel") return;
+        void episodeCounter.applyDecision({ counter, decision }).catch(
+          (err) => log("Episode counter error:", err)
+        );
+      }
+    });
+    content.append(menu.element);
+    chooser.append(makeBlueprintPopoverArrow(), content);
+    (portalRoot || document.body).appendChild(chooser);
+    statusChooserEl = chooser;
+    statusChooserReturnFocusEl = counter;
+    statusChooserAnchorEl = counter;
+    positionStatusChooser(chooser, counter);
+    const closeOnOutsideMouseDown = (event) => {
+      if (statusChooserEl?.contains(event.target)) return;
+      closeStatusChooser();
+    };
+    const keyGuard = (event) => {
+      if (statusChooserEl !== chooser) return;
+      const target = event.target;
+      const unfocused = !target || target === document || target === document.body || target === document.documentElement;
+      if (!unfocused && !chooser.contains(target)) return;
+      menu.handleKey(event);
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    };
+    const closeOnViewportChange = () => closeStatusChooser();
+    const keyEvents = ["keydown", "keypress", "keyup"];
+    document.addEventListener("mousedown", closeOnOutsideMouseDown, true);
+    keyEvents.forEach((type) => window.addEventListener(type, keyGuard, true));
+    window.addEventListener("resize", closeOnViewportChange, true);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    statusChooserTeardown = () => {
+      document.removeEventListener("mousedown", closeOnOutsideMouseDown, true);
+      keyEvents.forEach((type) => window.removeEventListener(type, keyGuard, true));
+      window.removeEventListener("resize", closeOnViewportChange, true);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+    window.requestAnimationFrame(() => {
+      if (statusChooserEl === chooser) menu.focusFirst();
     });
   }
   async function openStatusChooser({
@@ -5455,6 +6107,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusPeekController?.destroy?.();
     statusPeekController = null;
     stopStatusPillObserver();
+    episodeCounter.destroyAll(document);
     stopThemeObserver();
     repeatStatusReset.dispose();
     clearStatusColorOverrides();

@@ -2,6 +2,11 @@ import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
+  EPISODE_GLYPHS,
+  createEpisodeCounterController,
+  createEpisodeMenu,
+} from "./episode-counter.js";
+import {
   createFollowUpPrompt,
   isFollowUpStatusKey,
   readFollowUpState,
@@ -1451,12 +1456,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const pills = elementsIncludingRoot(scope, STATUS_PILL_SELECTOR);
     pills.forEach(annotateStatusPillElement);
     if (!checkboxStylingEnabled) {
+      episodeCounter.sweep(scope);
       statusPeekController?.refresh?.();
       return;
     }
 
     const blockStringsByUid = new Map();
     const textHelpers = getTextHelpers();
+    const keptEpisodeCounters = new Set();
 
     pills.forEach((pill) => {
       const tagTitle = pill.getAttribute?.("data-tag");
@@ -1473,7 +1480,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         );
       }
 
-      syncStatusPresentationForPill({
+      const presentation = syncStatusPresentationForPill({
         statusPill: pill,
         enabled: checkboxStylingEnabled,
         alertBeaconEnabled,
@@ -1486,7 +1493,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         blockString: blockStringsByUid.get(blockUid),
         textHelpers,
       });
+      if (presentation?.managed && EPISODE_GLYPHS.includes(getStatusGlyph(statusKey))) {
+        episodeCounter.sync({ pill, uid: blockUid, kept: keptEpisodeCounters });
+      }
     });
+    episodeCounter.sweep(scope, keptEpisodeCounters);
     statusPeekController?.refresh?.();
   }
 
@@ -1562,6 +1573,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       refreshStatusVisuals(scope);
     };
 
+    const episodeUids = new Set();
+    const noteEpisodeAttribute = (node, target) => {
+      if (!node || isInsideExtensionUi(node) || !episodeCounter.isEpisodeAttributeNode(node)) return;
+      const uid = episodeCounter.taskUidForAttributeNode(node, target);
+      if (uid) episodeUids.add(uid);
+    };
+
     for (const mutation of mutations || []) {
       if (isInsideExtensionUi(mutation.target)) continue;
       if (mutation.type === "attributes") {
@@ -1576,6 +1594,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
       for (const node of mutation.addedNodes || []) {
         if (containsStatusVisual(node)) refreshOnce(node);
+        noteEpisodeAttribute(node, mutation.target);
+      }
+      for (const node of mutation.removedNodes || []) {
+        noteEpisodeAttribute(node, mutation.target);
       }
 
       const removedStatusVisual = Array.from(mutation.removedNodes || []).some(
@@ -1585,6 +1607,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         refreshOnce(mutation.target);
       }
     }
+    episodeUids.forEach((uid) => episodeCounter.resyncUid(uid));
   }
 
   function startStatusPillObserver() {
@@ -1727,10 +1750,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       ),
     log,
   });
+  const activityRecorder = createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
-    activityRecorder: createBetterTasksActivityRecorder({ roamAlphaAPI: window.roamAlphaAPI }),
+    activityRecorder,
+  });
+  const episodeCounter = createEpisodeCounterController({
+    document,
+    roamAlphaAPI: window.roamAlphaAPI,
+    activityRecorder,
+    getBlockUid: (element) => getBlockUidFromElement(element),
+    onOpenMenu: (context) => openEpisodeMenu(context),
   });
 
   function getCurrentStatus(text) {
@@ -2286,6 +2317,72 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     // Positioning hides the chooser until its next frame; focus after that.
     window.requestAnimationFrame(() => {
       if (followUpPrompt === prompt) prompt.focusFirst();
+    });
+  }
+
+  // Alt-click / right-click on the episode counter. Shares the chooser's
+  // state, so only one of the two is ever open; closing it (Escape, click
+  // outside, scroll) writes nothing.
+  function openEpisodeMenu({ counter, current }) {
+    closeStatusChooser();
+
+    const chooser = document.createElement("div");
+    chooser.className = "ts-status-chooser ts-episode-chooser bp3-popover";
+    const content = document.createElement("div");
+    content.className = "bp3-popover-content";
+
+    const menu = createEpisodeMenu({
+      document,
+      current,
+      onDecision: (decision) => {
+        if (statusChooserEl !== chooser) return;
+        closeStatusChooser({ restoreFocus: true });
+        if (decision.action === "cancel") return;
+        void episodeCounter.applyDecision({ counter, decision }).catch((err) =>
+          log("Episode counter error:", err)
+        );
+      },
+    });
+    content.append(menu.element);
+    chooser.append(makeBlueprintPopoverArrow(), content);
+
+    (portalRoot || document.body).appendChild(chooser);
+    statusChooserEl = chooser;
+    statusChooserReturnFocusEl = counter;
+    statusChooserAnchorEl = counter;
+    positionStatusChooser(chooser, counter);
+
+    const closeOnOutsideMouseDown = (event) => {
+      if (statusChooserEl?.contains(event.target)) return;
+      closeStatusChooser();
+    };
+    const keyGuard = (event) => {
+      if (statusChooserEl !== chooser) return;
+      const target = event.target;
+      const unfocused =
+        !target || target === document || target === document.body || target === document.documentElement;
+      if (!unfocused && !chooser.contains(target)) return;
+      menu.handleKey(event);
+      // Roam's own shortcuts never see keys typed into the menu; native
+      // typing in the number fields still happens (no preventDefault here).
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    };
+    const closeOnViewportChange = () => closeStatusChooser();
+    const keyEvents = ["keydown", "keypress", "keyup"];
+
+    document.addEventListener("mousedown", closeOnOutsideMouseDown, true);
+    keyEvents.forEach((type) => window.addEventListener(type, keyGuard, true));
+    window.addEventListener("resize", closeOnViewportChange, true);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    statusChooserTeardown = () => {
+      document.removeEventListener("mousedown", closeOnOutsideMouseDown, true);
+      keyEvents.forEach((type) => window.removeEventListener(type, keyGuard, true));
+      window.removeEventListener("resize", closeOnViewportChange, true);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+    window.requestAnimationFrame(() => {
+      if (statusChooserEl === chooser) menu.focusFirst();
     });
   }
 
@@ -3759,6 +3856,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusPeekController?.destroy?.();
     statusPeekController = null;
     stopStatusPillObserver();
+    episodeCounter.destroyAll(document);
     stopThemeObserver();
     repeatStatusReset.dispose();
 

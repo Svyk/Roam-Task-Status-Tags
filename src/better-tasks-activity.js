@@ -85,11 +85,19 @@ export function renderStatusActivityLine({ to, ts }) {
   return `${formatActivityTimestamp(ts)} — ${label}`;
 }
 
-export function buildStatusActivityProps({ from, to, ts }) {
-  const bt = { kind: "event", event: "attr_change", ts, field: ACTIVITY_FIELD, source: ACTIVITY_SOURCE };
+export function buildAttributeActivityProps({ field, from, to, ts }) {
+  const bt = { kind: "event", event: "attr_change", ts, field, source: ACTIVITY_SOURCE };
   if (from) bt.from = from;
   if (to) bt.to = to;
   return { bt };
+}
+
+export function buildStatusActivityProps({ from, to, ts }) {
+  return buildAttributeActivityProps({ field: ACTIVITY_FIELD, from, to, ts });
+}
+
+export function renderAttributeActivityLine({ field, to, ts }) {
+  return `${formatActivityTimestamp(ts)} — ${field} → ${to}`;
 }
 
 function result(recorded, fields = {}) {
@@ -118,6 +126,41 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
     return orderedChildren(block);
   }
 
+  // Appends one line into the task's existing activity log. `buildLine(ts)`
+  // returns `{ text, props }`. Never creates a log, skips an identical last line.
+  async function appendLine(uid, roam, buildLine) {
+    let containerUid;
+    let siblings;
+    try {
+      const taskChildren = await pullChildren(roam, uid);
+      if (!taskChildren) return result(false, { reason: "block-not-found" });
+      const container = taskChildren.find((child) => isActivityLogContainerString(child.string));
+      if (!container) return result(false, { reason: "no-activity-log" });
+      containerUid = container.uid;
+      siblings = (await pullChildren(roam, containerUid)) || [];
+    } catch (error) {
+      return result(false, { reason: "activity-read-failed", error });
+    }
+
+    const { text, props } = buildLine(now());
+    const last = siblings[siblings.length - 1];
+    if (last && last.string === text) {
+      return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
+    }
+
+    const entryUid = roam.generateUID();
+    try {
+      // One write: Roam's block.create takes props, so the line and its event map land together (one undo step).
+      await roam.create({
+        location: { "parent-uid": containerUid, order: "last" },
+        block: { uid: entryUid, string: text, props },
+      });
+    } catch (error) {
+      return result(false, { reason: "activity-write-failed", error, containerUid });
+    }
+    return result(true, { reason: "recorded", containerUid, entryUid, text });
+  }
+
   return Object.freeze({
     async record({ uid, previousString, nextString, statusTagTitle }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
@@ -128,38 +171,24 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
         ? statusLabelFromTaskText(nextString)
         : statusLabelFromTagTitle(statusTagTitle);
       if ((from || null) === (to || null)) return result(false, { reason: "status-unchanged" });
+      return appendLine(uid, roam, (ts) => ({
+        text: renderStatusActivityLine({ to, ts }),
+        props: buildStatusActivityProps({ from, to, ts }),
+      }));
+    },
 
-      let containerUid;
-      let siblings;
-      try {
-        const taskChildren = await pullChildren(roam, uid);
-        if (!taskChildren) return result(false, { reason: "block-not-found" });
-        const container = taskChildren.find((child) => isActivityLogContainerString(child.string));
-        if (!container) return result(false, { reason: "no-activity-log" });
-        containerUid = container.uid;
-        siblings = (await pullChildren(roam, containerUid)) || [];
-      } catch (error) {
-        return result(false, { reason: "activity-read-failed", error });
+    async recordAttributeChange({ uid, field, from, to }) {
+      if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
+      if (typeof field !== "string" || !field.trim() || typeof to !== "string" || !to) {
+        return result(false, { reason: "invalid-change" });
       }
-
-      const ts = now();
-      const text = renderStatusActivityLine({ to, ts });
-      const last = siblings[siblings.length - 1];
-      if (last && last.string === text) {
-        return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
-      }
-
-      const entryUid = roam.generateUID();
-      try {
-        // One write: Roam's block.create takes props, so the line and its event map land together (one undo step).
-        await roam.create({
-          location: { "parent-uid": containerUid, order: "last" },
-          block: { uid: entryUid, string: text, props: buildStatusActivityProps({ from, to, ts }) },
-        });
-      } catch (error) {
-        return result(false, { reason: "activity-write-failed", error, containerUid });
-      }
-      return result(true, { reason: "recorded", containerUid, entryUid, text });
+      const roam = resolveRoamSurface(roamAlphaAPI);
+      if (!roam) return result(false, { reason: "roam-api-unavailable" });
+      if ((from || null) === to) return result(false, { reason: "attribute-unchanged" });
+      return appendLine(uid, roam, (ts) => ({
+        text: renderAttributeActivityLine({ field, to, ts }),
+        props: buildAttributeActivityProps({ field, from, to, ts }),
+      }));
     },
   });
 }
