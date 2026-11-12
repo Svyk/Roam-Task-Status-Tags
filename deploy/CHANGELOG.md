@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0 — 2026-11-11
+
+- A task with the status **Series**, **Watching** or **Rewatch** (open or done) shows a small episode counter like `S2E5` right after its status.
+- Click it for the next episode. Alt-click, right-click, Shift+F10 or the ContextMenu key opens a menu: **Next episode**, **New season** (season + 1, episode 1), or set the season and episode yourself (fields marked S and E).
+- Before it is first used the counter is a single small `+` that appears when you hover the row (always faintly visible on touch screens). It takes no width (the `+` sits in the space after the status), so a task that never uses it looks as before and nothing shifts. A set counter is wide enough for `S9E99`, so E9 to E10 does not move anything.
+- The value is stored as a plain child block of the task, `Episode:: S2E5`, created only when you first use the counter. Edit that block by hand and the counter follows. The block may have extra lines under its first one; only the value on the first line changes. If its value is not `S<number>E<number>`, or the task has two `Episode::` blocks, the counter shows `?` and nothing is written.
+- Better Tasks has no API for custom attributes (its `bt_modify` only knows its own), so the `Episode::` block is written directly: it is created, or its text is changed in place (same uid). Better Tasks ignores unknown attributes. No Better Tasks attribute and no task text is touched, and nothing is written to tasks that never use the counter.
+- Each change adds one line to the task's existing Better Tasks activity log (`episode → S2E6`), only into a log that already exists, never duplicated.
+- Fast double clicks count twice and never create a second `Episode::` block. A write that cannot be confirmed puts the counter back to what the graph says.
+- Clicks on the counter never enter Roam's edit mode or open the status chooser. Roam's shortcuts do not fire while its menu has focus.
+
 ## 0.12.0 — 2026-11-11
 
 - Picking **Waiting** or **In Review** in the status chooser on an open Better Tasks task now asks when to check back: **Tomorrow**, **In 3 days**, **Next week**, a date field, or **Skip**.

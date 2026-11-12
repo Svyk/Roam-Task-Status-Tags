@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   ACTIVITY_LOG_CONTAINER_TITLES,
+  buildAttributeActivityProps,
   buildStatusActivityProps,
   createBetterTasksActivityRecorder,
+  renderAttributeActivityLine,
   renderStatusActivityLine,
   statusLabelFromTaskText,
   statusLabelFromTagTitle,
@@ -212,5 +214,57 @@ test("a Roam API without the write surface degrades to not recorded", async () =
   assert.deepEqual(
     await recorder.record({ uid: "task", previousString: "{{[[TODO]]}} x", nextString: "{{[[TODO]]}} #[[task-status/Waiting]] x", statusTagTitle: "task-status/Waiting" }),
     { recorded: false, reason: "roam-api-unavailable" }
+  );
+});
+
+test("an attribute change line and props have the exact episode shape", () => {
+  assert.equal(
+    renderAttributeActivityLine({ field: "episode", to: "S2E6", ts: NOW }),
+    "2026-10-04 15:29 — episode → S2E6"
+  );
+  assert.deepEqual(buildAttributeActivityProps({ field: "episode", from: "S2E5", to: "S2E6", ts: NOW }), {
+    bt: { kind: "event", event: "attr_change", ts: NOW, field: "episode", source: "task-status-tags", from: "S2E5", to: "S2E6" },
+  });
+  assert.deepEqual(buildAttributeActivityProps({ field: "episode", to: "S1E1", ts: NOW }), {
+    bt: { kind: "event", event: "attr_change", ts: NOW, field: "episode", source: "task-status-tags", to: "S1E1" },
+  });
+});
+
+test("recordAttributeChange appends one line with props into the existing log only", async () => {
+  const graph = taskWithLog();
+  const recorder = createBetterTasksActivityRecorder({ roamAlphaAPI: graph.roamAlphaAPI, now: () => NOW });
+  const result = await recorder.recordAttributeChange({ uid: "task", field: "episode", from: "S2E5", to: "S2E6" });
+  assert.equal(result.recorded, true);
+  assert.equal(result.containerUid, "log");
+  assert.equal(graph.byUid.get("gen-1").string, "2026-10-04 15:29 — episode → S2E6");
+  assert.deepEqual(graph.byUid.get("gen-1").props, {
+    bt: { kind: "event", event: "attr_change", ts: NOW, field: "episode", source: "task-status-tags", from: "S2E5", to: "S2E6" },
+  });
+  assert.equal(graph.calls.filter(([kind]) => kind === "create").length, 1);
+  assert.equal(graph.calls.filter(([kind]) => kind === "update").length, 0);
+  assert.deepEqual(graph.byUid.get("task").children, ["due", "log"]);
+});
+
+test("recordAttributeChange never creates a log, skips duplicates and unchanged values", async () => {
+  const bare = fakeGraph({
+    task: { string: "{{[[TODO]]}} Legacy", children: [] },
+  });
+  const bareRecorder = createBetterTasksActivityRecorder({ roamAlphaAPI: bare.roamAlphaAPI, now: () => NOW });
+  assert.deepEqual(
+    await bareRecorder.recordAttributeChange({ uid: "task", field: "episode", to: "S1E1" }),
+    { recorded: false, reason: "no-activity-log" }
+  );
+  assert.equal(bare.calls.filter(([kind]) => kind !== "pull").length, 0);
+
+  const graph = taskWithLog();
+  const recorder = createBetterTasksActivityRecorder({ roamAlphaAPI: graph.roamAlphaAPI, now: () => NOW });
+  assert.equal((await recorder.recordAttributeChange({ uid: "task", field: "episode", to: "S1E1" })).recorded, true);
+  const duplicate = await recorder.recordAttributeChange({ uid: "task", field: "episode", to: "S1E1" });
+  assert.equal(duplicate.recorded, false);
+  assert.equal(duplicate.reason, "duplicate");
+  assert.equal(graph.byUid.get("log").children.length, 2);
+  assert.deepEqual(
+    await recorder.recordAttributeChange({ uid: "task", field: "episode", from: "S1E1", to: "S1E1" }),
+    { recorded: false, reason: "attribute-unchanged" }
   );
 });

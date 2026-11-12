@@ -6,6 +6,7 @@
   span.rm-page-ref[data-task-status-key],
   a.rm-page-ref[data-task-status-key],
   .ts-status-peek[data-task-status-key],
+  .ts-episode-counter,
   .ts-status-portal,
   .ts-status-names-panel
 ) {
@@ -94,10 +95,10 @@
   display: none !important;
 }
 
-:root.bp3-dark :where(.ts-status-portal, .ts-status-names-panel),
-body.bt-theme-dark :where(.ts-status-portal, .ts-status-names-panel),
-.rm-dark-theme :where(.ts-status-portal, .ts-status-names-panel),
-body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel) {
+:root.bp3-dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
+body.bt-theme-dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
+.rm-dark-theme :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
+body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter) {
   --ts-preview-surface-bg: #1f2428;
   --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
   --ts-menu-surface: var(--svy-overlay, #30404d);
@@ -119,7 +120,7 @@ body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel) {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not(.bp3-light) :where(.ts-status-portal, .ts-status-names-panel) {
+  :root:not(.bp3-light) :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter) {
     --ts-preview-surface-bg: #1f2428;
     --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
     --ts-menu-surface: var(--svy-overlay, #30404d);
@@ -1828,6 +1829,119 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
   .ts-status-chooser .ts-follow-up-set {
     border-color: CanvasText !important;
     background: Canvas !important;
+    color: CanvasText !important;
+    forced-color-adjust: auto;
+  }
+}
+
+/* Episode counter (Series / Watching / Rewatch): a quiet S2E5 after the status. */
+.ts-episode-counter {
+  display: inline-block;
+  box-sizing: border-box;
+  margin: 0 0.35em 0 0.1em;
+  padding: 0 0.3em;
+  border: 1px solid transparent;
+  border-radius: var(--svy-tag-radius, 5px);
+  color: var(--ts-menu-muted);
+  font-size: 0.75em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color var(--ts-transition), border-color var(--ts-transition);
+}
+
+.ts-episode-counter[data-ts-episode-state="set"] {
+  min-width: calc(5.6ch + 0.6em + 2px);
+  border-color: var(--ts-menu-border-subtle);
+}
+
+.ts-episode-counter[data-ts-episode-state="invalid"] {
+  min-width: 2em;
+}
+
+.ts-episode-counter:hover,
+.ts-episode-counter:focus-visible {
+  background: var(--ts-menu-hover);
+  color: var(--ts-menu-text);
+}
+
+.ts-episode-counter:focus-visible {
+  outline: 2px solid var(--ts-menu-accent);
+  outline-offset: 1px;
+}
+
+.ts-episode-counter[data-ts-episode-state="invalid"] {
+  border-color: var(--ts-menu-danger);
+  color: var(--ts-menu-danger);
+}
+
+/* Never used: a single small "+", invisible until the row is hovered. Its
+   box takes no width (the "+" sits in the space after the status), so an
+   unused task looks exactly as before and nothing shifts. */
+.ts-episode-counter[data-ts-episode-state="empty"] {
+  width: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  white-space: nowrap;
+  text-indent: -0.5em;
+  line-height: 1.5;
+  opacity: 0;
+}
+
+.rm-block-main:hover .ts-episode-counter[data-ts-episode-state="empty"],
+.ts-episode-counter[data-ts-episode-state="empty"]:focus-visible {
+  opacity: 0.8;
+}
+
+@media (hover: none) {
+  .ts-episode-counter[data-ts-episode-state="empty"] {
+    opacity: 0.35;
+  }
+}
+
+.ts-status-chooser .ts-episode-row {
+  gap: 4px;
+}
+
+.ts-status-chooser .ts-episode-field {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+  margin: 0;
+}
+
+.ts-status-chooser .ts-episode-field-prefix {
+  color: var(--ts-menu-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ts-status-chooser .ts-episode-input {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 36px;
+  text-align: center;
+}
+
+.ts-status-chooser .ts-episode-input:focus-visible {
+  outline: 2px solid var(--ts-menu-accent);
+  outline-offset: -1px;
+}
+
+@media (forced-colors: active) {
+  .ts-episode-counter {
+    border-color: ButtonText !important;
     color: CanvasText !important;
     forced-color-adjust: auto;
   }
