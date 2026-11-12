@@ -1,0 +1,725 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+import { episodeStateFromChildren, readEpisodeStateSync } from "../src/episode-counter.js";
+import { createTaskStatusTextHelpers } from "../src/extension.js";
+import { createStatusView, orderStatusGroups, queryStatusTasks, resolveViewTheme } from "../src/status-view.js";
+
+const CATALOG = [
+  ["ACTIVE", "Active", false],
+  ["WAITING", "Waiting", false],
+  ["IN_REVIEW", "In Review", false],
+  ["HOLDING", "Holding", false],
+  ["INCUBATING", "Incubating", false],
+  ["ALERT", "Alert", false],
+  ["CANCELLED", "Cancelled", false],
+  ["SERIES", "Series", true],
+  ["MOVIE", "Movie", true],
+  ["WATCHING", "Watching", true],
+  ["WATCHLIST", "Watchlist", true],
+  ["UPCOMING", "Upcoming", true],
+  ["REWATCH", "Rewatch", true],
+  ["DROPPED", "Dropped", true],
+].map(([key, name, media]) => ({
+  key,
+  name,
+  media,
+  tagTitle: `task-status/${name}`,
+  glyph: media ? name.toLowerCase() : null,
+}));
+
+const helpers = createTaskStatusTextHelpers();
+
+// --- orderStatusGroups ------------------------------------------------------
+
+test("orderStatusGroups: default catalog for media, tasks and all", () => {
+  assert.deepEqual(orderStatusGroups(CATALOG, "media"), [
+    "WATCHING", "WATCHLIST", "UPCOMING", "SERIES", "REWATCH", "MOVIE", "DROPPED",
+  ]);
+  assert.deepEqual(orderStatusGroups(CATALOG, "tasks"), [
+    "ALERT", "ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "INCUBATING", "CANCELLED",
+  ]);
+  assert.deepEqual(orderStatusGroups(CATALOG, "all"), [
+    ...orderStatusGroups(CATALOG, "media"),
+    ...orderStatusGroups(CATALOG, "tasks"),
+  ]);
+});
+
+test("orderStatusGroups: custom media status goes after the five, Dropped last, missing Watching works", () => {
+  const rows = [
+    { key: "DROPPED", name: "dropped", media: true },
+    { key: "ANIME", name: "Anime", media: true },
+    { key: "SERIES", name: "SERIES", media: true },
+    { key: "UPCOMING", name: "Upcoming", media: true },
+    { key: "MOVIE", name: "Movie", media: true },
+  ];
+  assert.deepEqual(orderStatusGroups(rows, "media"), ["UPCOMING", "SERIES", "ANIME", "MOVIE", "DROPPED"]);
+});
+
+test("orderStatusGroups: Alert first and Cancelled last by name", () => {
+  const rows = [
+    { key: "CANCELLED", name: "Cancelled", media: false },
+    { key: "A", name: "Alpha", media: false },
+    { key: "ALERT", name: "alert", media: false },
+    { key: "B", name: "Beta", media: false },
+  ];
+  assert.deepEqual(orderStatusGroups(rows, "tasks"), ["ALERT", "A", "B", "CANCELLED"]);
+});
+
+// --- queryStatusTasks -------------------------------------------------------
+
+function fakeApi({ tasks, children = [], asyncQ = true }) {
+  const calls = [];
+  const run = (query, ...args) => {
+    calls.push({ query, args });
+    if (query.includes(":node/title")) return tasks;
+    return children;
+  };
+  const api = { calls };
+  if (asyncQ) api.data = { async: { q: async (query, ...args) => run(query, ...args) } };
+  else api.q = (query, ...args) => run(query, ...args);
+  return api;
+}
+
+const WATCHING = "{{[[TODO]]}} #[[task-status/Watching]] Severance";
+
+test("queryStatusTasks: filters done, mid-text tags and duplicates, and orders by edit time", async () => {
+  const roamAlphaAPI = fakeApi({
+    tasks: [
+      ["a", WATCHING, "task-status/Watching", 100],
+      ["a", WATCHING, "task-status/Watching", 100],
+      ["b", "{{[[TODO]]}} #[[task-status/Watching]] Dark", "task-status/Watching", 300],
+      ["c", "{{[[DONE]]}} #[[task-status/Watching]] Lost", "task-status/Watching", 400],
+      ["d", "{{[[TODO]]}} #[[task-status/Active]] Plan and mention #[[task-status/Watching]]", "task-status/Watching", 500],
+      ["e", "{{[[TODO]]}} #[[task-status/Series]] Ozark", "task-status/Series", 300],
+    ],
+  });
+  const result = await queryStatusTasks({ roamAlphaAPI, statuses: CATALOG, helpers });
+  assert.deepEqual(result.map((row) => row.uid), ["b", "e", "a"]);
+  assert.equal(result[2].body, "Severance");
+  assert.equal(result[2].statusKey, "WATCHING");
+  assert.equal(result[2].editTime, 100);
+});
+
+test("queryStatusTasks: Episode child valid, invalid, duplicate and absent", async () => {
+  const roamAlphaAPI = fakeApi({
+    tasks: [
+      ["ok", "{{[[TODO]]}} #[[task-status/Series]] One", "task-status/Series", 5],
+      ["bad", "{{[[TODO]]}} #[[task-status/Series]] Two", "task-status/Series", 4],
+      ["dup", "{{[[TODO]]}} #[[task-status/Series]] Three", "task-status/Series", 3],
+      ["none", "{{[[TODO]]}} #[[task-status/Series]] Four", "task-status/Series", 2],
+    ],
+    children: [
+      ["ok", "c1", "Episode:: S2E5", 0],
+      ["bad", "c2", "Episode:: junk", 0],
+      ["dup", "c3", "Episode:: S1E1", 0],
+      ["dup", "c4", "Episode:: S1E2", 1],
+      ["none", "c5", "Note:: x", 0],
+    ],
+  });
+  const result = await queryStatusTasks({ roamAlphaAPI, statuses: CATALOG, helpers });
+  const byUid = Object.fromEntries(result.map((row) => [row.uid, row.episode]));
+  assert.deepEqual(byUid, {
+    ok: { text: "S2E5" },
+    bad: { text: "?", invalid: true },
+    dup: { text: "?", invalid: true },
+    none: null,
+  });
+});
+
+test("queryStatusTasks: async.q first, q fallback, tag titles bound, no second query when empty", async () => {
+  const withAsync = fakeApi({ tasks: [] });
+  withAsync.q = () => assert.fail("sync q must not be used when async.q exists");
+  assert.deepEqual(await queryStatusTasks({ roamAlphaAPI: withAsync, statuses: CATALOG, helpers }), []);
+  assert.equal(withAsync.calls.length, 1);
+  assert.deepEqual(withAsync.calls[0].args, [CATALOG.map((status) => status.tagTitle)]);
+
+  const sync = fakeApi({ tasks: [["a", WATCHING, "task-status/Watching", 1]], asyncQ: false });
+  const result = await queryStatusTasks({ roamAlphaAPI: sync, statuses: CATALOG, helpers });
+  assert.equal(result.length, 1);
+  assert.equal(sync.calls.length, 2);
+  assert.deepEqual(sync.calls[1].args, [["a"]]);
+});
+
+// --- episodeStateFromChildren parity ---------------------------------------
+
+test("episodeStateFromChildren matches readEpisodeStateSync", () => {
+  const cases = [
+    [],
+    [{ uid: "x", string: "other", order: 0 }],
+    [{ uid: "x", string: "Episode:: S2E5", order: 0 }],
+    [{ uid: "x", string: "episode::s3e4\nmore", order: 0 }],
+    [{ uid: "x", string: "Episode:: junk", order: 0 }],
+    [
+      { uid: "x", string: "Episode:: S1E1", order: 0 },
+      { uid: "y", string: "Episode:: S1E2", order: 1 },
+    ],
+    [
+      { uid: "y", string: "Episode:: S9E9", order: 5 },
+      { uid: "z", string: "Note:: a", order: 1 },
+    ],
+  ];
+  for (const children of cases) {
+    const roamAlphaAPI = {
+      data: {
+        pull: () => ({
+          ":block/uid": "t",
+          ":block/children": children.map((child) => ({
+            ":block/uid": child.uid,
+            ":block/string": child.string,
+            ":block/order": child.order,
+          })),
+        }),
+      },
+    };
+    const expected = readEpisodeStateSync({ roamAlphaAPI, uid: "t" });
+    assert.deepEqual({ found: true, ...episodeStateFromChildren(children) }, expected);
+  }
+});
+
+// --- view controller --------------------------------------------------------
+
+class FakeEl {
+  constructor(tag) {
+    this.tagName = tag.toUpperCase();
+    this.children = [];
+    this.parentNode = null;
+    this.attributes = new Map();
+    this.handlers = new Map();
+    this.className = "";
+    this.textContent = "";
+    this.style = {};
+    this.scrollTop = 0;
+    this.isConnected = false;
+    this.focused = 0;
+  }
+  append(...nodes) {
+    for (const node of nodes) {
+      node.parentNode = this;
+      node.setConnected(this.isConnected);
+      this.children.push(node);
+    }
+  }
+  appendChild(node) { this.append(node); return node; }
+  setConnected(value) {
+    this.isConnected = value;
+    this.children.forEach((child) => child.setConnected(value));
+  }
+  remove() {
+    if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+    this.parentNode = null;
+    this.setConnected(false);
+  }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
+  addEventListener(type, handler) {
+    if (!this.handlers.has(type)) this.handlers.set(type, new Set());
+    this.handlers.get(type).add(handler);
+  }
+  removeEventListener(type, handler) { this.handlers.get(type)?.delete(handler); }
+  dispatch(type, extra = {}) {
+    const event = {
+      type,
+      target: this,
+      stopped: false,
+      prevented: false,
+      stopPropagation() { this.stopped = true; },
+      preventDefault() { this.prevented = true; },
+      ...extra,
+    };
+    this.handlers.get(type)?.forEach((handler) => handler(event));
+    return event;
+  }
+  focus() { this.focused += 1; }
+  prepend(node) {
+    node.parentNode = this;
+    node.setConnected(this.isConnected);
+    this.children.unshift(node);
+  }
+  contains(node) {
+    for (let current = node; current; current = current.parentNode) if (current === this) return true;
+    return false;
+  }
+  hasClass(name) { return this.className.split(/\s+/).includes(name); }
+  all(predicate, out = []) {
+    for (const child of this.children) {
+      if (predicate(child)) out.push(child);
+      child.all(predicate, out);
+    }
+    return out;
+  }
+  byClass(name) { return this.all((el) => el.hasClass(name)); }
+}
+
+class FakeWindow {
+  constructor() { this.handlers = []; }
+  addEventListener(type, handler, capture) { this.handlers.push({ type, handler, capture }); }
+  removeEventListener(type, handler, capture) {
+    this.handlers = this.handlers.filter((h) => !(h.type === type && h.handler === handler && h.capture === capture));
+  }
+  count() { return this.handlers.length; }
+  dispatch(type, target, extra = {}) {
+    const event = {
+      type,
+      target,
+      stopped: false,
+      immediate: false,
+      prevented: false,
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.immediate = true; },
+      preventDefault() { this.prevented = true; },
+      ...extra,
+    };
+    this.handlers.filter((h) => h.type === type && h.capture === true).forEach((h) => h.handler(event));
+    return event;
+  }
+}
+
+class FakeObserver {
+  static instances = [];
+  constructor(callback) { this.callback = callback; this.disconnected = false; FakeObserver.instances.push(this); }
+  observe() {}
+  disconnect() { this.disconnected = true; }
+}
+
+function setup({
+  tasks,
+  children = [],
+  statuses = CATALOG,
+  withRender = false,
+  dock = false,
+  contentAppears = true,
+  sidebarOpen = false,
+  windows = [],
+  waitMs = 20,
+  htmlClasses = [],
+  bodyClasses = [],
+} = {}) {
+  FakeObserver.instances = [];
+  const sidebarState = { host: new FakeEl("div"), content: null, windows };
+  sidebarState.host.setConnected(true);
+  const makeContent = () => {
+    const content = new FakeEl("div");
+    content.setAttribute("id", "roam-right-sidebar-content");
+    content.scrollTop = 79;
+    sidebarState.host.append(content);
+    sidebarState.content = content;
+  };
+  if (sidebarOpen) makeContent();
+  const document = {
+    body: new FakeEl("body"),
+    activeElement: null,
+    createElement: (tag) => new FakeEl(tag),
+    querySelector: (selector) => {
+      if (!dock) return null;
+      if (selector === "#right-sidebar") return sidebarState.host;
+      if (selector === "#roam-right-sidebar-content") {
+        return sidebarState.content?.isConnected ? sidebarState.content : null;
+      }
+      return null;
+    },
+  };
+  document.body.isConnected = true;
+  document.body.classList = { contains: (name) => bodyClasses.includes(name) };
+  document.documentElement = { classList: { contains: (name) => htmlClasses.includes(name) } };
+  const portalRoot = new FakeEl("div");
+  document.body.append(portalRoot);
+  const calls = { q: [], open: [], sidebar: [], write: [], render: [], unmount: [], sidebarOpen: 0, sidebarClose: 0 };
+  let pending = null;
+  const taskRows = tasks ?? [
+    ["w1", "{{[[TODO]]}} #[[task-status/Watching]] Severance", "task-status/Watching", 20],
+    ["s1", "{{[[TODO]]}} #[[task-status/Series]] Ozark", "task-status/Series", 30],
+    ["a1", "{{[[TODO]]}} #[[task-status/Active]] Write report", "task-status/Active", 10],
+  ];
+  const q = async (query) => {
+    calls.q.push(query);
+    if (pending) await pending.promise;
+    return query.includes(":node/title") ? taskRows : children;
+  };
+  const roamAlphaAPI = {
+    data: {
+      async: { q },
+      block: { create: () => calls.write.push("create"), update: () => calls.write.push("update") },
+    },
+    createBlock: () => calls.write.push("createBlock"),
+    updateBlock: () => calls.write.push("updateBlock"),
+    ui: {
+      mainWindow: { openBlock: (arg) => calls.open.push(arg) },
+      rightSidebar: {
+        addWindow: (arg) => calls.sidebar.push(arg),
+        ...(dock
+          ? {
+              open: () => {
+                calls.sidebarOpen += 1;
+                if (contentAppears && !sidebarState.content?.isConnected) makeContent();
+              },
+              close: () => {
+                calls.sidebarClose += 1;
+                sidebarState.content?.remove();
+              },
+              getWindows: () => sidebarState.windows,
+            }
+          : {}),
+      },
+      components: withRender
+        ? {
+            renderString: ({ el, string }) => calls.render.push({ el, string }),
+            unmountNode: ({ el }) => calls.unmount.push(el),
+          }
+        : {},
+    },
+  };
+  const logs = [];
+  const win = new FakeWindow();
+  const view = createStatusView({
+    document,
+    window: win,
+    roamAlphaAPI,
+    portalRoot,
+    readGroups: () => ({ statuses, helpers }),
+    waitMs,
+    MutationObserverCtor: FakeObserver,
+    log: (...args) => logs.push(args),
+  });
+  const gate = () => {
+    let release;
+    const promise = new Promise((resolve) => { release = resolve; });
+    pending = { promise, release };
+    return () => { const current = pending; pending = null; current.release(); };
+  };
+  return { view, document, portalRoot, calls, logs, gate, win, sidebarState };
+}
+
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+function groupNames(root) {
+  return root.byClass("ts-status-view-group").map(
+    (group) => group.byClass("ts-status-view-group-header")[0].children[0].textContent
+  );
+}
+
+test("open renders groups in order and mounts in the portal", async () => {
+  const { view, portalRoot } = setup();
+  view.open();
+  const root = portalRoot.children[0];
+  assert.equal(root.getAttribute("role"), "dialog");
+  assert.equal(root.getAttribute("aria-label"), "Watching now");
+  assert.match(root.textContent + root.byClass("ts-status-view-message")[0].textContent, /Loading/);
+  await tick();
+  assert.deepEqual(groupNames(root), ["Watching", "Series"]);
+  const pill = root.byClass("ts-status-view-group")[0].byClass("ts-status-pill-preview")[0];
+  assert.equal(pill.getAttribute("data-task-status-key"), "WATCHING");
+  assert.equal(pill.getAttribute("data-ts-status-glyph"), "watching");
+  const icon = root.byClass("ts-status-view-icon")[0];
+  assert.equal(icon.getAttribute("aria-hidden"), "true");
+  assert.equal(root.byClass("ts-status-view-row")[0].getAttribute("tabindex"), "0");
+  assert.equal(view.isOpen(), true);
+});
+
+test("filter switch re-renders from the last query without a new one", async () => {
+  const ctx = setup();
+  ctx.view.open();
+  await tick();
+  const queries = ctx.calls.q.length;
+  const root = ctx.portalRoot.children[0];
+  const radios = root.byClass("ts-status-view-radio");
+  assert.equal(radios[0].getAttribute("aria-checked"), "true");
+  radios[1].dispatch("click");
+  assert.deepEqual(groupNames(root), ["Active"]);
+  assert.equal(radios[1].getAttribute("aria-checked"), "true");
+  radios[2].dispatch("click");
+  assert.deepEqual(groupNames(root), ["Watching", "Series", "Active"]);
+  assert.equal(ctx.calls.q.length, queries);
+});
+
+test("empty and failure states", async () => {
+  const empty = setup({ tasks: [] });
+  empty.view.open();
+  await tick();
+  assert.equal(empty.portalRoot.children[0].byClass("ts-status-view-message")[0].textContent, "No open tasks with a media status.");
+  empty.portalRoot.children[0].byClass("ts-status-view-radio")[1].dispatch("click");
+  assert.equal(empty.portalRoot.children[0].byClass("ts-status-view-message")[0].textContent, "No open tasks with a task status.");
+  empty.portalRoot.children[0].byClass("ts-status-view-radio")[2].dispatch("click");
+  assert.equal(empty.portalRoot.children[0].byClass("ts-status-view-message")[0].textContent, "No open tasks with a status.");
+
+  const failing = setup();
+  failing.view.open();
+  await tick();
+  failing.view.close();
+  const view2 = createStatusView({
+    document: failing.document,
+    window: new FakeWindow(),
+    roamAlphaAPI: { data: { async: { q: async () => { throw new Error("boom"); } } }, ui: {} },
+    portalRoot: failing.portalRoot,
+    readGroups: () => ({ statuses: CATALOG, helpers }),
+    log: (...args) => failing.logs.push(args),
+  });
+  view2.open();
+  await tick();
+  assert.equal(failing.portalRoot.children[0].byClass("ts-status-view-message")[0].textContent, "Could not read tasks.");
+  assert.equal(failing.logs.length, 1);
+});
+
+test("refresh coalescing: two refreshes during one query run exactly two cycles", async () => {
+  const ctx = setup();
+  const release = ctx.gate();
+  ctx.view.open();
+  await tick();
+  void ctx.view.refresh();
+  void ctx.view.refresh();
+  release();
+  await tick();
+  await tick();
+  // Each cycle is one task query (no Episode query for children-less rows in the
+  // fake returns [], but rows exist, so two queries per cycle).
+  assert.equal(ctx.calls.q.filter((query) => query.includes(":node/title")).length, 2);
+});
+
+test("a result that arrives after close is dropped", async () => {
+  const ctx = setup();
+  const release = ctx.gate();
+  ctx.view.open();
+  ctx.view.close();
+  release();
+  await tick();
+  assert.equal(ctx.portalRoot.children.length, 0);
+  assert.equal(ctx.view.isOpen(), false);
+});
+
+test("click opens the main window, shift-click the sidebar, inner page refs do nothing", async () => {
+  const ctx = setup();
+  ctx.view.open();
+  await tick();
+  const row = ctx.portalRoot.children[0].byClass("ts-status-view-row")[0];
+  row.dispatch("click", { shiftKey: false });
+  assert.deepEqual(ctx.calls.open, [{ block: { uid: "w1" } }]);
+  row.dispatch("click", { shiftKey: true });
+  assert.deepEqual(ctx.calls.sidebar, [{ window: { type: "block", "block-uid": "w1" } }]);
+  row.dispatch("click", { target: { closest: (selector) => (selector.includes(".rm-page-ref") ? {} : null) } });
+  assert.equal(ctx.calls.open.length, 1);
+  assert.equal(ctx.view.isOpen(), true);
+});
+
+test("key guard: Escape closes, Enter opens, outside keys pass, guard removed after close", async () => {
+  const ctx = setup();
+  const before = new FakeEl("div");
+  before.setConnected(true);
+  ctx.document.activeElement = before;
+  ctx.view.open();
+  await tick();
+  const root = ctx.portalRoot.children[0];
+  assert.equal(ctx.win.count(), 3);
+  const row = root.byClass("ts-status-view-row")[0];
+  const other = ctx.win.dispatch("keydown", row, { key: "j" });
+  assert.equal(other.stopped, true);
+  assert.equal(other.immediate, true);
+  assert.equal(other.prevented, false);
+  const enter = ctx.win.dispatch("keydown", row, { key: "Enter" });
+  assert.equal(enter.prevented, true);
+  assert.deepEqual(ctx.calls.open, [{ block: { uid: "w1" } }]);
+  ctx.win.dispatch("keydown", row, { key: "Enter", shiftKey: true });
+  assert.deepEqual(ctx.calls.sidebar, [{ window: { type: "block", "block-uid": "w1" } }]);
+  const outside = ctx.win.dispatch("keydown", new FakeEl("div"), { key: "Escape" });
+  assert.equal(outside.stopped, false);
+  assert.equal(ctx.view.isOpen(), true);
+  const button = root.byClass("ts-status-view-button")[0];
+  const tab = ctx.win.dispatch("keydown", button, { key: "Enter" });
+  assert.equal(tab.prevented, false);
+  assert.equal(tab.stopped, true);
+  const escape = ctx.win.dispatch("keydown", row, { key: "Escape" });
+  assert.equal(escape.stopped, true);
+  assert.equal(ctx.view.isOpen(), false);
+  assert.equal(before.focused, 1);
+  assert.equal(ctx.win.count(), 0);
+});
+
+test("dispose removes the element and unmounts rendered text; renderString is used when present", async () => {
+  const ctx = setup({ withRender: true });
+  ctx.view.open();
+  await tick();
+  assert.deepEqual(ctx.calls.render.map((entry) => entry.string).sort(), ["Ozark", "Severance"]);
+  ctx.view.dispose();
+  assert.equal(ctx.portalRoot.children.length, 0);
+  assert.equal(ctx.calls.unmount.length, 2);
+  ctx.view.open();
+  assert.equal(ctx.portalRoot.children.length, 0);
+});
+
+test("the view never calls a write API", async () => {
+  const ctx = setup();
+  ctx.view.open();
+  await tick();
+  const root = ctx.portalRoot.children[0];
+  root.byClass("ts-status-view-row")[0].dispatch("click");
+  root.byClass("ts-status-view-button")[0].dispatch("click");
+  await tick();
+  root.byClass("ts-status-view-radio")[2].dispatch("click");
+  ctx.view.close();
+  assert.deepEqual(ctx.calls.write, []);
+  const source = readFileSync(new URL("../src/status-view.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /createBlock|updateBlock|data\.block|moveBlock|deleteBlock/);
+});
+
+// --- wiring ---------------------------------------------------------------
+
+test("extension wiring: palette command, listeners, chooser item and cleanup", () => {
+  const source = readFileSync(new URL("../src/extension.js", import.meta.url), "utf8");
+  assert.match(source, /const viewLabel = "Task Status: Watching now"/);
+  assert.match(source, /registeredCommands\.palette\.push\(\{ label: viewLabel, api \}\)/);
+  assert.match(source, /\["change", "statuses"\]/);
+  assert.match(source, /publicApi\.addEventListener\(type, handler\)/);
+  assert.match(source, /publicApi\.removeEventListener\(type, handler\)/);
+  assert.match(source, /className: "ts-status-choice-view"/);
+  assert.match(source, /Watching now\\u2026/);
+  assert.match(source, /statusView\?\.dispose\(\)/);
+  assert.match(source, /onChange: \(\) =>/);
+});
+
+// --- docking ---------------------------------------------------------------
+
+test("docked: wrapper is the first child of the sidebar content", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const content = ctx.sidebarState.content;
+  assert.equal(ctx.portalRoot.children.length, 0);
+  const wrapper = content.children[0];
+  assert.equal(wrapper.hasClass("ts-status-portal"), true);
+  assert.equal(wrapper.hasClass("ts-status-view-dock"), true);
+  assert.equal(wrapper.getAttribute("data-task-status-portal"), "true");
+  assert.equal(wrapper.children[0].hasClass("ts-status-view--docked"), true);
+  await tick();
+  assert.deepEqual(groupNames(wrapper.children[0]), ["Watching", "Series"]);
+});
+
+test("falls back to the floating panel without the API or when the content never appears", async () => {
+  const none = setup();
+  await none.view.open();
+  assert.equal(none.portalRoot.children.length, 1);
+
+  const late = setup({ dock: true, contentAppears: false });
+  await late.view.open();
+  assert.equal(late.portalRoot.children.length, 1);
+  assert.equal(late.portalRoot.children[0].hasClass("ts-status-view--docked"), false);
+  assert.equal(late.calls.sidebarClose, 1);
+});
+
+test("observer re-prepends a removed wrapper and closes the view when the sidebar went away", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const observer = FakeObserver.instances[0];
+  const content = ctx.sidebarState.content;
+  const wrapper = content.children[0];
+  wrapper.remove();
+  observer.callback();
+  assert.equal(content.children[0], wrapper);
+  assert.equal(ctx.view.isOpen(), true);
+
+  content.remove();
+  observer.callback();
+  assert.equal(ctx.view.isOpen(), false);
+  assert.equal(observer.disconnected, true);
+  assert.equal(ctx.calls.sidebarClose, 0);
+});
+
+test("closing closes the sidebar only when the view opened it and no window is left", async () => {
+  const ours = setup({ dock: true });
+  await ours.view.open();
+  ours.view.close();
+  assert.equal(ours.calls.sidebarClose, 1);
+  assert.equal(FakeObserver.instances[0].disconnected, true);
+
+  const withWindow = setup({ dock: true, windows: [{}] });
+  await withWindow.view.open();
+  withWindow.view.close();
+  assert.equal(withWindow.calls.sidebarClose, 0);
+
+  const already = setup({ dock: true, sidebarOpen: true });
+  await already.view.open();
+  assert.equal(already.sidebarState.content.children[0].hasClass("ts-status-view-dock"), true);
+  already.view.close();
+  assert.equal(already.calls.sidebarClose, 0);
+});
+
+test("double open during the mount wait mounts once; close during the wait mounts nothing", async () => {
+  const ctx = setup({ dock: true, contentAppears: false, waitMs: 60 });
+  const first = ctx.view.open();
+  const second = ctx.view.open();
+  await Promise.all([first, second]);
+  assert.equal(ctx.portalRoot.children.length, 1);
+  assert.equal(ctx.win.count(), 3);
+
+  const aborted = setup({ dock: true, contentAppears: false, waitMs: 60 });
+  const pending = aborted.view.open();
+  aborted.view.close();
+  await pending;
+  assert.equal(aborted.portalRoot.children.length, 0);
+  assert.equal(aborted.view.isOpen(), false);
+  assert.equal(aborted.win.count(), 0);
+});
+
+// --- scroll and theme -------------------------------------------------------
+
+test("docked mount scrolls the sidebar to the top once, not on refresh", async () => {
+  const ctx = setup({ dock: true });
+  await ctx.view.open();
+  const content = ctx.sidebarState.content;
+  assert.equal(content.scrollTop, 0);
+  content.scrollTop = 40;
+  await tick();
+  await ctx.view.refresh();
+  content.children[0].remove();
+  FakeObserver.instances[0].callback();
+  assert.equal(content.scrollTop, 40);
+});
+
+function themeEnv({ html = [], body = [], background = null, dark = null } = {}) {
+  return {
+    document: {
+      documentElement: { classList: { contains: (name) => html.includes(name) } },
+      body: { classList: { contains: (name) => body.includes(name) } },
+    },
+    window: {
+      getComputedStyle: () => ({ backgroundColor: background }),
+      ...(dark == null ? {} : { matchMedia: () => ({ matches: dark }) }),
+    },
+  };
+}
+
+test("resolveViewTheme: classes, body luminance, OS hint, then light", () => {
+  assert.equal(resolveViewTheme(themeEnv({ html: ["bp3-dark"], background: "rgb(255, 255, 255)" })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["bt-theme-dark"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ html: ["rm-dark-theme"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["roam-body", "dark"] })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["roam-body"] })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ html: ["bp3-light"], background: "rgb(0, 0, 0)", dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ body: ["bt-theme-light"], dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgb(30, 36, 40)", dark: false })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgb(255, 255, 255)", dark: true })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "rgba(0, 0, 0, 0)", dark: true })), "dark");
+  assert.equal(resolveViewTheme(themeEnv({ background: "transparent", dark: false })), "light");
+  assert.equal(resolveViewTheme(themeEnv({ background: "transparent" })), "light");
+});
+
+test("the view root and dock wrapper carry the resolved theme", async () => {
+  const dark = setup({ dock: true, htmlClasses: ["bp3-dark"] });
+  await dark.view.open();
+  const wrapper = dark.sidebarState.content.children[0];
+  assert.equal(wrapper.getAttribute("data-ts-view-theme"), "dark");
+  assert.equal(wrapper.children[0].getAttribute("data-ts-view-theme"), "dark");
+  const light = setup({ htmlClasses: ["bp3-light"] });
+  light.view.open();
+  assert.equal(light.portalRoot.children[0].getAttribute("data-ts-view-theme"), "light");
+});
+
+test("theme override rules exist and follow the prefers-color-scheme portal rule", () => {
+  const css = readFileSync(new URL("../src/extension.css", import.meta.url), "utf8");
+  const osRule = css.indexOf(":root:not(.bp3-light) :where(.ts-status-portal");
+  for (const theme of ["light", "dark"]) {
+    const menu = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] {`);
+    const pill = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] .ts-status-pill-preview[data-task-status-key] {`);
+    assert.ok(osRule > -1 && menu > osRule && pill > menu, `${theme} rules come after the OS rule`);
+    assert.match(css.slice(menu, pill), /--ts-menu-surface: var\(--svy-overlay/);
+    assert.match(css.slice(pill, pill + 500), new RegExp(`--ts-status-bg: var\\(--ts-status-bg-${theme}`));
+  }
+});

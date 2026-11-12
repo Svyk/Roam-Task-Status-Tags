@@ -19,6 +19,7 @@ import {
   parseCarryOverSetting,
   resetTagTitles,
 } from "./repeat-status-reset.js";
+import { createStatusView } from "./status-view.js";
 import {
   createPublicApi,
   emitStatusCatalog,
@@ -1342,6 +1343,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let statusChooserAnchorEl = null;
   let followUpPrompt = null;
   let statusPeekController = null;
+  let statusView = null;
+  let statusViewListeners = [];
 
   function log(...args) {
     if (CONFIG.debug) console.log("[TaskStatus]", ...args);
@@ -1643,6 +1646,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     themeRefreshFrame = requestFrame(() => {
       themeRefreshFrame = null;
       applyStatusColorOverrides(statusColorOverrides);
+      if (statusView?.isOpen()) void statusView.refresh();
     });
   }
 
@@ -1762,6 +1766,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     activityRecorder,
     getBlockUid: (element) => getBlockUidFromElement(element),
     onOpenMenu: (context) => openEpisodeMenu(context),
+    onChange: () => {
+      if (statusView?.isOpen()) void statusView.refresh();
+    },
   });
 
   function getCurrentStatus(text) {
@@ -2177,6 +2184,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return li;
   }
 
+  function makeWatchingNowChoice() {
+    return makeStatusMenuItem({
+      label: "Watching now\u2026",
+      className: "ts-status-choice-view",
+      onChoose: () => {
+        closeStatusChooser();
+        void statusView?.open();
+      },
+    });
+  }
+
   function makeStatusChoiceButton({ statusKey, currentStatusKey, targetUids }) {
     const status = STATUSES[statusKey];
     const item = makeStatusMenuItem({
@@ -2453,6 +2471,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         },
       })
     );
+    const viewDivider = document.createElement("li");
+    viewDivider.className = "bp3-menu-divider ts-status-choice-divider";
+    viewDivider.setAttribute("role", "separator");
+    choices.append(viewDivider, makeWatchingNowChoice());
     content.append(choices);
     chooser.append(makeBlueprintPopoverArrow(), content);
 
@@ -2666,6 +2688,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       log("Failed to add palette command:", removeLabel, err);
     }
     registeredCommands.palette.push({ label: removeLabel, api });
+
+    const viewLabel = "Task Status: Watching now";
+    try {
+      const res = api.addCommand({
+        label: viewLabel,
+        "disable-hotkey": false,
+        callback: () => statusView?.toggle(),
+      });
+      if (isThenable(res)) await res;
+    } catch (err) {
+      log("Failed to add palette command:", viewLabel, err);
+    }
+    registeredCommands.palette.push({ label: viewLabel, api });
 
     if (msApi?.addCommand) {
       try {
@@ -3824,6 +3859,31 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusPeekController.start();
     statusPeekController.setEnabled(isStatusPeekEnabled());
 
+    statusView = createStatusView({
+      document,
+      window,
+      roamAlphaAPI: window.roamAlphaAPI,
+      portalRoot,
+      readGroups: () => ({
+        statuses: CONFIG.cycleOrder
+          .filter((key) => STATUSES[key]?.active)
+          .map((key) => ({
+            key,
+            name: STATUSES[key].name,
+            tagTitle: STATUSES[key].tagTitle,
+            glyph: getStatusGlyph(key),
+            media: statusIsMedia(key),
+          })),
+        helpers: getTextHelpers(),
+      }),
+      log,
+    });
+    const refreshStatusView = () => {
+      if (statusView?.isOpen()) void statusView.refresh();
+    };
+    statusViewListeners = ["change", "statuses"].map((type) => [type, refreshStatusView]);
+    statusViewListeners.forEach(([type, handler]) => publicApi.addEventListener(type, handler));
+
     // Apply persisted status color overrides (if any)
     clearStatusColorOverrides();
     applyStatusColorOverrides(statusColorOverrides);
@@ -3855,6 +3915,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     closeStatusChooser();
     statusPeekController?.destroy?.();
     statusPeekController = null;
+    statusViewListeners.forEach(([type, handler]) => publicApi.removeEventListener(type, handler));
+    statusViewListeners = [];
+    statusView?.dispose();
+    statusView = null;
     stopStatusPillObserver();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
