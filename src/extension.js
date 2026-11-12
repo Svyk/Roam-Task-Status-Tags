@@ -559,9 +559,9 @@ function createTaskStatusExtension({ extensionAPI }) {
     MOVIE: "#f97316",
     WATCHING: "#22c55e",
     WATCHLIST: "#ec4899",
-    UPCOMING: "#2626d9",
+    UPCOMING: "#0d87f2",
     REWATCH: "#84cc16",
-    DROPPED: "#a16207",
+    DROPPED: "#7c2d12",
   };
 
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";

@@ -49,7 +49,7 @@ does not replace it, intercept it, or create another completion state.
 | Movie | Orange outline + centered clapperboard | Orange outline + centered clapperboard | Native theme checkmark |
 | Watching | Green outline + centered disc with play triangle | Green outline + centered disc with play triangle | Native theme checkmark |
 | Watchlist | Pink outline + centered bookmark | Pink outline + centered bookmark | Native theme checkmark |
-| Upcoming | Royal blue outline + centered calendar | Royal blue outline + centered calendar | Native theme checkmark |
+| Upcoming | Azure outline + centered calendar | Azure outline + centered calendar | Native theme checkmark |
 | Rewatch | Lime outline + centered loop arrows | Lime outline + centered loop arrows | Native theme checkmark |
 | Dropped | Brown outline + centered eject symbol | Brown outline + centered eject symbol | Native theme checkmark |
 | Custom status | Contrast-adjusted configured hue + centered diamond | Contrast-adjusted configured hue + centered diamond | Native theme checkmark |
@@ -139,7 +139,7 @@ Active -> Waiting -> In Review -> Holding -> Incubating -> Alert -> Cancelled ->
 Click-to-cycle and `Task Status: Cycle` walk the task statuses only; media statuses are
 set from the chooser (shown below a divider), slash commands, or the palette. A status you
 add yourself named Series, Movie, Watching, Watchlist, Upcoming, Rewatch, or Dropped gets
-the matching glyph by name and keeps its own key and colour. Existing installs get the media
+the matching glyph by name, keeps its own key and colour, and is left out of click-to-cycle like the other media statuses. Existing installs get the media
 statuses once, appended at the end, unless a status with that name already exists.
 
 You can add, rename, delete, and reorder statuses in settings.
