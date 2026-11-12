@@ -82,6 +82,8 @@ function fakeEnv({ pages = {}, blocks = {}, betterTasks = "v2", t0 = 1_000_000 }
     /* absent */
   }
 
+  const intervals = [];
+  const clearedIntervals = [];
   const refsOf = (uids) => ({ ":block/_refs": uids.map((uid) => ({ ":db/id": entityId(uid) })) });
   return {
     clock,
@@ -91,6 +93,8 @@ function fakeEnv({ pages = {}, blocks = {}, betterTasks = "v2", t0 = 1_000_000 }
     roamAlphaAPI,
     windowLike,
     pullCounts,
+    intervals,
+    clearedIntervals,
     fire(pageUid, beforeUids, afterUids) {
       const watch = watches.find((w) => w.uid === pageUid);
       assert.ok(watch, `no watch on ${pageUid}`);
@@ -108,6 +112,11 @@ function fakeEnv({ pages = {}, blocks = {}, betterTasks = "v2", t0 = 1_000_000 }
           return 1;
         },
         clearTimer: () => {},
+        setRepeatingTimer: (fn, ms) => {
+          intervals.push({ fn, ms });
+          return intervals.length;
+        },
+        clearRepeatingTimer: (id) => clearedIntervals.push(id),
         ...options,
       });
     },
@@ -317,4 +326,37 @@ test("props arrive in every shape", async () => {
     await flush();
     assert.equal(env.requests.length, 1, `shape ${index}`);
   }
+});
+
+test("a status set by hand on a fresh occurrence a few seconds later is kept", async () => {
+  const env = fakeEnv({
+    pages: { "task-status/Active": "pg-active" },
+    blocks: { fresh: { string: SPAWN_STRING, created: 1_000_000 - 4_000, props: PROPS } },
+  });
+  const reset = env.make();
+  reset.sync();
+  env.fire("pg-active", ["other"], ["other", "fresh"]);
+  await flush();
+  assert.equal(env.requests.length, 0);
+});
+
+test("the re-sync timer watches a tag page created after load; dispose stops it", () => {
+  const pages = {};
+  const env = fakeEnv({ pages });
+  const reset = env.make();
+  reset.sync();
+  assert.equal(env.watches.length, 0);
+  assert.equal(env.intervals.length, 1);
+  assert.equal(env.intervals[0].ms, 60000);
+  pages["task-status/Active"] = "pg-active";
+  env.intervals[0].fn();
+  assert.deepEqual(reset.watchedTitles(), ["task-status/Active"]);
+  pages["task-status/Active"] = "pg-active-2";
+  env.intervals[0].fn();
+  assert.deepEqual(env.watches.map((w) => w.uid), ["pg-active-2"]);
+  reset.sync();
+  assert.equal(env.intervals.length, 1);
+  reset.dispose();
+  assert.deepEqual(env.clearedIntervals, [1]);
+  assert.equal(env.watches.length, 0);
 });

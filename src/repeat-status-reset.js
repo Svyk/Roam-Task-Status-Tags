@@ -106,11 +106,18 @@ export function createRepeatStatusReset({
   setTimer = (fn, ms) => setTimeout(fn, ms),
   clearTimer = (id) => clearTimeout(id),
   // The ref must arrive with the block: a block older than this when its tag
-  // ref appears was edited, not spawned.
-  bornWithinMs = 10000,
+  // ref appears was edited (a status set by hand on a fresh occurrence, or a
+  // block synced from another device), not spawned here.
+  bornWithinMs = 2000,
   // How long to wait for Better Tasks to finish writing `rt` props.
-  spawnSettleMs = 5000,
-  pollMs = 150,
+  spawnSettleMs = 10000,
+  pollMs = 200,
+  // Tag pages created after load (typed by hand, set through Better Tasks,
+  // synced from another device) or recreated under a new uid get a watch on
+  // the next re-sync.
+  resyncMs = 60000,
+  setRepeatingTimer = (fn, ms) => setInterval(fn, ms),
+  clearRepeatingTimer = (id) => clearInterval(id),
   log = () => {},
 }) {
   const watches = new Map(); // tag title (lower case) -> { title, pageUid, callback }
@@ -118,6 +125,7 @@ export function createRepeatStatusReset({
   const timers = new Set();
   let disposed = false;
   let resetTitleSet = new Set();
+  let resyncTimer = null;
 
   const data = () => roamAlphaAPI?.data;
 
@@ -246,6 +254,9 @@ export function createRepeatStatusReset({
   // created a tag page for the first time.
   function sync() {
     if (disposed) return;
+    if (resyncTimer === null && resyncMs > 0) {
+      resyncTimer = setRepeatingTimer(() => sync(), resyncMs);
+    }
     const titles = (getResetTagTitles?.() || []).filter((t) => typeof t === "string");
     resetTitleSet = new Set(titles.map((t) => t.toLowerCase()));
     for (const key of [...watches.keys()]) {
@@ -271,6 +282,8 @@ export function createRepeatStatusReset({
 
   function dispose() {
     disposed = true;
+    if (resyncTimer !== null) clearRepeatingTimer(resyncTimer);
+    resyncTimer = null;
     for (const key of [...watches.keys()]) unwatch(key);
     for (const id of timers) clearTimer(id);
     timers.clear();

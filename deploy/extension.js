@@ -422,11 +422,18 @@ function createRepeatStatusReset({
   setTimer = (fn, ms) => setTimeout(fn, ms),
   clearTimer = (id) => clearTimeout(id),
   // The ref must arrive with the block: a block older than this when its tag
-  // ref appears was edited, not spawned.
-  bornWithinMs = 1e4,
+  // ref appears was edited (a status set by hand on a fresh occurrence, or a
+  // block synced from another device), not spawned here.
+  bornWithinMs = 2e3,
   // How long to wait for Better Tasks to finish writing `rt` props.
-  spawnSettleMs = 5e3,
-  pollMs = 150,
+  spawnSettleMs = 1e4,
+  pollMs = 200,
+  // Tag pages created after load (typed by hand, set through Better Tasks,
+  // synced from another device) or recreated under a new uid get a watch on
+  // the next re-sync.
+  resyncMs = 6e4,
+  setRepeatingTimer = (fn, ms) => setInterval(fn, ms),
+  clearRepeatingTimer = (id) => clearInterval(id),
   log = () => {
   }
 }) {
@@ -435,6 +442,7 @@ function createRepeatStatusReset({
   const timers = /* @__PURE__ */ new Set();
   let disposed = false;
   let resetTitleSet = /* @__PURE__ */ new Set();
+  let resyncTimer = null;
   const data = () => roamAlphaAPI?.data;
   function pagesUidForTitle(title) {
     try {
@@ -548,6 +556,9 @@ function createRepeatStatusReset({
   }
   function sync() {
     if (disposed) return;
+    if (resyncTimer === null && resyncMs > 0) {
+      resyncTimer = setRepeatingTimer(() => sync(), resyncMs);
+    }
     const titles = (getResetTagTitles?.() || []).filter((t) => typeof t === "string");
     resetTitleSet = new Set(titles.map((t) => t.toLowerCase()));
     for (const key of [...watches.keys()]) {
@@ -572,6 +583,8 @@ function createRepeatStatusReset({
   }
   function dispose() {
     disposed = true;
+    if (resyncTimer !== null) clearRepeatingTimer(resyncTimer);
+    resyncTimer = null;
     for (const key of [...watches.keys()]) unwatch(key);
     for (const id of timers) clearTimer(id);
     timers.clear();
