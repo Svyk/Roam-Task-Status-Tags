@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0 — 2026-11-11
+
+- New read-only **Watching now** panel: open tasks grouped by status, each row showing the task, its status icon, and its episode (`S2E5`) when it has an `Episode::` block.
+- Open it with the command palette entry `Task Status: Watching now` (toggles it) or the chooser item `Watching now…` below Remove status.
+- Filter: **Media** (default), **Tasks** or **All**, kept for the session. Media order: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped. Tasks order: Alert, the other task statuses in your order, Cancelled. Groups with no open tasks are hidden; newest edit first inside a group.
+- Click a row (or press Enter) to open the task in the main window, Shift+click or Shift+Enter for the right sidebar. A click on a link inside the text is left to Roam. The panel stays open.
+- Read-only: it never writes to the graph. DONE tasks are not listed. Escape or the close button closes it; Roam's shortcuts do not fire while it has focus.
+- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand show after Refresh or reopening the panel.
+- A custom panel, not a query page: a query page would write blocks into your graph, could not follow the status order, show the episode, or switch filters without editing the query.
+
 ## 0.13.0 — 2026-11-11
 
 - A task with the status **Series**, **Watching** or **Rewatch** (open or done) shows a small episode counter like `S2E5` right after its status.

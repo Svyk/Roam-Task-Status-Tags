@@ -67,21 +67,29 @@ function orderedChildren(block) {
     .sort((a, b) => a.order - b.order);
 }
 
-function stateFromBlock(block, uid) {
-  if (valueAt(block, ":block/uid", null) !== uid) return { found: false };
-  const matches = orderedChildren(block).filter((entry) => EPISODE_CHILD_RE.test(entry.string));
-  if (!matches.length) return { found: true, episode: null, childUid: null, childString: null, invalid: false, duplicate: false };
+// Decides the Episode state from a task's children (`[{uid, string, order}]`).
+export function episodeStateFromChildren(children) {
+  const ordered = (Array.isArray(children) ? children : [])
+    .filter((child) => typeof child?.uid === "string" && typeof child?.string === "string")
+    .map((child) => ({ uid: child.uid, string: child.string, order: Number(child.order) || 0 }))
+    .sort((a, b) => a.order - b.order);
+  const matches = ordered.filter((entry) => EPISODE_CHILD_RE.test(entry.string));
+  if (!matches.length) return { episode: null, childUid: null, childString: null, invalid: false, duplicate: false };
   const child = matches[0];
   const duplicate = matches.length > 1;
   const episode = duplicate ? null : parseEpisode(child.string.match(EPISODE_CHILD_RE)[1]);
   return {
-    found: true,
     episode,
     childUid: child.uid,
     childString: child.string,
     invalid: duplicate || !episode,
     duplicate,
   };
+}
+
+function stateFromBlock(block, uid) {
+  if (valueAt(block, ":block/uid", null) !== uid) return { found: false };
+  return { found: true, ...episodeStateFromChildren(orderedChildren(block)) };
 }
 
 // Only the first line's value changes; any further lines stay byte-for-byte.
@@ -234,6 +242,7 @@ export function createEpisodeCounterController({
   roamAlphaAPI,
   activityRecorder = null,
   onOpenMenu = () => {},
+  onChange = () => {},
   getBlockUid = () => null,
   warn = (...args) => console.warn(...args),
 }) {
@@ -305,6 +314,11 @@ export function createEpisodeCounterController({
     if (remaining > 0) inFlight.set(uid, remaining);
     else inFlight.delete(uid);
     if (remaining > 0) return result;
+    if (result.status === "updated") {
+      try {
+        onChange(uid);
+      } catch (_) {}
+    }
     if (result.status === "updated" || result.status === "unchanged") {
       const settled = parseEpisode(result.value);
       if (settled) countersFor(uid).forEach((el) => render(el, { episode: settled }));

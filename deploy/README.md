@@ -201,6 +201,18 @@ A task whose status is **Series**, **Watching** or **Rewatch** (open or done) sh
 - Each change adds one line to the task's existing Better Tasks activity log (`episode → S2E6`). It never creates a log and never repeats a line.
 - Fast double clicks count twice. A write that cannot be confirmed puts the counter back to what the graph says.
 
+## Watching now view
+
+A read-only panel that lists open tasks grouped by status.
+
+- Open it with the command palette entry `Task Status: Watching now` (toggles it), or the chooser item `Watching now…` under Remove status.
+- Filter **Media** (default), **Tasks** or **All**, kept for the session. Media order: Watching, Watchlist, Upcoming, Series, Rewatch, other media statuses, Dropped. Tasks order: Alert, the other task statuses in your order, Cancelled. Empty groups are hidden; the most recently edited task comes first.
+- Each row shows the status icon, the task text, and the episode (`S2E5`) when the task has an `Episode::` block.
+- Click or Enter opens the task in the main window; Shift+click or Shift+Enter opens it in the right sidebar. Links inside the text still work as in Roam. The panel stays open. Escape closes it.
+- It never writes to the graph and does not list DONE tasks.
+- It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand show after **Refresh** or reopening.
+- It is a custom panel, not a query page, so nothing is added to your graph and the order, episode and filter are not tied to a query block.
+
 ## Settings
 
 Open `Settings -> Extensions -> Task Status Tags`.
