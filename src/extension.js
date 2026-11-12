@@ -2,6 +2,13 @@ import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
+  DEFAULT_CARRY_OVER_STATUS_NAMES,
+  createRepeatStatusReset,
+  formatCarryOverSetting,
+  parseCarryOverSetting,
+  resetTagTitles,
+} from "./repeat-status-reset.js";
+import {
   createPublicApi,
   emitStatusCatalog,
   emitStatusChange,
@@ -512,6 +519,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
+    repeatCarryOver: "task-status-repeat-carry-over",
   };
 
   const STATUS_LABEL_DISPLAY = Object.freeze({
@@ -584,6 +592,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   );
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
+  let repeatCarryOver = loadRepeatCarryOverSetting();
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -903,6 +912,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return normalizeStatusLabelDisplay(parseMaybeJson(raw), fallback);
   }
 
+  function loadRepeatCarryOverSetting() {
+    const fallback = parseCarryOverSetting(null);
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.repeatCarryOver);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(
+        SETTINGS_KEYS.repeatCarryOver,
+        formatCarryOverSetting(DEFAULT_CARRY_OVER_STATUS_NAMES)
+      );
+      return fallback;
+    }
+    return parseCarryOverSetting(typeof raw === "string" ? raw : String(raw ?? ""));
+  }
+
   function saveSetting(key, value) {
     if (!extensionAPI?.settings?.set) return;
     try {
@@ -1135,6 +1158,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     applyStatusColorOverrides(statusColorOverrides);
     refreshStatusVisuals(document);
     publishStatuses();
+    repeatStatusReset?.sync();
   }
 
   function escapeDatalogString(text) {
@@ -1493,6 +1517,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     refreshStatusVisuals(document);
   }
 
+  function setRepeatCarryOver(value) {
+    const candidate =
+      value && typeof value === "object"
+        ? value.target?.value ?? value.currentTarget?.value ?? value.value
+        : value;
+    repeatCarryOver = parseCarryOverSetting(String(candidate ?? ""));
+    repeatStatusReset.sync();
+  }
+
   function refreshMutationScopes(mutations) {
     const refreshed = new Set();
     const isInsideExtensionUi = (node) =>
@@ -1670,6 +1703,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     updateBlock,
     getLiveEditorString: getLiveBlockInputValue,
   });
+  const repeatStatusReset = createRepeatStatusReset({
+    roamAlphaAPI: window.roamAlphaAPI,
+    windowLike: window,
+    getResetTagTitles: () =>
+      resetTagTitles(
+        statusList.map((entry) => STATUSES[entry.key]?.name || entry.name),
+        repeatCarryOver
+      ),
+    log,
+  });
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
@@ -1766,7 +1809,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           reason: outcome?.reason || "unknown",
         });
       }
-      if (outcome?.status === "updated") publishChange(blockUid, statusKey);
+      if (outcome?.status === "updated") {
+        publishChange(blockUid, statusKey);
+        if (statusKey !== null) repeatStatusReset.sync();
+      }
       return outcome;
     } finally {
       pendingOperations.delete(blockUid);
@@ -3455,6 +3501,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.repeatCarryOver,
+          name: "Statuses kept on the next repeat",
+          description:
+            "When Better Tasks creates the next occurrence of a repeating task, every status not listed here is removed from the new occurrence (one write, through Better Tasks). Listed statuses carry over. Comma-separated status names, any case. Empty means none carry over.",
+          action: {
+            type: "input",
+            placeholder: "Series, Movie, ...",
+            onChange: (value) => setRepeatCarryOver(value),
+          },
+        },
+        {
           id: "task-status-status-names",
           name: "",
           description: "",
@@ -3525,6 +3582,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return false;
     }
 
+    repeatStatusReset.sync();
+
     startStatusPillObserver();
 
     // Roam's page/tag navigation triggers on mouse down. We intercept mousedown/touchstart
@@ -3544,6 +3603,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusPeekController = null;
     stopStatusPillObserver();
     stopThemeObserver();
+    repeatStatusReset.dispose();
 
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();
