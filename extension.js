@@ -375,7 +375,7 @@ var EPISODE_COUNTER_CLASS = "ts-episode-counter";
 var EPISODE_UID_ATTRIBUTE = "data-ts-episode-uid";
 var EPISODE_MAX = 9999;
 var EPISODE_VALUE_RE = /^\s*S(\d+)E(\d+)\s*$/i;
-var EPISODE_CHILD_RE = /^\s*Episode::\s*(.*)$/i;
+var EPISODE_CHILD_RE = /^[ \t]*Episode::[ \t]*([^\r\n]*)/i;
 var CHILDREN_PULL_PATTERN = "[:block/uid :block/string {:block/children [:block/uid :block/string :block/order]}]";
 function validPart(value) {
   return Number.isInteger(value) && value >= 1 && value <= EPISODE_MAX;
@@ -417,16 +417,23 @@ function orderedChildren2(block) {
 }
 function stateFromBlock(block, uid) {
   if (valueAt2(block, ":block/uid", null) !== uid) return { found: false };
-  const child = orderedChildren2(block).find((entry) => EPISODE_CHILD_RE.test(entry.string));
-  if (!child) return { found: true, episode: null, childUid: null, childString: null, invalid: false };
-  const episode = parseEpisode(child.string.match(EPISODE_CHILD_RE)[1]);
+  const matches = orderedChildren2(block).filter((entry) => EPISODE_CHILD_RE.test(entry.string));
+  if (!matches.length) return { found: true, episode: null, childUid: null, childString: null, invalid: false, duplicate: false };
+  const child = matches[0];
+  const duplicate = matches.length > 1;
+  const episode = duplicate ? null : parseEpisode(child.string.match(EPISODE_CHILD_RE)[1]);
   return {
     found: true,
     episode,
     childUid: child.uid,
     childString: child.string,
-    invalid: !episode
+    invalid: duplicate || !episode,
+    duplicate
   };
+}
+function replaceFirstLine(childString, value) {
+  const rest = childString.slice(childString.search(/[\r\n]|$/));
+  return `${EPISODE_ATTRIBUTE}:: ${value}${rest}`;
 }
 async function readEpisodeState({ roamAlphaAPI, uid }) {
   const pull = roamAlphaAPI?.data?.async?.pull;
@@ -463,13 +470,14 @@ async function writeEpisodeNow({ roamAlphaAPI, uid, compute, activityRecorder })
     return { status: "unknown", reason: "read-failed", error };
   }
   if (!before.found) return { status: "rejected", reason: "block-not-found" };
+  if (before.duplicate) return { status: "rejected", reason: "duplicate-episode-blocks" };
   if (before.invalid) return { status: "rejected", reason: "invalid-existing-value" };
   const next = compute(before.episode);
   if (!isValidEpisode(next)) return { status: "rejected", reason: "invalid-episode-value" };
   if (before.episode && sameEpisode(before.episode, next)) {
     return { status: "unchanged", reason: "same-value", value: formatEpisode(next), childUid: before.childUid };
   }
-  const string = `${EPISODE_ATTRIBUTE}:: ${formatEpisode(next)}`;
+  const string = before.childUid ? replaceFirstLine(before.childString, formatEpisode(next)) : `${EPISODE_ATTRIBUTE}:: ${formatEpisode(next)}`;
   try {
     if (before.childUid) {
       await roamAlphaAPI.data.block.update({ block: { uid: before.childUid, string } });
@@ -528,7 +536,7 @@ function computeFromDecision(decision) {
       return null;
   }
 }
-var PLACEHOLDER = "+ep";
+var PLACEHOLDER = "+";
 function setAttr(el, name, value) {
   if (el.getAttribute(name) !== value) el.setAttribute(name, value);
 }
@@ -712,7 +720,10 @@ function createEpisodeCounterController({
   }
   function isEpisodeAttributeNode(node) {
     if (node?.nodeType !== 1) return false;
-    const candidates = elementsIncludingRoot(node, ".rm-attr-ref");
+    const candidates = [];
+    if (node.classList?.contains("rm-attr-ref")) candidates.push(node);
+    const inner = node.getElementsByClassName?.("rm-attr-ref");
+    if (inner?.length) candidates.push(...Array.from(inner));
     return candidates.some((el) => {
       const title = el.getAttribute?.("data-link-title") ?? el.textContent ?? "";
       return String(title).replace(/:+\s*$/, "").trim().toLowerCase() === EPISODE_ATTRIBUTE.toLowerCase();
@@ -820,7 +831,13 @@ function createEpisodeMenu({ document: documentLike, current = null, onDecision 
   }
   const row = documentLike.createElement("li");
   row.className = "ts-follow-up-date-row ts-episode-row";
-  const makeInput = (label, value) => {
+  const makeInput = (label, prefix, value) => {
+    const field2 = documentLike.createElement("label");
+    field2.className = "ts-episode-field";
+    const tag = documentLike.createElement("span");
+    tag.className = "ts-episode-field-prefix";
+    tag.setAttribute("aria-hidden", "true");
+    tag.textContent = prefix;
     const input = documentLike.createElement("input");
     input.className = "ts-follow-up-date ts-episode-input bp3-input bp3-small";
     input.setAttribute("type", "number");
@@ -831,10 +848,13 @@ function createEpisodeMenu({ document: documentLike, current = null, onDecision 
     input.setAttribute("aria-label", label);
     input.setAttribute("value", String(value));
     input.value = String(value);
-    return input;
+    field2.append(tag, input);
+    return { field: field2, input };
   };
-  const seasonInput = makeInput("Season", current ? current.season : 1);
-  const episodeInput = makeInput("Episode", current ? current.episode : 1);
+  const seasonField = makeInput("Season", "S", current ? current.season : 1);
+  const episodeField = makeInput("Episode", "E", current ? current.episode : 1);
+  const seasonInput = seasonField.input;
+  const episodeInput = episodeField.input;
   const setButton = documentLike.createElement("button");
   setButton.className = "ts-follow-up-set ts-episode-set bp3-button bp3-small";
   setButton.setAttribute("type", "button");
@@ -854,7 +874,7 @@ function createEpisodeMenu({ document: documentLike, current = null, onDecision 
   });
   seasonInput._episodeChoose = chooseInputs;
   episodeInput._episodeChoose = chooseInputs;
-  row.append(seasonInput, episodeInput, setButton);
+  row.append(seasonField.field, episodeField.field, setButton);
   list.append(row);
   function focusables() {
     return Array.from(list.querySelectorAll(FOCUSABLE));

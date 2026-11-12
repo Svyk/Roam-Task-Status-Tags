@@ -164,14 +164,53 @@ test("an out-of-range computed value is rejected before any write", async () => 
   assert.equal(writes(graph).length, 0);
 });
 
-test("first match wins among direct children only", async () => {
+test("a first line Episode:: with extra lines is recognised; only the first line's value changes", async () => {
+  const graph = taskGraph({ ep: { string: "Episode:: S1E1\nwatched with Sam" } });
+  graph.byUid.get("task").children.push("ep");
+  const state = await readEpisodeState({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task" });
+  assert.deepEqual(state.episode, { season: 1, episode: 1 });
+  const result = await writeEpisode({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task", compute: nextEpisode });
+  assert.equal(result.status, "updated");
+  assert.deepEqual(writes(graph), [["update", "ep", "Episode:: S1E2\nwatched with Sam", ["string", "uid"]]]);
+  assert.equal(graph.byUid.get("ep").string, "Episode:: S1E2\nwatched with Sam");
+  const upper = taskGraph({ ep: { string: "EPISODE::s02e05\n\nmore" } });
+  upper.byUid.get("task").children.push("ep");
+  const state2 = await readEpisodeState({ roamAlphaAPI: upper.roamAlphaAPI, uid: "task" });
+  assert.deepEqual(state2.episode, { season: 2, episode: 5 });
+});
+
+test("two Episode blocks fail closed: invalid state and no write", async () => {
+  const graph = taskGraph({ ep1: { string: "Episode:: S1E2" }, ep2: { string: "Episode:: S5E5" } });
+  graph.byUid.get("task").children.push("ep1", "ep2");
+  const state = await readEpisodeState({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task" });
+  assert.equal(state.invalid, true);
+  assert.equal(state.duplicate, true);
+  const result = await writeEpisode({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task", compute: nextEpisode });
+  assert.deepEqual([result.status, result.reason], ["rejected", "duplicate-episode-blocks"]);
+  assert.equal(writes(graph).length, 0);
+});
+
+test("two Episode blocks show ? on the counter", () => {
+  const { controller, pill, graph } = setup({ blocks: { ep1: { string: "Episode:: S1E2" }, ep2: { string: "Episode:: S5E5" } } });
+  graph.byUid.get("task").children.push("ep1", "ep2");
+  const counter = controller.sync({ pill, uid: "task", kept: new Set() });
+  assert.equal(counter.textContent, "?");
+  assert.equal(counter.getAttribute("data-ts-episode-state"), "invalid");
+});
+
+test("menu number fields carry visible S and E prefixes", () => {
+  const { menu } = makeMenu({ season: 2, episode: 5 });
+  const prefixes = menu.element.querySelectorAll(".ts-episode-field-prefix").map((n) => n.textContent);
+  assert.deepEqual(prefixes, ["S", "E"]);
+});
+
+test("only direct children count", async () => {
   const graph = taskGraph({
     nested: { string: "Episode:: S9E9" },
     ep1: { string: "Episode:: S1E2" },
-    ep2: { string: "Episode:: S5E5" },
   });
   graph.byUid.get("due").children.push("nested");
-  graph.byUid.get("task").children.push("ep1", "ep2");
+  graph.byUid.get("task").children.push("ep1");
   const state = await readEpisodeState({ roamAlphaAPI: graph.roamAlphaAPI, uid: "task" });
   assert.deepEqual(state.episode, { season: 1, episode: 2 });
   assert.equal(state.childUid, "ep1");
@@ -276,6 +315,12 @@ class FakeEl extends EventTarget {
     this.textContent = "";
     this.value = "";
     this.isConnected = false;
+  }
+  get classList() {
+    return { contains: (name) => String(this.className).split(/\s+/).includes(name) };
+  }
+  getElementsByClassName(name) {
+    return [...this.walk()].filter((node) => node.classList.contains(name));
   }
   get nextSibling() {
     const siblings = this.parentElement?.children || [];
@@ -401,7 +446,7 @@ test("the counter is inserted once right after the pill and reused across refres
 test("no Episode child shows the invisible-until-hover placeholder", () => {
   const { controller, pill } = setup();
   const counter = controller.sync({ pill, uid: "task", kept: new Set() });
-  assert.equal(counter.textContent, "+ep");
+  assert.equal(counter.textContent, "+");
   assert.equal(counter.getAttribute("data-ts-episode-state"), "empty");
   assert.equal(counter.getAttribute("aria-label"), "Start episode counter");
 });
@@ -563,7 +608,7 @@ test("a hand edit of the Episode block re-syncs the counter of its task", () => 
   assert.equal(counter.textContent, "S2E9");
   graph.byUid.get("task").children = ["due"];
   controller.resyncUid("task");
-  assert.equal(counter.textContent, "+ep");
+  assert.equal(counter.textContent, "+");
 
   const attr = new FakeEl("span");
   attr.className = "rm-attr-ref";

@@ -1838,7 +1838,6 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
 .ts-episode-counter {
   display: inline-block;
   box-sizing: border-box;
-  min-width: 3.1em;
   margin: 0 0.35em 0 0.1em;
   padding: 0 0.3em;
   border: 1px solid transparent;
@@ -1857,7 +1856,12 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
 }
 
 .ts-episode-counter[data-ts-episode-state="set"] {
+  min-width: calc(5.6ch + 0.6em + 2px);
   border-color: var(--ts-menu-border-subtle);
+}
+
+.ts-episode-counter[data-ts-episode-state="invalid"] {
+  min-width: 2em;
 }
 
 .ts-episode-counter:hover,
@@ -1876,10 +1880,15 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
   color: var(--ts-menu-danger);
 }
 
-/* Never used: keeps its width so revealing it moves nothing. */
+/* Never used: a single small "+", invisible until the row is hovered. Its
+   box is the same size hidden or shown, so nothing shifts and no gap is left. */
 .ts-episode-counter[data-ts-episode-state="empty"] {
-  border-style: dashed;
-  border-color: var(--ts-menu-border-subtle);
+  width: 0.6em;
+  min-width: 0;
+  margin: 0 0.15em 0 0.1em;
+  padding: 0;
+  border: 0;
+  line-height: 1.5;
   opacity: 0;
 }
 
@@ -1898,10 +1907,26 @@ body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
   gap: 4px;
 }
 
+.ts-status-chooser .ts-episode-field {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+  margin: 0;
+}
+
+.ts-status-chooser .ts-episode-field-prefix {
+  color: var(--ts-menu-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .ts-status-chooser .ts-episode-input {
   flex: 1 1 0;
   width: 0;
-  min-width: 44px;
+  min-width: 36px;
   text-align: center;
 }
 

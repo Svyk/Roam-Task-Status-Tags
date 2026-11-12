@@ -78,6 +78,15 @@ the exact requested value counts as committed, the exact original counts as
 not committed, and any third or unreadable state is unknown. No retry writes
 occur automatically.
 
+## Episode counter
+
+The `Episode::` child of a Series, Watching or Rewatch task is written directly
+by this extension. Better Tasks has no API for custom attributes and ignores
+unknown `X::` children, so there is nothing to route through it. The child is
+created only on first use and updated in place (uid kept). The write never
+touches the task string or any `BT_attr*` block. The activity line goes only
+into an existing Better Tasks log.
+
 ## UI and lifecycle
 
 - The chooser is mounted under one extension-owned body portal.
