@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.16.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.17.0 | generated; edit src/ */
 
 // src/status-checkbox.js
 var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
@@ -5228,7 +5228,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.16.0" : "development";
+var BUNDLED_VERSION = true ? "0.17.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;

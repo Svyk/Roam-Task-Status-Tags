@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 - 2026-11-24
+
+- Register five AI agent tools (`list_statuses`, `get_task_status`, `list_tasks`, `status_counts`, `set_task_status`) through Roam's experimental `extensionAPI.ai.addTool` API.
+- Expose live configured status names as a JSON Schema `enum` on `list_tasks` and `set_task_status`, re-registered in place when statuses change, with a safe plain-type fallback past 3800 characters.
+- Route every `set_task_status` write sequentially through the existing certified router and Better Tasks activity log, refusing non-task blocks (`not-a-task`) and Better Tasks blocks before Better Tasks loads (`better-tasks-not-ready`), and attributing direct writes and activity lines to `context.tokenUserUid`.
+- Add the **Let AI agents read and set statuses** switch in settings (on by default), removing tools immediately when turned off or on extension unload.
+- Extend `window.RoamTaskStatusTags` (`apiVersion` 1) with a frozen `features` array, `group` and `inCycle` on `statuses()` rows, `statusOfBlock(uid)`, `tasks(opts)`, `counts(opts)`, and `renderIcon(element, name)` with automatic unload cleanup.
+- Add `docs/agent-guide.md` with Local API examples, refusal reasons, extension API examples, and attribution notes.
+
 ## 0.16.0 - 2026-11-24
 
 - Port BetterTask for Thymer status icon artwork, Neon Glass / Vivid Solid / Minimal Crisp preset styles, ambient icon animations, canvas transition bursts, and picker styling under the MIT License with author permission. See `THIRD_PARTY_NOTICES.md`.

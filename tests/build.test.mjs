@@ -33,7 +33,7 @@ test("build emits deterministic, matching browser ESM artifacts with a default e
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   const version = JSON.parse(packageJson).version;
-  assert.equal(version, "0.16.0");
+  assert.equal(version, "0.17.0");
   const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   assert.equal(pagesJs, rootJs);

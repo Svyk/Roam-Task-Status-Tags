@@ -32,6 +32,10 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 
 Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, ambient icon motion, transition bursts, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
 
+## AI agents and other extensions
+
+Task Status Tags registers five AI agent tools (`list_statuses`, `get_task_status`, `list_tasks`, `status_counts`, `set_task_status`) through Roam's `extensionAPI.ai.addTool` API so connected agents can inspect tasks and update statuses safely through the same Better Tasks router and activity log as the chooser. Toggle them in settings under **Let AI agents read and set statuses**. Other Roam extensions can also query tasks and counts, inspect blocks, and render live status icons through `window.RoamTaskStatusTags`. See [docs/agent-guide.md](docs/agent-guide.md) for tool IDs, Local API examples, and API usage.
+
 ## Credits
 
 Roam Task Status Tags was created by [Harpreet Singh Chima](https://github.com/harpreetchima). The original extension is [harpreetchima/Roam-Task-Status-Tags](https://github.com/harpreetchima/Roam-Task-Status-Tags), and the core design is his: Roam's own TODO and DONE stay in charge, each task carries one managed `#[[task-status/<Name>]]` tag, the status list is configurable, and a chooser and commands change the tag while leaving the rest of the block alone. This repository is a fork that builds on that work.
@@ -297,6 +301,7 @@ Open `Settings -> Extensions -> Task Status Tags`, pick **Settings…** at the b
 - `Animate status changes` (on by default) toggles the canvas transition burst in Glass / Solid / Minimal (or CSS pop in Outline) played when this extension sets or changes an unchecked task's status.
 - `Animate status icons` (on by default) toggles subtle looping ambient motion on status icons in Glass, Solid, and Minimal (disabled under reduced motion, forced colors, and print, and always off in Outline).
 - `Ask for a follow-up date on Waiting / In Review` (on by default) turns the follow-up date prompt on or off (needs Better Tasks).
+- `Let AI agents read and set statuses` (on by default) offers read and status-change tools to AI agents connected to this graph, using the same checks and routing as the chooser.
 - `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Statuses:
@@ -327,8 +332,13 @@ Other extensions can call the frozen `window.RoamTaskStatusTags` object (`apiVer
 | Member | Call | Result |
 |---|---|---|
 | `apiVersion` | — | `1` |
-| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. `glyph` is the checkbox shape id: a built-in one, `custom`, media (`series`, `movie`, `watching`, `watchlist`, `upcoming`, `rewatch`, `dropped`), or extra (`important`, `starred`, `discuss`, `billable`, `bug`, `draft`, `deadline`, `kawaii`, `flower`, `sun`, `moon`). |
+| `features` | — | Frozen array of additive capability names (`["statusOfBlock", "tasks", "counts", "renderIcon", "aiTools"]`). |
+| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, group, inCycle, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. `group` is `"task"`, `"media"`, or `"extra"`, and `inCycle` is true when click-to-cycle visits the status. Colours are the pill colours. `glyph` is the checkbox shape id: a built-in one, `custom`, media (`series`, `movie`, `watching`, `watchlist`, `upcoming`, `rewatch`, `dropped`), or extra (`important`, `starred`, `discuss`, `billable`, `bug`, `draft`, `deadline`, `kawaii`, `flower`, `sun`, `moon`). |
 | `statusOf` | `statusOf(blockString)` | The status display name, or `null` when the string has no managed status tag. |
+| `statusOfBlock` | `statusOfBlock(uid)` | Promise of `{ found, isTask, done, status }`. `isTask` is true only for a leading TODO/DONE macro. Never throws. |
+| `tasks` | `tasks({ status?, includeDone?, limit? })` | Promise of `{ tasks: [{ uid, text, status, done, page }], truncated }`. Queries tasks carrying a configured status (`limit` clamps to 1..200, default 50). Rejects on an unknown status name with the valid names listed. |
+| `counts` | `counts({ includeDone? })` | Promise of `{ counts: { <Name>: n }, total }` for every configured status (zeros included). |
+| `renderIcon` | `renderIcon(element, name)` | Renders the live styled status icon inside `element` and returns a cleanup function that removes only what was added. Unknown names or non-elements return a no-op cleanup. All live icons are also removed on unload. |
 | `setStatus` | `setStatus(uid, nameOrNull)` | Promise of `{ status, didWrite, reason? }`. `name` is the display name (`"Waiting"`, `"In Review"`); `null` clears the tag. |
 | `cycle` | `cycle(uid)` | Promise of the same result shape. |
 | `addEventListener` | `addEventListener("change" \| "statuses", callback)` | Callback receives the event detail. |
