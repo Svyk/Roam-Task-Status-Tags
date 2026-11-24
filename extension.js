@@ -96,7 +96,7 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
     if (valueAt(block, ":block/uid", null) !== uid) return null;
     return orderedChildren(block);
   }
-  async function appendLine(uid, roam, buildLine) {
+  async function appendLine(uid, roam, buildLine, { userUid } = {}) {
     let containerUid;
     let siblings;
     try {
@@ -115,10 +115,14 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
       return result(false, { reason: "duplicate", containerUid, entryUid: last.uid, text });
     }
     const entryUid = roam.generateUID();
+    const block = { uid: entryUid, string: text, props };
+    if (typeof userUid === "string" && userUid.trim()) {
+      block["user-uid"] = userUid.trim();
+    }
     try {
       await roam.create({
         location: { "parent-uid": containerUid, order: "last" },
-        block: { uid: entryUid, string: text, props }
+        block
       });
     } catch (error) {
       return result(false, { reason: "activity-write-failed", error, containerUid });
@@ -126,19 +130,24 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
     return result(true, { reason: "recorded", containerUid, entryUid, text });
   }
   return Object.freeze({
-    async record({ uid, previousString, nextString, statusTagTitle }) {
+    async record({ uid, previousString, nextString, statusTagTitle, userUid }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
       const roam = resolveRoamSurface(roamAlphaAPI);
       if (!roam) return result(false, { reason: "roam-api-unavailable" });
       const from = statusLabelFromTaskText(previousString);
       const to = statusTagTitle == null ? statusLabelFromTaskText(nextString) : statusLabelFromTagTitle(statusTagTitle);
       if ((from || null) === (to || null)) return result(false, { reason: "status-unchanged" });
-      return appendLine(uid, roam, (ts) => ({
-        text: renderStatusActivityLine({ to, ts }),
-        props: buildStatusActivityProps({ from, to, ts })
-      }));
+      return appendLine(
+        uid,
+        roam,
+        (ts) => ({
+          text: renderStatusActivityLine({ to, ts }),
+          props: buildStatusActivityProps({ from, to, ts })
+        }),
+        { userUid }
+      );
     },
-    async recordAttributeChange({ uid, field: field2, from, to }) {
+    async recordAttributeChange({ uid, field: field2, from, to, userUid }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
       if (typeof field2 !== "string" || !field2.trim() || typeof to !== "string" || !to) {
         return result(false, { reason: "invalid-change" });
@@ -146,10 +155,15 @@ function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now }) {
       const roam = resolveRoamSurface(roamAlphaAPI);
       if (!roam) return result(false, { reason: "roam-api-unavailable" });
       if ((from || null) === to) return result(false, { reason: "attribute-unchanged" });
-      return appendLine(uid, roam, (ts) => ({
-        text: renderAttributeActivityLine({ field: field2, to, ts }),
-        props: buildAttributeActivityProps({ field: field2, from, to, ts })
-      }));
+      return appendLine(
+        uid,
+        roam,
+        (ts) => ({
+          text: renderAttributeActivityLine({ field: field2, to, ts }),
+          props: buildAttributeActivityProps({ field: field2, from, to, ts })
+        }),
+        { userUid }
+      );
     }
   });
 }
@@ -178,7 +192,8 @@ function routed(status, fields = {}) {
 function createBetterTasksStatusRouter({
   windowLike,
   directWriter,
-  activityRecorder = null
+  activityRecorder = null,
+  readChildStrings = null
 }) {
   if (!directWriter || typeof directWriter.apply !== "function") {
     throw new TypeError("directWriter.apply is required");
@@ -186,17 +201,24 @@ function createBetterTasksStatusRouter({
   if (activityRecorder != null && typeof activityRecorder.record !== "function") {
     throw new TypeError("activityRecorder.record must be a function");
   }
-  async function recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle }) {
+  if (readChildStrings != null && typeof readChildStrings !== "function") {
+    throw new TypeError("readChildStrings must be a function");
+  }
+  async function recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle, userUid }) {
     if (!activityRecorder || outcome?.status !== "updated") return outcome;
     if (outcome.activity !== void 0) return outcome;
     let activity;
     try {
-      activity = await activityRecorder.record({
+      const recordArgs = {
         uid,
         previousString: expectedString,
         nextString: typeof outcome.string === "string" ? outcome.string : nextString,
         statusTagTitle
-      });
+      };
+      if (typeof userUid === "string" && userUid.trim()) {
+        recordArgs.userUid = userUid.trim();
+      }
+      activity = await activityRecorder.record(recordArgs);
     } catch (error) {
       activity = { recorded: false, reason: "activity-recorder-threw", error };
     }
@@ -209,16 +231,40 @@ function createBetterTasksStatusRouter({
       nextString,
       statusTagTitle,
       expectedLiveEditorString,
-      editorString
+      editorString,
+      userUid,
+      requireExistingTask = false,
+      requireBetterTasksReady = false
     }) {
       const editorOptions = expectedLiveEditorString === void 0 && editorString === void 0 ? {} : { expectedLiveEditorString, editorString };
+      const normalizedUserUid = typeof userUid === "string" && userUid.trim() ? userUid.trim() : null;
+      const directExtra = {};
+      if (normalizedUserUid) directExtra.userUid = normalizedUserUid;
+      if (requireExistingTask) directExtra.requireExistingTask = true;
       const provider = resolveBetterTasksProvider(windowLike);
       if (provider.kind === "absent") {
+        if (requireBetterTasksReady) {
+          if (typeof readChildStrings !== "function") {
+            return routed("unknown", { reason: "better-tasks-children-read-unavailable" });
+          }
+          let childStrings;
+          try {
+            childStrings = await readChildStrings(uid);
+          } catch (error) {
+            return routed("unknown", { reason: "better-tasks-children-read-failed", error });
+          }
+          if (Array.isArray(childStrings) && childStrings.some(
+            (child) => typeof child === "string" && child.trimStart().startsWith("BT_attr")
+          )) {
+            return routed("rejected", { reason: "better-tasks-not-ready" });
+          }
+        }
         return directWriter.apply({
           uid,
           expectedString,
           nextString,
-          ...editorOptions
+          ...editorOptions,
+          ...directExtra
         });
       }
       if (provider.kind === "legacy") {
@@ -255,7 +301,8 @@ function createBetterTasksStatusRouter({
           uid,
           expectedString,
           nextString,
-          ...editorOptions
+          ...editorOptions,
+          ...directExtra
         });
       }
       if (classification.kind !== "task") {
@@ -278,7 +325,13 @@ function createBetterTasksStatusRouter({
       } catch (error) {
         return routed("unknown", { reason: "better-tasks-status-request-failed", error });
       }
-      return recordActivity(outcome, { uid, expectedString, nextString, statusTagTitle });
+      return recordActivity(outcome, {
+        uid,
+        expectedString,
+        nextString,
+        statusTagTitle,
+        userUid: normalizedUserUid
+      });
     }
   });
 }
@@ -2501,7 +2554,8 @@ var EMPTY_TEXT = {
   all: "No open tasks with a status."
 };
 var MEDIA_ORDER = ["watching", "watchlist", "upcoming", "series", "rewatch"];
-var TASKS_QUERY = "[:find ?uid ?str ?title ?time :in $ [?title ...] :where [?t :node/title ?title] [?b :block/refs ?t] [?b :block/uid ?uid] [?b :block/string ?str] [(get-else $ ?b :edit/time 0) ?time]]";
+var STATUS_TASKS_QUERY = "[:find ?uid ?str ?title ?time ?page :in $ [?title ...] :where [?t :node/title ?title] [?b :block/refs ?t] [?b :block/uid ?uid] [?b :block/string ?str] [(get-else $ ?b :edit/time 0) ?time] [?b :block/page ?p] [?p :node/title ?page]]";
+var TASKS_QUERY = STATUS_TASKS_QUERY;
 var EPISODE_QUERY = '[:find ?puid ?cuid ?cs ?order :in $ [?puid ...] :where [?p :block/uid ?puid] [?p :block/children ?c] [?c :block/uid ?cuid] [?c :block/string ?cs] [?c :block/order ?order] [(clojure.string/includes? ?cs "::")]]';
 function lowerName(row) {
   return String(row?.name ?? "").trim().toLowerCase();
@@ -2543,45 +2597,60 @@ async function runQuery(roamAlphaAPI, query, ...args) {
   if (typeof roamAlphaAPI?.q === "function") return roamAlphaAPI.q(query, ...args);
   throw new Error("roamAlphaAPI query is unavailable");
 }
-async function queryStatusTasks({ roamAlphaAPI, statuses, helpers }) {
+async function queryStatusTasks({
+  roamAlphaAPI,
+  statuses,
+  helpers,
+  includeDone = false,
+  includeEpisodes = true
+}) {
   const keyByTitle = /* @__PURE__ */ new Map();
   for (const status of statuses || []) {
-    if (status?.tagTitle && status?.key) keyByTitle.set(status.tagTitle, status.key);
+    const tagTitle = status?.tagTitle || status?.tag;
+    if (tagTitle && status?.key) keyByTitle.set(tagTitle, status.key);
   }
   if (!keyByTitle.size) return [];
   const found = await runQuery(roamAlphaAPI, TASKS_QUERY, [...keyByTitle.keys()]);
   const kept = /* @__PURE__ */ new Map();
   for (const entry of Array.isArray(found) ? found : []) {
-    const [uid, string, title, time] = entry || [];
+    const [uid, string, title, time, page] = entry || [];
     if (typeof uid !== "string" || typeof string !== "string" || kept.has(uid)) continue;
     const key = keyByTitle.get(title);
-    if (!key || helpers.isDoneTask(string)) continue;
-    if (helpers.getCurrentStatus(string) !== key) continue;
+    if (!key) continue;
+    const parsed = helpers.parseManagedPrefix(string);
+    if (!parsed?.managed) continue;
+    const done = parsed.taskKind === "done";
+    if (!includeDone && done) continue;
+    if (parsed.currentStatus !== key) continue;
     kept.set(uid, {
       uid,
       statusKey: key,
       string,
-      body: String(helpers.parseManagedPrefix(string).body ?? "").trim(),
+      body: String(parsed.body ?? "").trim(),
+      done,
+      page: typeof page === "string" ? page : null,
       editTime: Number(time) || 0,
       episode: null
     });
   }
   const rows = [...kept.values()];
   if (!rows.length) return rows;
-  const childRows = await runQuery(roamAlphaAPI, EPISODE_QUERY, rows.map((row) => row.uid));
-  const childrenByUid = /* @__PURE__ */ new Map();
-  for (const entry of Array.isArray(childRows) ? childRows : []) {
-    const [puid, uid, string, order] = entry || [];
-    if (typeof puid !== "string") continue;
-    if (!childrenByUid.has(puid)) childrenByUid.set(puid, []);
-    childrenByUid.get(puid).push({ uid, string, order });
-  }
-  for (const row of rows) {
-    const children = childrenByUid.get(row.uid);
-    if (!children) continue;
-    const state = episodeStateFromChildren(children);
-    if (!state.childUid) continue;
-    row.episode = state.invalid ? { text: "?", invalid: true } : { text: formatEpisode(state.episode) };
+  if (includeEpisodes) {
+    const childRows = await runQuery(roamAlphaAPI, EPISODE_QUERY, rows.map((row) => row.uid));
+    const childrenByUid = /* @__PURE__ */ new Map();
+    for (const entry of Array.isArray(childRows) ? childRows : []) {
+      const [puid, uid, string, order] = entry || [];
+      if (typeof puid !== "string") continue;
+      if (!childrenByUid.has(puid)) childrenByUid.set(puid, []);
+      childrenByUid.get(puid).push({ uid, string, order });
+    }
+    for (const row of rows) {
+      const children = childrenByUid.get(row.uid);
+      if (!children) continue;
+      const state = episodeStateFromChildren(children);
+      if (!state.childUid) continue;
+      row.episode = state.invalid ? { text: "?", invalid: true } : { text: formatEpisode(state.episode) };
+    }
   }
   rows.sort((a, b) => b.editTime - a.editTime || (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));
   return rows;
@@ -2993,368 +3062,6 @@ function createStatusView({
     if (had) closeSidebarIfOurs();
   }
   return { open, close, toggle, refresh, isOpen, dispose };
-}
-
-// src/public-api.js
-var API_VERSION = 1;
-var GLOBAL_NAME = "RoamTaskStatusTags";
-var READY_EVENT = "roam-task-status-tags:ready";
-var UNLOAD_EVENT = "roam-task-status-tags:unload";
-var API_EVENTS = Object.freeze(["change", "statuses"]);
-var EVENT_TYPES = new Set(API_EVENTS);
-var PUBLIC_STATUSES = /* @__PURE__ */ new Set([
-  "updated",
-  "rejected",
-  "unknown",
-  "conflict",
-  "not-updated",
-  "unchanged"
-]);
-var emitters = /* @__PURE__ */ new WeakMap();
-function requiredFunction(name, value) {
-  if (typeof value !== "function") throw new TypeError(`${name} is required`);
-  return value;
-}
-function helperOptionsFromCatalog(catalog) {
-  const statuses = {};
-  const cycleOrder = [];
-  for (const row of catalog || []) {
-    if (!row?.key || !row?.name) continue;
-    cycleOrder.push(row.key);
-    const tagTitle = row.tag || `task-status/${row.name}`;
-    statuses[row.key] = {
-      name: row.name,
-      label: row.name,
-      tagTitle,
-      tagTitles: [tagTitle]
-    };
-  }
-  return { statuses, cycleOrder };
-}
-function resolveStatusKey(name, catalog) {
-  if (name === null) return { ok: true, key: null };
-  if (typeof name !== "string") return { ok: false, reason: "unknown-status" };
-  const text = name.trim();
-  if (!text) return { ok: false, reason: "unknown-status" };
-  const rows = Array.isArray(catalog) ? catalog : [];
-  const upper = text.toUpperCase();
-  for (const row of rows) {
-    if (row?.key === text || row?.key === upper) return { ok: true, key: row.key };
-  }
-  const folded = text.toLowerCase();
-  for (const row of rows) {
-    if (row?.name === text || String(row?.name ?? "").toLowerCase() === folded) {
-      return { ok: true, key: row.key };
-    }
-  }
-  return { ok: false, reason: "unknown-status" };
-}
-function mapPublicResult(outcome) {
-  if (outcome == null || typeof outcome !== "object") {
-    return { status: "unknown", didWrite: false, reason: "unmapped-result" };
-  }
-  const known = PUBLIC_STATUSES.has(outcome.status);
-  const status = known ? outcome.status : "unknown";
-  const mapped = {
-    status,
-    didWrite: status === "updated" && outcome.didWrite === true
-  };
-  if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
-  else if (!known) mapped.reason = "unmapped-result";
-  const activity = outcome.activity;
-  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
-    mapped.activity = { recorded: activity.recorded };
-    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
-  }
-  return mapped;
-}
-function publicStatusRow({ key, name, tag, glyph, colors }) {
-  return Object.freeze({
-    key: String(key),
-    name: String(name),
-    tag: String(tag),
-    glyph: String(glyph),
-    light: Object.freeze({
-      base: String(colors?.lightBackgroundCss ?? ""),
-      text: String(colors?.lightTextCss ?? "")
-    }),
-    dark: Object.freeze({
-      base: String(colors?.darkBackgroundCss ?? ""),
-      text: String(colors?.darkTextCss ?? "")
-    })
-  });
-}
-function dispatch(target, type, detail) {
-  try {
-    const Ctor = globalThis.CustomEvent;
-    if (!Ctor) return;
-    target.dispatchEvent(new Ctor(type, { detail }));
-  } catch (error) {
-    console.error("[TaskStatus] listener dispatch failed", error);
-  }
-}
-function emitStatusChange(api, detail) {
-  const emitter = emitters.get(api);
-  if (!emitter) return;
-  dispatch(emitter, "change", detail);
-}
-function emitStatusCatalog(api, detail) {
-  const emitter = emitters.get(api);
-  if (!emitter) return;
-  dispatch(emitter, "statuses", detail ?? { apiVersion: API_VERSION });
-}
-function emitChange(emitter, detail) {
-  dispatch(emitter, "change", detail);
-}
-function createPublicApi({
-  readCatalog,
-  readStatuses,
-  createTextHelpers,
-  setBlockStatus,
-  cycleBlockStatus
-} = {}) {
-  requiredFunction("readCatalog", readCatalog);
-  requiredFunction("readStatuses", readStatuses);
-  requiredFunction("createTextHelpers", createTextHelpers);
-  requiredFunction("setBlockStatus", setBlockStatus);
-  requiredFunction("cycleBlockStatus", cycleBlockStatus);
-  const emitter = new EventTarget();
-  const buckets = /* @__PURE__ */ new Map();
-  const api = {
-    apiVersion: API_VERSION,
-    statuses() {
-      const rows = readStatuses();
-      return Object.freeze(Array.isArray(rows) ? rows.slice() : []);
-    },
-    statusOf(text) {
-      if (typeof text !== "string" || text.length === 0) return null;
-      try {
-        const catalog = readCatalog();
-        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
-        const key = helpers?.getCurrentStatus?.(text);
-        if (!key) return null;
-        const row = (catalog || []).find((entry) => entry?.key === key);
-        return typeof row?.name === "string" && row.name ? row.name : null;
-      } catch (error) {
-        console.warn("[TaskStatus] statusOf failed", error);
-        return null;
-      }
-    },
-    async setStatus(uid, name) {
-      let catalog;
-      try {
-        catalog = readCatalog();
-      } catch (error) {
-        console.warn("[TaskStatus] status list read failed", error);
-        return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
-      }
-      const resolved = resolveStatusKey(name, catalog);
-      if (!resolved.ok) {
-        return { status: "rejected", didWrite: false, reason: resolved.reason };
-      }
-      let outcome;
-      try {
-        outcome = await setBlockStatus(uid, resolved.key);
-      } catch (error) {
-        console.warn("[TaskStatus] setStatus failed", error);
-        return { status: "unknown", didWrite: false, reason: "set-status-failed" };
-      }
-      const mapped = mapPublicResult(outcome);
-      if (mapped.status !== "updated") return mapped;
-      const row = (catalog || []).find((entry) => entry?.key === resolved.key);
-      emitChange(emitter, {
-        apiVersion: API_VERSION,
-        uid,
-        name: row?.name ?? null,
-        status: "updated"
-      });
-      return mapped;
-    },
-    async cycle(uid) {
-      let outcome;
-      try {
-        outcome = await cycleBlockStatus(uid);
-      } catch (error) {
-        console.warn("[TaskStatus] cycle failed", error);
-        return { status: "unknown", didWrite: false, reason: "cycle-failed" };
-      }
-      if (outcome == null || typeof outcome !== "object") {
-        return { status: "unchanged", didWrite: false, reason: "done-task" };
-      }
-      const mapped = mapPublicResult(outcome);
-      if (mapped.status !== "updated") return mapped;
-      const written = typeof outcome.string === "string" ? api.statusOf(outcome.string) : null;
-      emitChange(emitter, {
-        apiVersion: API_VERSION,
-        uid,
-        name: written,
-        status: "updated"
-      });
-      return mapped;
-    },
-    addEventListener(type, cb) {
-      if (!EVENT_TYPES.has(type) || typeof cb !== "function") return;
-      let bag = buckets.get(type);
-      if (!bag) {
-        bag = /* @__PURE__ */ new Map();
-        buckets.set(type, bag);
-      }
-      if (bag.has(cb)) return;
-      const wrapped = (event) => {
-        try {
-          cb(event?.detail);
-        } catch (error) {
-          console.error("[TaskStatus] listener failed", error);
-        }
-      };
-      bag.set(cb, wrapped);
-      emitter.addEventListener(type, wrapped);
-    },
-    removeEventListener(type, cb) {
-      const bag = buckets.get(type);
-      const wrapped = bag?.get(cb);
-      if (!wrapped) return;
-      bag.delete(cb);
-      emitter.removeEventListener(type, wrapped);
-    }
-  };
-  const frozen = Object.freeze(api);
-  emitters.set(frozen, emitter);
-  return frozen;
-}
-var fire = (win, type, detail, Ctor) => {
-  try {
-    const C = Ctor ?? win.CustomEvent ?? globalThis.CustomEvent;
-    if (C) win.dispatchEvent(new C(type, { detail }));
-  } catch (error) {
-    console.warn("[TaskStatus] event dispatch failed", error);
-  }
-};
-function installPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
-  win[GLOBAL_NAME] = api;
-  fire(win, READY_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
-}
-function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
-  const ours = win[GLOBAL_NAME] === api;
-  if (ours) delete win[GLOBAL_NAME];
-  fire(win, UNLOAD_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
-  return ours;
-}
-
-// src/status-write.js
-var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
-function valueAt4(value, keyword, fallback = null) {
-  if (!value || typeof value !== "object") return fallback;
-  const plain = keyword.replace(/^:/, "");
-  return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
-}
-function createFreshBlockStringReader(roamAlphaAPI) {
-  const pull = roamAlphaAPI?.data?.async?.pull;
-  if (typeof pull !== "function") {
-    throw new TypeError("roamAlphaAPI.data.async.pull is required");
-  }
-  return async (uid) => {
-    const value = await pull.call(
-      roamAlphaAPI.data.async,
-      BLOCK_STRING_PULL_PATTERN,
-      [":block/uid", uid]
-    );
-    const pulledUid = valueAt4(value, ":block/uid", null);
-    const string = valueAt4(value, ":block/string", null);
-    if (pulledUid !== uid || typeof string !== "string") return null;
-    return string;
-  };
-}
-function result3(status, fields = {}) {
-  return { status, didWrite: status === "updated", ...fields };
-}
-async function certify({ uid, expectedString, nextString, readFresh, writeError = null }) {
-  let observed;
-  try {
-    observed = await readFresh(uid);
-  } catch (error) {
-    return result3("unknown", {
-      reason: "post-write-read-failed",
-      error: writeError || error
-    });
-  }
-  if (observed === nextString) {
-    return result3("updated", {
-      reason: writeError ? "write-threw-after-commit" : "certified",
-      string: observed
-    });
-  }
-  if (observed === expectedString) {
-    return result3("not-updated", {
-      reason: writeError ? "write-failed-before-commit" : "write-not-observed",
-      error: writeError || void 0,
-      string: observed
-    });
-  }
-  return result3("conflict", {
-    reason: observed == null ? "block-missing-after-write" : "third-state-after-write",
-    error: writeError || void 0,
-    string: observed
-  });
-}
-function createCertifiedBlockStringWriter({
-  readFresh,
-  updateBlock,
-  getLiveEditorString = () => null
-}) {
-  if (typeof readFresh !== "function") throw new TypeError("readFresh must be a function");
-  if (typeof updateBlock !== "function") throw new TypeError("updateBlock must be a function");
-  if (typeof getLiveEditorString !== "function") {
-    throw new TypeError("getLiveEditorString must be a function");
-  }
-  return Object.freeze({
-    async apply({
-      uid,
-      expectedString,
-      nextString,
-      expectedLiveEditorString,
-      editorString
-    }) {
-      if (typeof uid !== "string" || !uid.trim()) {
-        return result3("rejected", { reason: "invalid-uid" });
-      }
-      if (typeof expectedString !== "string" || typeof nextString !== "string") {
-        return result3("rejected", { reason: "invalid-string" });
-      }
-      let before;
-      try {
-        before = await readFresh(uid);
-      } catch (error) {
-        return result3("unknown", { reason: "pre-write-read-failed", error });
-      }
-      if (before == null) return result3("rejected", { reason: "block-not-found" });
-      if (before !== expectedString) {
-        return result3("conflict", { reason: "stale-expected-string", string: before });
-      }
-      const hasEditorHandoff = expectedLiveEditorString !== void 0 || editorString !== void 0;
-      if (hasEditorHandoff && (typeof expectedLiveEditorString !== "string" || typeof editorString !== "string")) {
-        return result3("rejected", { reason: "invalid-editor-handoff" });
-      }
-      if (hasEditorHandoff) {
-        const live = getLiveEditorString(uid);
-        if (live !== expectedLiveEditorString && live !== editorString) {
-          return result3("conflict", {
-            reason: "active-editor-diverged",
-            string: typeof live === "string" ? live : null
-          });
-        }
-      }
-      if (nextString === expectedString) {
-        return result3("unchanged", { reason: "already-current", string: before });
-      }
-      try {
-        await updateBlock(uid, nextString);
-      } catch (error) {
-        return certify({ uid, expectedString, nextString, readFresh, writeError: error });
-      }
-      return certify({ uid, expectedString, nextString, readFresh });
-    }
-  });
 }
 
 // src/status-checkbox.js
@@ -3834,7 +3541,7 @@ function includingRoot(root, selector) {
 }
 function clearOwnedStatusCheckboxes(root) {
   const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
-    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser")
+    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser, .ts-rendered-icon")
   );
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
@@ -3975,6 +3682,608 @@ function createStatusPopTracker({
     clearAll,
     dispose
   };
+}
+
+// src/public-api.js
+var API_VERSION = 1;
+var GLOBAL_NAME = "RoamTaskStatusTags";
+var READY_EVENT = "roam-task-status-tags:ready";
+var UNLOAD_EVENT = "roam-task-status-tags:unload";
+var API_EVENTS = Object.freeze(["change", "statuses"]);
+var API_FEATURES = Object.freeze([
+  "statusOfBlock",
+  "tasks",
+  "counts",
+  "renderIcon",
+  "aiTools"
+]);
+var DEFAULT_TASK_LIMIT = 50;
+var MIN_TASK_LIMIT = 1;
+var MAX_TASK_LIMIT = 200;
+var EVENT_TYPES = new Set(API_EVENTS);
+var PUBLIC_STATUSES = /* @__PURE__ */ new Set([
+  "updated",
+  "rejected",
+  "unknown",
+  "conflict",
+  "not-updated",
+  "unchanged"
+]);
+var emitters = /* @__PURE__ */ new WeakMap();
+var renderedIconCleanups = /* @__PURE__ */ new WeakMap();
+function requiredFunction(name, value) {
+  if (typeof value !== "function") throw new TypeError(`${name} is required`);
+  return value;
+}
+function helperOptionsFromCatalog(catalog) {
+  const statuses = {};
+  const cycleOrder = [];
+  for (const row of catalog || []) {
+    if (!row?.key || !row?.name) continue;
+    cycleOrder.push(row.key);
+    const tagTitle = row.tag || `task-status/${row.name}`;
+    statuses[row.key] = {
+      name: row.name,
+      label: row.name,
+      tagTitle,
+      tagTitles: [tagTitle]
+    };
+  }
+  return { statuses, cycleOrder };
+}
+function validStatusNames(catalog) {
+  return (Array.isArray(catalog) ? catalog : []).map((row) => row?.name).filter((name) => typeof name === "string" && name.length > 0);
+}
+function unknownStatusError(name, catalog) {
+  const valid = validStatusNames(catalog);
+  const label = name === null ? "null" : String(name);
+  const list = valid.length ? valid.join(", ") : "(none)";
+  return new Error(`Unknown status "${label}". Valid statuses: ${list}`);
+}
+function resolveStatusKey(name, catalog) {
+  if (name === null) return { ok: true, key: null };
+  if (typeof name !== "string") return { ok: false, reason: "unknown-status" };
+  const text = name.trim();
+  if (!text) return { ok: false, reason: "unknown-status" };
+  const rows = Array.isArray(catalog) ? catalog : [];
+  const upper = text.toUpperCase();
+  for (const row of rows) {
+    if (row?.key === text || row?.key === upper) return { ok: true, key: row.key };
+  }
+  const folded = text.toLowerCase();
+  for (const row of rows) {
+    if (row?.name === text || String(row?.name ?? "").toLowerCase() === folded) {
+      return { ok: true, key: row.key };
+    }
+  }
+  return { ok: false, reason: "unknown-status" };
+}
+function clampTaskLimit(value, fallback = DEFAULT_TASK_LIMIT) {
+  if (value === void 0 || value === null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(MAX_TASK_LIMIT, Math.max(MIN_TASK_LIMIT, Math.trunc(parsed)));
+}
+function isElementLike(node) {
+  if (!node || typeof node !== "object") return false;
+  if (node.nodeType !== void 0 && node.nodeType !== 1) return false;
+  return typeof node.appendChild === "function" && typeof node.tagName === "string";
+}
+function noop() {
+}
+function mapPublicResult(outcome) {
+  if (outcome == null || typeof outcome !== "object") {
+    return { status: "unknown", didWrite: false, reason: "unmapped-result" };
+  }
+  const known = PUBLIC_STATUSES.has(outcome.status);
+  const status = known ? outcome.status : "unknown";
+  const mapped = {
+    status,
+    didWrite: status === "updated" && outcome.didWrite === true
+  };
+  if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
+  else if (!known) mapped.reason = "unmapped-result";
+  const activity = outcome.activity;
+  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
+    mapped.activity = { recorded: activity.recorded };
+    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
+  }
+  return mapped;
+}
+function publicStatusRow({ key, name, tag, glyph, group, inCycle, colors }) {
+  const resolvedGroup = group === "media" || group === "extra" ? group : "task";
+  const resolvedInCycle = typeof inCycle === "boolean" ? inCycle : resolvedGroup === "task";
+  return Object.freeze({
+    key: String(key),
+    name: String(name),
+    tag: String(tag),
+    glyph: String(glyph),
+    group: resolvedGroup,
+    inCycle: resolvedInCycle,
+    light: Object.freeze({
+      base: String(colors?.lightBackgroundCss ?? ""),
+      text: String(colors?.lightTextCss ?? "")
+    }),
+    dark: Object.freeze({
+      base: String(colors?.darkBackgroundCss ?? ""),
+      text: String(colors?.darkTextCss ?? "")
+    })
+  });
+}
+function dispatch(target, type, detail) {
+  try {
+    const Ctor = globalThis.CustomEvent;
+    if (!Ctor) return;
+    target.dispatchEvent(new Ctor(type, { detail }));
+  } catch (error) {
+    console.error("[TaskStatus] listener dispatch failed", error);
+  }
+}
+function emitStatusChange(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "change", detail);
+}
+function emitStatusCatalog(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "statuses", detail ?? { apiVersion: API_VERSION });
+}
+function clearRenderedIcons(api) {
+  const active = renderedIconCleanups.get(api);
+  if (!active) return;
+  for (const cleanup of [...active]) {
+    try {
+      cleanup();
+    } catch (_) {
+    }
+  }
+  active.clear();
+}
+function emitChange(emitter, detail) {
+  dispatch(emitter, "change", detail);
+}
+function createPublicApi({
+  readCatalog,
+  readStatuses,
+  createTextHelpers,
+  setBlockStatus,
+  cycleBlockStatus,
+  readBlockString = null,
+  queryTasks = null,
+  documentLike = null
+} = {}) {
+  requiredFunction("readCatalog", readCatalog);
+  requiredFunction("readStatuses", readStatuses);
+  requiredFunction("createTextHelpers", createTextHelpers);
+  requiredFunction("setBlockStatus", setBlockStatus);
+  requiredFunction("cycleBlockStatus", cycleBlockStatus);
+  const emitter = new EventTarget();
+  const buckets = /* @__PURE__ */ new Map();
+  const liveIcons = /* @__PURE__ */ new Set();
+  function statusEntriesForQuery(entries) {
+    return (Array.isArray(entries) ? entries : []).filter((entry) => entry?.key && entry?.name).map((entry) => ({
+      key: entry.key,
+      name: entry.name,
+      tagTitle: entry.tag || `task-status/${entry.name}`
+    }));
+  }
+  const api = {
+    apiVersion: API_VERSION,
+    features: API_FEATURES,
+    statuses() {
+      const rows = readStatuses();
+      return Object.freeze(Array.isArray(rows) ? rows.slice() : []);
+    },
+    statusOf(text) {
+      if (typeof text !== "string" || text.length === 0) return null;
+      try {
+        const catalog = readCatalog();
+        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+        const key = helpers?.getCurrentStatus?.(text);
+        if (!key) return null;
+        const row = (catalog || []).find((entry) => entry?.key === key);
+        return typeof row?.name === "string" && row.name ? row.name : null;
+      } catch (error) {
+        console.warn("[TaskStatus] statusOf failed", error);
+        return null;
+      }
+    },
+    async statusOfBlock(uid) {
+      const empty = { found: false, isTask: false, done: false, status: null };
+      if (typeof uid !== "string" || !uid.trim() || typeof readBlockString !== "function") {
+        return empty;
+      }
+      try {
+        const text = await readBlockString(uid.trim());
+        if (typeof text !== "string") return empty;
+        const catalog = readCatalog();
+        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+        const parsed = helpers?.parseManagedPrefix?.(text);
+        if (!parsed?.managed) {
+          return { found: true, isTask: false, done: false, status: null };
+        }
+        const row = parsed.currentStatus ? (catalog || []).find((entry) => entry?.key === parsed.currentStatus) : null;
+        return {
+          found: true,
+          isTask: true,
+          done: parsed.taskKind === "done",
+          status: typeof row?.name === "string" && row.name ? row.name : null
+        };
+      } catch {
+        return empty;
+      }
+    },
+    async tasks({ status, includeDone = false, limit = DEFAULT_TASK_LIMIT } = {}) {
+      if (typeof queryTasks !== "function") {
+        throw new Error("Task query reader is unavailable");
+      }
+      const catalog = readCatalog() || [];
+      let targetEntries = catalog;
+      if (status !== void 0) {
+        if (status === null) throw unknownStatusError(status, catalog);
+        const resolved = resolveStatusKey(status, catalog);
+        if (!resolved.ok || !resolved.key) throw unknownStatusError(status, catalog);
+        const matchedEntry = catalog.find((entry) => entry?.key === resolved.key);
+        if (!matchedEntry) throw unknownStatusError(status, catalog);
+        targetEntries = [matchedEntry];
+      }
+      const clampedLimit = clampTaskLimit(limit, DEFAULT_TASK_LIMIT);
+      const queryStatuses = statusEntriesForQuery(targetEntries);
+      if (!queryStatuses.length) {
+        return { tasks: [], truncated: false };
+      }
+      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+      const rows = await queryTasks({
+        statuses: queryStatuses,
+        helpers,
+        includeDone: Boolean(includeDone)
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      const nameByKey = new Map(
+        catalog.filter((entry) => entry?.key && entry?.name).map((entry) => [entry.key, entry.name])
+      );
+      const truncated = list.length > clampedLimit;
+      const sliced = list.slice(0, clampedLimit).map((row) => ({
+        uid: row.uid,
+        text: String(row.body ?? ""),
+        status: nameByKey.get(row.statusKey) ?? row.statusKey,
+        done: Boolean(row.done),
+        page: typeof row.page === "string" ? row.page : null
+      }));
+      return { tasks: sliced, truncated };
+    },
+    async counts({ includeDone = false } = {}) {
+      if (typeof queryTasks !== "function") {
+        throw new Error("Task query reader is unavailable");
+      }
+      const catalog = readCatalog() || [];
+      const counts = {};
+      const nameByKey = /* @__PURE__ */ new Map();
+      for (const entry of catalog) {
+        if (!entry?.key || !entry?.name) continue;
+        counts[entry.name] = 0;
+        nameByKey.set(entry.key, entry.name);
+      }
+      const queryStatuses = statusEntriesForQuery(catalog);
+      if (!queryStatuses.length) {
+        return { counts, total: 0 };
+      }
+      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+      const rows = await queryTasks({
+        statuses: queryStatuses,
+        helpers,
+        includeDone: Boolean(includeDone)
+      });
+      let total = 0;
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const name = nameByKey.get(row?.statusKey);
+        if (name && Object.prototype.hasOwnProperty.call(counts, name)) {
+          counts[name] += 1;
+          total += 1;
+        }
+      }
+      return { counts, total };
+    },
+    renderIcon(element, name) {
+      if (!isElementLike(element) || typeof name !== "string") return noop;
+      let catalog;
+      try {
+        catalog = readCatalog();
+      } catch {
+        return noop;
+      }
+      const resolved = resolveStatusKey(name, catalog);
+      if (!resolved.ok || !resolved.key) return noop;
+      const entry = (catalog || []).find((row) => row?.key === resolved.key);
+      if (!entry) return noop;
+      const doc = element.ownerDocument || documentLike || globalThis.document;
+      if (!doc || typeof doc.createElement !== "function") return noop;
+      const wrap = doc.createElement("span");
+      wrap.className = "ts-rendered-icon";
+      wrap.setAttribute("data-ts-rendered-icon", "true");
+      wrap.setAttribute("aria-hidden", "true");
+      wrap.setAttribute("data-task-status-key", entry.key);
+      const box = doc.createElement("span");
+      box.className = "rm-checkbox rm-todo";
+      box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, entry.key);
+      box.setAttribute(CHECKBOX_SHAPE_ATTRIBUTE, String(entry.glyph || "custom"));
+      const container = doc.createElement("span");
+      container.className = "check-container";
+      const fakeInput = doc.createElement("input");
+      fakeInput.setAttribute("type", "checkbox");
+      fakeInput.setAttribute("tabindex", "-1");
+      fakeInput.setAttribute("aria-hidden", "true");
+      const checkmark = doc.createElement("span");
+      checkmark.className = "checkmark";
+      container.appendChild(fakeInput);
+      container.appendChild(checkmark);
+      box.appendChild(container);
+      wrap.appendChild(box);
+      element.appendChild(wrap);
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        liveIcons.delete(cleanup);
+        if (typeof wrap.remove === "function") {
+          wrap.remove();
+        } else if (wrap.parentNode && typeof wrap.parentNode.removeChild === "function") {
+          wrap.parentNode.removeChild(wrap);
+        }
+      };
+      liveIcons.add(cleanup);
+      return cleanup;
+    },
+    async setStatus(uid, name) {
+      let catalog;
+      try {
+        catalog = readCatalog();
+      } catch (error) {
+        console.warn("[TaskStatus] status list read failed", error);
+        return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
+      }
+      const resolved = resolveStatusKey(name, catalog);
+      if (!resolved.ok) {
+        return { status: "rejected", didWrite: false, reason: resolved.reason };
+      }
+      let outcome;
+      try {
+        outcome = await setBlockStatus(uid, resolved.key);
+      } catch (error) {
+        console.warn("[TaskStatus] setStatus failed", error);
+        return { status: "unknown", didWrite: false, reason: "set-status-failed" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const row = (catalog || []).find((entry) => entry?.key === resolved.key);
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: row?.name ?? null,
+        status: "updated"
+      });
+      return mapped;
+    },
+    async cycle(uid) {
+      let outcome;
+      try {
+        outcome = await cycleBlockStatus(uid);
+      } catch (error) {
+        console.warn("[TaskStatus] cycle failed", error);
+        return { status: "unknown", didWrite: false, reason: "cycle-failed" };
+      }
+      if (outcome == null || typeof outcome !== "object") {
+        return { status: "unchanged", didWrite: false, reason: "done-task" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const written = typeof outcome.string === "string" ? api.statusOf(outcome.string) : null;
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: written,
+        status: "updated"
+      });
+      return mapped;
+    },
+    addEventListener(type, cb) {
+      if (!EVENT_TYPES.has(type) || typeof cb !== "function") return;
+      let bag = buckets.get(type);
+      if (!bag) {
+        bag = /* @__PURE__ */ new Map();
+        buckets.set(type, bag);
+      }
+      if (bag.has(cb)) return;
+      const wrapped = (event) => {
+        try {
+          cb(event?.detail);
+        } catch (error) {
+          console.error("[TaskStatus] listener failed", error);
+        }
+      };
+      bag.set(cb, wrapped);
+      emitter.addEventListener(type, wrapped);
+    },
+    removeEventListener(type, cb) {
+      const bag = buckets.get(type);
+      const wrapped = bag?.get(cb);
+      if (!wrapped) return;
+      bag.delete(cb);
+      emitter.removeEventListener(type, wrapped);
+    }
+  };
+  const frozen = Object.freeze(api);
+  emitters.set(frozen, emitter);
+  renderedIconCleanups.set(frozen, liveIcons);
+  return frozen;
+}
+var fire = (win, type, detail, Ctor) => {
+  try {
+    const C = Ctor ?? win.CustomEvent ?? globalThis.CustomEvent;
+    if (C) win.dispatchEvent(new C(type, { detail }));
+  } catch (error) {
+    console.warn("[TaskStatus] event dispatch failed", error);
+  }
+};
+function installPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  win[GLOBAL_NAME] = api;
+  fire(win, READY_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+}
+function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  const ours = win[GLOBAL_NAME] === api;
+  if (ours) delete win[GLOBAL_NAME];
+  fire(win, UNLOAD_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+  return ours;
+}
+
+// src/status-write.js
+var BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
+var BLOCK_CHILDREN_PULL_PATTERN = "[:block/uid {:block/children [:block/string]}]";
+var MANAGED_TASK_PREFIX_RE = /^[ \t]*(?:\{\{\[\[TODO\]\]\}\}|\{\{TODO\}\}|\{\{\[\[DONE\]\]\}\}|\{\{DONE\}\})/;
+function hasManagedTaskPrefix(text) {
+  return typeof text === "string" && MANAGED_TASK_PREFIX_RE.test(text);
+}
+function valueAt4(value, keyword, fallback = null) {
+  if (!value || typeof value !== "object") return fallback;
+  const plain = keyword.replace(/^:/, "");
+  return value[keyword] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
+}
+function createFreshBlockStringReader(roamAlphaAPI) {
+  const pull = roamAlphaAPI?.data?.async?.pull;
+  if (typeof pull !== "function") {
+    throw new TypeError("roamAlphaAPI.data.async.pull is required");
+  }
+  return async (uid) => {
+    const value = await pull.call(
+      roamAlphaAPI.data.async,
+      BLOCK_STRING_PULL_PATTERN,
+      [":block/uid", uid]
+    );
+    const pulledUid = valueAt4(value, ":block/uid", null);
+    const string = valueAt4(value, ":block/string", null);
+    if (pulledUid !== uid || typeof string !== "string") return null;
+    return string;
+  };
+}
+function createBlockChildStringsReader(roamAlphaAPI) {
+  const pull = roamAlphaAPI?.data?.async?.pull;
+  if (typeof pull !== "function") {
+    throw new TypeError("roamAlphaAPI.data.async.pull is required");
+  }
+  return async (uid) => {
+    const value = await pull.call(
+      roamAlphaAPI.data.async,
+      BLOCK_CHILDREN_PULL_PATTERN,
+      [":block/uid", uid]
+    );
+    const pulledUid = valueAt4(value, ":block/uid", null);
+    if (pulledUid !== uid) return null;
+    const children = valueAt4(value, ":block/children", []);
+    if (!Array.isArray(children)) return [];
+    return children.map((child) => valueAt4(child, ":block/string", null)).filter((string) => typeof string === "string");
+  };
+}
+function result3(status, fields = {}) {
+  return { status, didWrite: status === "updated", ...fields };
+}
+async function certify({ uid, expectedString, nextString, readFresh, writeError = null }) {
+  let observed;
+  try {
+    observed = await readFresh(uid);
+  } catch (error) {
+    return result3("unknown", {
+      reason: "post-write-read-failed",
+      error: writeError || error
+    });
+  }
+  if (observed === nextString) {
+    return result3("updated", {
+      reason: writeError ? "write-threw-after-commit" : "certified",
+      string: observed
+    });
+  }
+  if (observed === expectedString) {
+    return result3("not-updated", {
+      reason: writeError ? "write-failed-before-commit" : "write-not-observed",
+      error: writeError || void 0,
+      string: observed
+    });
+  }
+  return result3("conflict", {
+    reason: observed == null ? "block-missing-after-write" : "third-state-after-write",
+    error: writeError || void 0,
+    string: observed
+  });
+}
+function createCertifiedBlockStringWriter({
+  readFresh,
+  updateBlock,
+  getLiveEditorString = () => null
+}) {
+  if (typeof readFresh !== "function") throw new TypeError("readFresh must be a function");
+  if (typeof updateBlock !== "function") throw new TypeError("updateBlock must be a function");
+  if (typeof getLiveEditorString !== "function") {
+    throw new TypeError("getLiveEditorString must be a function");
+  }
+  return Object.freeze({
+    async apply({
+      uid,
+      expectedString,
+      nextString,
+      expectedLiveEditorString,
+      editorString,
+      userUid,
+      requireExistingTask = false
+    }) {
+      if (typeof uid !== "string" || !uid.trim()) {
+        return result3("rejected", { reason: "invalid-uid" });
+      }
+      if (typeof expectedString !== "string" || typeof nextString !== "string") {
+        return result3("rejected", { reason: "invalid-string" });
+      }
+      let before;
+      try {
+        before = await readFresh(uid);
+      } catch (error) {
+        return result3("unknown", { reason: "pre-write-read-failed", error });
+      }
+      if (before == null) return result3("rejected", { reason: "block-not-found" });
+      if (before !== expectedString) {
+        return result3("conflict", { reason: "stale-expected-string", string: before });
+      }
+      if (requireExistingTask && !hasManagedTaskPrefix(before)) {
+        return result3("rejected", { reason: "not-a-task", string: before });
+      }
+      const hasEditorHandoff = expectedLiveEditorString !== void 0 || editorString !== void 0;
+      if (hasEditorHandoff && (typeof expectedLiveEditorString !== "string" || typeof editorString !== "string")) {
+        return result3("rejected", { reason: "invalid-editor-handoff" });
+      }
+      if (hasEditorHandoff) {
+        const live = getLiveEditorString(uid);
+        if (live !== expectedLiveEditorString && live !== editorString) {
+          return result3("conflict", {
+            reason: "active-editor-diverged",
+            string: typeof live === "string" ? live : null
+          });
+        }
+      }
+      if (nextString === expectedString) {
+        return result3("unchanged", { reason: "already-current", string: before });
+      }
+      const normalizedUserUid = typeof userUid === "string" && userUid.trim() ? userUid.trim() : null;
+      try {
+        if (normalizedUserUid) {
+          await updateBlock(uid, nextString, { userUid: normalizedUserUid });
+        } else {
+          await updateBlock(uid, nextString);
+        }
+      } catch (error) {
+        return certify({ uid, expectedString, nextString, readFresh, writeError: error });
+      }
+      return certify({ uid, expectedString, nextString, readFresh });
+    }
+  });
 }
 
 // src/status-peek.js
@@ -4979,7 +5288,7 @@ function createTaskStatusExtension({
     "a.rm-page-ref[data-task-status-key]"
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
-  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview, .ts-burst-canvas";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview, .ts-burst-canvas, .ts-rendered-icon";
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
   const CONFIG = {
     // Active status order. This is replaced by persisted settings during startup.
@@ -5591,11 +5900,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const built = buildStatuses({ list });
     return list.map((entry) => {
       const status = built[entry.key];
+      const name = status?.name || entry.name;
+      const group = getStatusGroup(entry.key, name);
       return {
         key: entry.key,
-        name: status?.name || entry.name,
+        name,
         tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
-        glyph: getStatusCheckboxShape(entry.key, status?.name || entry.name)
+        glyph: getStatusCheckboxShape(entry.key, name),
+        group,
+        inCycle: group === "task"
       };
     });
   }
@@ -5608,6 +5921,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       name: entry.name,
       tag: entry.tag,
       glyph: entry.glyph,
+      group: entry.group,
+      inCycle: entry.inCycle,
       colors: deriveStatusPillColorValues(entry.key, overrides?.[entry.key], surfaces)
     }));
   }
@@ -6231,12 +6546,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     return null;
   }
-  async function updateBlock(blockUid, newText) {
-    await window.roamAlphaAPI.data.block.update({
-      block: { uid: blockUid, string: newText }
-    });
+  async function updateBlock(blockUid, newText, { userUid } = {}) {
+    const block = { uid: blockUid, string: newText };
+    if (typeof userUid === "string" && userUid.trim()) {
+      block["user-uid"] = userUid.trim();
+    }
+    await window.roamAlphaAPI.data.block.update({ block });
   }
   const readBlockStringFresh = createFreshBlockStringReader(window.roamAlphaAPI);
+  const readBlockChildStrings = createBlockChildStringsReader(window.roamAlphaAPI);
   const certifiedBlockWriter = createCertifiedBlockStringWriter({
     readFresh: readBlockStringFresh,
     updateBlock,
@@ -6255,7 +6573,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   const statusWriteRouter = createBetterTasksStatusRouter({
     windowLike: window,
     directWriter: certifiedBlockWriter,
-    activityRecorder
+    activityRecorder,
+    readChildStrings: readBlockChildStrings
   });
   const episodeCounter = createEpisodeCounterController({
     document,
@@ -6292,7 +6611,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       primaryUid
     });
   }
-  async function setBlockStatus(blockUid, statusKey, { editorString, expectedLiveEditorString } = {}) {
+  async function setBlockStatus(blockUid, statusKey, {
+    editorString,
+    expectedLiveEditorString,
+    userUid,
+    requireExistingTask = false,
+    requireBetterTasksReady = false
+  } = {}) {
     if (!blockUid) return { status: "rejected", didWrite: false, reason: "missing-uid" };
     if (statusKey != null && !STATUSES[statusKey]?.active) {
       return { status: "rejected", didWrite: false, reason: "inactive-status" };
@@ -6314,20 +6639,29 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return { status: "rejected", didWrite: false, reason: "invalid-editor-handoff" };
     }
     const sourceString = hasEditorHandoff ? editorString : expectedString;
+    if (requireExistingTask && !getTextHelpers().parseManagedPrefix(sourceString).managed) {
+      return { status: "rejected", didWrite: false, reason: "not-a-task", string: expectedString };
+    }
     const newText = statusKey === null ? removeStatusFromText(sourceString) : applyStatusToText(sourceString, statusKey);
     if (newText === expectedString) {
       return { status: "unchanged", didWrite: false, reason: "already-current", string: expectedString };
     }
     pendingOperations.add(blockUid);
     try {
-      const outcome = await statusWriteRouter.apply({
+      const routerArgs = {
         uid: blockUid,
         expectedString,
         nextString: newText,
         statusTagTitle: statusKey === null ? null : STATUSES[statusKey].tagTitle,
         expectedLiveEditorString,
         editorString
-      });
+      };
+      if (typeof userUid === "string" && userUid.trim()) {
+        routerArgs.userUid = userUid.trim();
+      }
+      if (requireExistingTask) routerArgs.requireExistingTask = true;
+      if (requireBetterTasksReady) routerArgs.requireBetterTasksReady = true;
+      const outcome = await statusWriteRouter.apply(routerArgs);
       if (!["updated", "unchanged"].includes(outcome?.status)) {
         console.warn("[TaskStatus] Status edit refused", {
           uid: blockUid,
@@ -8425,6 +8759,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     document?.documentElement?.removeAttribute?.(AMBIENT_MOTION_ATTRIBUTE);
     repeatStatusReset.dispose();
     clearStatusColorOverrides();
+    clearRenderedIcons(publicApi);
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
@@ -8458,7 +8793,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       } finally {
         publicWriteDepth -= 1;
       }
-    }
+    },
+    readBlockString: readBlockStringFresh,
+    queryTasks: ({ statuses, helpers, includeDone }) => queryStatusTasks({
+      roamAlphaAPI: window.roamAlphaAPI,
+      statuses,
+      helpers,
+      includeDone,
+      includeEpisodes: false
+    }),
+    documentLike: document
   });
   return { init, cleanup, publicApi };
 }

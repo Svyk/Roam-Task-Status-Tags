@@ -128,7 +128,7 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
 
   // Appends one line into the task's existing activity log. `buildLine(ts)`
   // returns `{ text, props }`. Never creates a log, skips an identical last line.
-  async function appendLine(uid, roam, buildLine) {
+  async function appendLine(uid, roam, buildLine, { userUid } = {}) {
     let containerUid;
     let siblings;
     try {
@@ -149,11 +149,15 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
     }
 
     const entryUid = roam.generateUID();
+    const block = { uid: entryUid, string: text, props };
+    if (typeof userUid === "string" && userUid.trim()) {
+      block["user-uid"] = userUid.trim();
+    }
     try {
       // One write: Roam's block.create takes props, so the line and its event map land together (one undo step).
       await roam.create({
         location: { "parent-uid": containerUid, order: "last" },
-        block: { uid: entryUid, string: text, props },
+        block,
       });
     } catch (error) {
       return result(false, { reason: "activity-write-failed", error, containerUid });
@@ -162,7 +166,7 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
   }
 
   return Object.freeze({
-    async record({ uid, previousString, nextString, statusTagTitle }) {
+    async record({ uid, previousString, nextString, statusTagTitle, userUid }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
       const roam = resolveRoamSurface(roamAlphaAPI);
       if (!roam) return result(false, { reason: "roam-api-unavailable" });
@@ -171,13 +175,18 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
         ? statusLabelFromTaskText(nextString)
         : statusLabelFromTagTitle(statusTagTitle);
       if ((from || null) === (to || null)) return result(false, { reason: "status-unchanged" });
-      return appendLine(uid, roam, (ts) => ({
-        text: renderStatusActivityLine({ to, ts }),
-        props: buildStatusActivityProps({ from, to, ts }),
-      }));
+      return appendLine(
+        uid,
+        roam,
+        (ts) => ({
+          text: renderStatusActivityLine({ to, ts }),
+          props: buildStatusActivityProps({ from, to, ts }),
+        }),
+        { userUid }
+      );
     },
 
-    async recordAttributeChange({ uid, field, from, to }) {
+    async recordAttributeChange({ uid, field, from, to, userUid }) {
       if (typeof uid !== "string" || !uid.trim()) return result(false, { reason: "invalid-uid" });
       if (typeof field !== "string" || !field.trim() || typeof to !== "string" || !to) {
         return result(false, { reason: "invalid-change" });
@@ -185,10 +194,15 @@ export function createBetterTasksActivityRecorder({ roamAlphaAPI, now = Date.now
       const roam = resolveRoamSurface(roamAlphaAPI);
       if (!roam) return result(false, { reason: "roam-api-unavailable" });
       if ((from || null) === to) return result(false, { reason: "attribute-unchanged" });
-      return appendLine(uid, roam, (ts) => ({
-        text: renderAttributeActivityLine({ field, to, ts }),
-        props: buildAttributeActivityProps({ field, from, to, ts }),
-      }));
+      return appendLine(
+        uid,
+        roam,
+        (ts) => ({
+          text: renderAttributeActivityLine({ field, to, ts }),
+          props: buildAttributeActivityProps({ field, from, to, ts }),
+        }),
+        { userUid }
+      );
     },
   });
 }

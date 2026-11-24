@@ -18,8 +18,9 @@ const EMPTY_TEXT = {
 };
 const MEDIA_ORDER = ["watching", "watchlist", "upcoming", "series", "rewatch"];
 
-const TASKS_QUERY =
-  "[:find ?uid ?str ?title ?time :in $ [?title ...] :where [?t :node/title ?title] [?b :block/refs ?t] [?b :block/uid ?uid] [?b :block/string ?str] [(get-else $ ?b :edit/time 0) ?time]]";
+export const STATUS_TASKS_QUERY =
+  "[:find ?uid ?str ?title ?time ?page :in $ [?title ...] :where [?t :node/title ?title] [?b :block/refs ?t] [?b :block/uid ?uid] [?b :block/string ?str] [(get-else $ ?b :edit/time 0) ?time] [?b :block/page ?p] [?p :node/title ?page]]";
+const TASKS_QUERY = STATUS_TASKS_QUERY;
 const EPISODE_QUERY =
   '[:find ?puid ?cuid ?cs ?order :in $ [?puid ...] :where [?p :block/uid ?puid] [?p :block/children ?c] [?c :block/uid ?cuid] [?c :block/string ?cs] [?c :block/order ?order] [(clojure.string/includes? ?cs "::")]]';
 
@@ -69,26 +70,39 @@ async function runQuery(roamAlphaAPI, query, ...args) {
   throw new Error("roamAlphaAPI query is unavailable");
 }
 
-export async function queryStatusTasks({ roamAlphaAPI, statuses, helpers }) {
+export async function queryStatusTasks({
+  roamAlphaAPI,
+  statuses,
+  helpers,
+  includeDone = false,
+  includeEpisodes = true,
+}) {
   const keyByTitle = new Map();
   for (const status of statuses || []) {
-    if (status?.tagTitle && status?.key) keyByTitle.set(status.tagTitle, status.key);
+    const tagTitle = status?.tagTitle || status?.tag;
+    if (tagTitle && status?.key) keyByTitle.set(tagTitle, status.key);
   }
   if (!keyByTitle.size) return [];
 
   const found = await runQuery(roamAlphaAPI, TASKS_QUERY, [...keyByTitle.keys()]);
   const kept = new Map();
   for (const entry of Array.isArray(found) ? found : []) {
-    const [uid, string, title, time] = entry || [];
+    const [uid, string, title, time, page] = entry || [];
     if (typeof uid !== "string" || typeof string !== "string" || kept.has(uid)) continue;
     const key = keyByTitle.get(title);
-    if (!key || helpers.isDoneTask(string)) continue;
-    if (helpers.getCurrentStatus(string) !== key) continue;
+    if (!key) continue;
+    const parsed = helpers.parseManagedPrefix(string);
+    if (!parsed?.managed) continue;
+    const done = parsed.taskKind === "done";
+    if (!includeDone && done) continue;
+    if (parsed.currentStatus !== key) continue;
     kept.set(uid, {
       uid,
       statusKey: key,
       string,
-      body: String(helpers.parseManagedPrefix(string).body ?? "").trim(),
+      body: String(parsed.body ?? "").trim(),
+      done,
+      page: typeof page === "string" ? page : null,
       editTime: Number(time) || 0,
       episode: null,
     });
@@ -96,20 +110,22 @@ export async function queryStatusTasks({ roamAlphaAPI, statuses, helpers }) {
   const rows = [...kept.values()];
   if (!rows.length) return rows;
 
-  const childRows = await runQuery(roamAlphaAPI, EPISODE_QUERY, rows.map((row) => row.uid));
-  const childrenByUid = new Map();
-  for (const entry of Array.isArray(childRows) ? childRows : []) {
-    const [puid, uid, string, order] = entry || [];
-    if (typeof puid !== "string") continue;
-    if (!childrenByUid.has(puid)) childrenByUid.set(puid, []);
-    childrenByUid.get(puid).push({ uid, string, order });
-  }
-  for (const row of rows) {
-    const children = childrenByUid.get(row.uid);
-    if (!children) continue;
-    const state = episodeStateFromChildren(children);
-    if (!state.childUid) continue;
-    row.episode = state.invalid ? { text: "?", invalid: true } : { text: formatEpisode(state.episode) };
+  if (includeEpisodes) {
+    const childRows = await runQuery(roamAlphaAPI, EPISODE_QUERY, rows.map((row) => row.uid));
+    const childrenByUid = new Map();
+    for (const entry of Array.isArray(childRows) ? childRows : []) {
+      const [puid, uid, string, order] = entry || [];
+      if (typeof puid !== "string") continue;
+      if (!childrenByUid.has(puid)) childrenByUid.set(puid, []);
+      childrenByUid.get(puid).push({ uid, string, order });
+    }
+    for (const row of rows) {
+      const children = childrenByUid.get(row.uid);
+      if (!children) continue;
+      const state = episodeStateFromChildren(children);
+      if (!state.childUid) continue;
+      row.episode = state.invalid ? { text: "?", invalid: true } : { text: formatEpisode(state.episode) };
+    }
   }
 
   rows.sort((a, b) => b.editTime - a.editTime || (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));

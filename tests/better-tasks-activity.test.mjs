@@ -42,10 +42,10 @@ function fakeGraph(blocks) {
       },
       block: {
         async create({ location, block }) {
-          calls.push(["create", location["parent-uid"], block.string, block.uid, block.props]);
+          calls.push(["create", location["parent-uid"], block.string, block.uid, block.props, block["user-uid"]]);
           const parent = byUid.get(location["parent-uid"]);
           if (!parent) throw new Error("no parent");
-          byUid.set(block.uid, { string: block.string, children: [], props: block.props ?? null });
+          byUid.set(block.uid, { string: block.string, children: [], props: block.props ?? null, userUid: block["user-uid"] });
           parent.children.push(block.uid);
         },
         async update({ block }) {
@@ -267,4 +267,28 @@ test("recordAttributeChange never creates a log, skips duplicates and unchanged 
     await recorder.recordAttributeChange({ uid: "task", field: "episode", from: "S1E1", to: "S1E1" }),
     { recorded: false, reason: "attribute-unchanged" }
   );
+});
+
+test("userUid is passed to block.create as user-uid only when provided", async () => {
+  const graph = taskWithLog();
+  const recorder = createBetterTasksActivityRecorder({ roamAlphaAPI: graph.roamAlphaAPI, now: () => NOW });
+
+  const withUser = await recorder.record({
+    uid: "task",
+    previousString: "{{[[TODO]]}} Call the lab",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] Call the lab",
+    statusTagTitle: "task-status/Waiting",
+    userUid: "ai-user-42",
+  });
+  assert.equal(withUser.recorded, true);
+  assert.equal(graph.byUid.get(withUser.entryUid).userUid, "ai-user-42");
+
+  const withoutUser = await recorder.record({
+    uid: "task",
+    previousString: "{{[[TODO]]}} #[[task-status/Waiting]] Call the lab",
+    nextString: "{{[[TODO]]}} #[[task-status/Active]] Call the lab",
+    statusTagTitle: "task-status/Active",
+  });
+  assert.equal(withoutUser.recorded, true);
+  assert.equal(graph.byUid.get(withoutUser.entryUid).userUid, undefined);
 });

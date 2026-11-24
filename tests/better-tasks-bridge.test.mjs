@@ -332,3 +332,94 @@ test("ordinary blocks and routers without a recorder record nothing", async () =
     TypeError
   );
 });
+
+test("requireBetterTasksReady rejects a BT_attr child when provider is absent and allows ordinary tasks", async () => {
+  const direct = directHarness();
+  const childReads = [];
+  const router = createBetterTasksStatusRouter({
+    windowLike: {},
+    directWriter: direct.writer,
+    readChildStrings: async (uid) => {
+      childReads.push(uid);
+      return uid === "bt-task" ? ["BT_attrDue:: [[October 6th, 2026]]", "Notes"] : ["Plain note"];
+    },
+  });
+
+  const refused = await router.apply({
+    uid: "bt-task",
+    expectedString: "{{[[TODO]]}} BT task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] BT task",
+    statusTagTitle: "task-status/Waiting",
+    requireBetterTasksReady: true,
+    requireExistingTask: true,
+    userUid: "ai-user-1",
+  });
+  assert.equal(refused.status, "rejected");
+  assert.equal(refused.didWrite, false);
+  assert.equal(refused.reason, "better-tasks-not-ready");
+  assert.equal(direct.calls.length, 0);
+  assert.deepEqual(childReads, ["bt-task"]);
+
+  const ordinary = await router.apply({
+    uid: "plain-task",
+    expectedString: "{{[[TODO]]}} Plain task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] Plain task",
+    statusTagTitle: "task-status/Waiting",
+    requireBetterTasksReady: true,
+    requireExistingTask: true,
+    userUid: "ai-user-1",
+  });
+  assert.equal(ordinary.status, "updated");
+  assert.equal(direct.calls.length, 1);
+  assert.equal(direct.calls[0].userUid, "ai-user-1");
+  assert.equal(direct.calls[0].requireExistingTask, true);
+
+  // Without requireBetterTasksReady, no child read happens.
+  await router.apply({
+    uid: "bt-task",
+    expectedString: "{{[[TODO]]}} BT task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] BT task",
+    statusTagTitle: "task-status/Waiting",
+  });
+  assert.deepEqual(childReads, ["bt-task", "plain-task"]);
+});
+
+test("requireBetterTasksReady fails closed when child read fails and userUid reaches activity only on Better Tasks path", async () => {
+  const direct = directHarness();
+  const failingRouter = createBetterTasksStatusRouter({
+    windowLike: {},
+    directWriter: direct.writer,
+    readChildStrings: async () => { throw new Error("pull failed"); },
+  });
+  const failed = await failingRouter.apply({
+    uid: "bt-task",
+    expectedString: "{{[[TODO]]}} BT task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] BT task",
+    requireBetterTasksReady: true,
+  });
+  assert.equal(failed.status, "unknown");
+  assert.equal(failed.reason, "better-tasks-children-read-failed");
+  assert.equal(direct.calls.length, 0);
+
+  const activity = activityHarness();
+  const providerCalls = [];
+  const v2Router = createBetterTasksStatusRouter({
+    windowLike: v2Window(async (...args) => {
+      providerCalls.push(args);
+      return { status: "updated", didWrite: true, reason: "certified" };
+    }),
+    directWriter: direct.writer,
+    activityRecorder: activity.recorder,
+  });
+  await v2Router.apply({
+    uid: "task",
+    expectedString: "{{[[TODO]]}} task",
+    nextString: "{{[[TODO]]}} #[[task-status/Waiting]] task",
+    statusTagTitle: "task-status/Waiting",
+    userUid: "ai-user-7",
+    requireExistingTask: true,
+    requireBetterTasksReady: true,
+  });
+  assert.equal(providerCalls[0][1].userUid, undefined);
+  assert.equal(activity.calls[0].userUid, "ai-user-7");
+});

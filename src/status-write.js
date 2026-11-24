@@ -1,4 +1,12 @@
 export const BLOCK_STRING_PULL_PATTERN = "[:block/uid :block/string]";
+export const BLOCK_CHILDREN_PULL_PATTERN = "[:block/uid {:block/children [:block/string]}]";
+
+const MANAGED_TASK_PREFIX_RE =
+  /^[ \t]*(?:\{\{\[\[TODO\]\]\}\}|\{\{TODO\}\}|\{\{\[\[DONE\]\]\}\}|\{\{DONE\}\})/;
+
+export function hasManagedTaskPrefix(text) {
+  return typeof text === "string" && MANAGED_TASK_PREFIX_RE.test(text);
+}
 
 function valueAt(value, keyword, fallback = null) {
   if (!value || typeof value !== "object") return fallback;
@@ -21,6 +29,27 @@ export function createFreshBlockStringReader(roamAlphaAPI) {
     const string = valueAt(value, ":block/string", null);
     if (pulledUid !== uid || typeof string !== "string") return null;
     return string;
+  };
+}
+
+export function createBlockChildStringsReader(roamAlphaAPI) {
+  const pull = roamAlphaAPI?.data?.async?.pull;
+  if (typeof pull !== "function") {
+    throw new TypeError("roamAlphaAPI.data.async.pull is required");
+  }
+  return async (uid) => {
+    const value = await pull.call(
+      roamAlphaAPI.data.async,
+      BLOCK_CHILDREN_PULL_PATTERN,
+      [":block/uid", uid]
+    );
+    const pulledUid = valueAt(value, ":block/uid", null);
+    if (pulledUid !== uid) return null;
+    const children = valueAt(value, ":block/children", []);
+    if (!Array.isArray(children)) return [];
+    return children
+      .map((child) => valueAt(child, ":block/string", null))
+      .filter((string) => typeof string === "string");
   };
 }
 
@@ -76,6 +105,8 @@ export function createCertifiedBlockStringWriter({
       nextString,
       expectedLiveEditorString,
       editorString,
+      userUid,
+      requireExistingTask = false,
     }) {
       if (typeof uid !== "string" || !uid.trim()) {
         return result("rejected", { reason: "invalid-uid" });
@@ -93,6 +124,9 @@ export function createCertifiedBlockStringWriter({
       if (before == null) return result("rejected", { reason: "block-not-found" });
       if (before !== expectedString) {
         return result("conflict", { reason: "stale-expected-string", string: before });
+      }
+      if (requireExistingTask && !hasManagedTaskPrefix(before)) {
+        return result("rejected", { reason: "not-a-task", string: before });
       }
 
       const hasEditorHandoff =
@@ -116,8 +150,14 @@ export function createCertifiedBlockStringWriter({
         return result("unchanged", { reason: "already-current", string: before });
       }
 
+      const normalizedUserUid =
+        typeof userUid === "string" && userUid.trim() ? userUid.trim() : null;
       try {
-        await updateBlock(uid, nextString);
+        if (normalizedUserUid) {
+          await updateBlock(uid, nextString, { userUid: normalizedUserUid });
+        } else {
+          await updateBlock(uid, nextString);
+        }
       } catch (error) {
         return certify({ uid, expectedString, nextString, readFresh, writeError: error });
       }

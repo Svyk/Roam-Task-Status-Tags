@@ -24,7 +24,7 @@ import {
   resetTagTitles,
 } from "./repeat-status-reset.js";
 import { createStatusBurstSystem } from "./status-burst.js";
-import { createStatusView } from "./status-view.js";
+import { createStatusView, queryStatusTasks } from "./status-view.js";
 import {
   THEME_ATTRIBUTE,
   THEME_SETTING_VALUES,
@@ -33,6 +33,7 @@ import {
   themeSettingToPreference,
 } from "./theme.js";
 import {
+  clearRenderedIcons,
   createPublicApi,
   emitStatusCatalog,
   emitStatusChange,
@@ -41,6 +42,7 @@ import {
   uninstallPublicApi,
 } from "./public-api.js";
 import {
+  createBlockChildStringsReader,
   createCertifiedBlockStringWriter,
   createFreshBlockStringReader,
 } from "./status-write.js";
@@ -591,7 +593,7 @@ function createTaskStatusExtension({
     "a.rm-page-ref[data-task-status-key]",
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
-  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview, .ts-burst-canvas";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview, .ts-burst-canvas, .ts-rendered-icon";
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
 
   const CONFIG = {
@@ -1295,11 +1297,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const built = buildStatuses({ list });
     return list.map((entry) => {
       const status = built[entry.key];
+      const name = status?.name || entry.name;
+      const group = getStatusGroup(entry.key, name);
       return {
         key: entry.key,
-        name: status?.name || entry.name,
+        name,
         tag: status?.tagTitle || `${STATUS_TAG_PREFIX}${entry.name}`,
-        glyph: getStatusCheckboxShape(entry.key, status?.name || entry.name),
+        glyph: getStatusCheckboxShape(entry.key, name),
+        group,
+        inCycle: group === "task",
       };
     });
   }
@@ -1313,6 +1319,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       name: entry.name,
       tag: entry.tag,
       glyph: entry.glyph,
+      group: entry.group,
+      inCycle: entry.inCycle,
       colors: deriveStatusPillColorValues(entry.key, overrides?.[entry.key], surfaces),
     }));
   }
@@ -2063,13 +2071,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return null;
   }
 
-  async function updateBlock(blockUid, newText) {
-    await window.roamAlphaAPI.data.block.update({
-      block: { uid: blockUid, string: newText },
-    });
+  async function updateBlock(blockUid, newText, { userUid } = {}) {
+    const block = { uid: blockUid, string: newText };
+    if (typeof userUid === "string" && userUid.trim()) {
+      block["user-uid"] = userUid.trim();
+    }
+    await window.roamAlphaAPI.data.block.update({ block });
   }
 
   const readBlockStringFresh = createFreshBlockStringReader(window.roamAlphaAPI);
+  const readBlockChildStrings = createBlockChildStringsReader(window.roamAlphaAPI);
   const certifiedBlockWriter = createCertifiedBlockStringWriter({
     readFresh: readBlockStringFresh,
     updateBlock,
@@ -2090,6 +2101,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     windowLike: window,
     directWriter: certifiedBlockWriter,
     activityRecorder,
+    readChildStrings: readBlockChildStrings,
   });
   const episodeCounter = createEpisodeCounterController({
     document,
@@ -2137,7 +2149,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function setBlockStatus(
     blockUid,
     statusKey,
-    { editorString, expectedLiveEditorString } = {}
+    {
+      editorString,
+      expectedLiveEditorString,
+      userUid,
+      requireExistingTask = false,
+      requireBetterTasksReady = false,
+    } = {}
   ) {
     if (!blockUid) return { status: "rejected", didWrite: false, reason: "missing-uid" };
     if (statusKey != null && !STATUSES[statusKey]?.active) {
@@ -2166,6 +2184,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return { status: "rejected", didWrite: false, reason: "invalid-editor-handoff" };
     }
     const sourceString = hasEditorHandoff ? editorString : expectedString;
+    if (requireExistingTask && !getTextHelpers().parseManagedPrefix(sourceString).managed) {
+      return { status: "rejected", didWrite: false, reason: "not-a-task", string: expectedString };
+    }
 
     const newText =
       statusKey === null
@@ -2178,14 +2199,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
     pendingOperations.add(blockUid);
     try {
-      const outcome = await statusWriteRouter.apply({
+      const routerArgs = {
         uid: blockUid,
         expectedString,
         nextString: newText,
         statusTagTitle: statusKey === null ? null : STATUSES[statusKey].tagTitle,
         expectedLiveEditorString,
         editorString,
-      });
+      };
+      if (typeof userUid === "string" && userUid.trim()) {
+        routerArgs.userUid = userUid.trim();
+      }
+      if (requireExistingTask) routerArgs.requireExistingTask = true;
+      if (requireBetterTasksReady) routerArgs.requireBetterTasksReady = true;
+      const outcome = await statusWriteRouter.apply(routerArgs);
       if (!["updated", "unchanged"].includes(outcome?.status)) {
         console.warn("[TaskStatus] Status edit refused", {
           uid: blockUid,
@@ -4644,6 +4671,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     repeatStatusReset.dispose();
 
     clearStatusColorOverrides();
+    clearRenderedIcons(publicApi);
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;
 
@@ -4681,6 +4709,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         publicWriteDepth -= 1;
       }
     },
+    readBlockString: readBlockStringFresh,
+    queryTasks: ({ statuses, helpers, includeDone }) =>
+      queryStatusTasks({
+        roamAlphaAPI: window.roamAlphaAPI,
+        statuses,
+        helpers,
+        includeDone,
+        includeEpisodes: false,
+      }),
+    documentLike: document,
   });
 
   return { init, cleanup, publicApi };

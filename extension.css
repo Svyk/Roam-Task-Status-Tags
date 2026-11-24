@@ -3417,6 +3417,45 @@ a.rm-page-ref[data-task-status-key]:hover {
   height: 16px;
 }
 
+.ts-rendered-icon[data-ts-rendered-icon="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.ts-rendered-icon[data-ts-rendered-icon="true"] .rm-checkbox[data-ts-checkbox-status] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ts-rendered-icon[data-ts-rendered-icon="true"] .rm-checkbox[data-ts-checkbox-status] > .check-container {
+  display: inline-block;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.ts-rendered-icon[data-ts-rendered-icon="true"] .rm-checkbox[data-ts-checkbox-status] > .check-container > input {
+  position: absolute;
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.ts-rendered-icon[data-ts-rendered-icon="true"] .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark {
+  position: absolute;
+  inset: 0;
+  width: 16px;
+  height: 16px;
+}
+
 /* Adapted from BetterTask by imhalid (MIT). See THIRD_PARTY_NOTICES.md. */
 .ts-burst-canvas[data-ts-burst-canvas="true"] {
   position: fixed;

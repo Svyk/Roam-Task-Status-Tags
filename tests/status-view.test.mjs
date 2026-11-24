@@ -142,6 +142,43 @@ test("queryStatusTasks: async.q first, q fallback, tag titles bound, no second q
   assert.deepEqual(sync.calls[1].args, [["a"]]);
 });
 
+test("queryStatusTasks: returns page title, supports includeDone, and skips episode query when includeEpisodes is false", async () => {
+  const roamAlphaAPI = fakeApi({
+    tasks: [
+      ["a", "{{[[TODO]]}} #[[task-status/Watching]] Severance", "task-status/Watching", 100, "TV"],
+      ["b", "{{[[DONE]]}} #[[task-status/Watching]] Dark", "task-status/Watching", 300, "Archive"],
+      ["c", "Mention #[[task-status/Watching]] in prose", "task-status/Watching", 500, "Notes"],
+    ],
+  });
+  const openOnly = await queryStatusTasks({
+    roamAlphaAPI,
+    statuses: CATALOG,
+    helpers,
+    includeDone: false,
+    includeEpisodes: false,
+  });
+  assert.equal(roamAlphaAPI.calls.length, 1, "episode query must be skipped");
+  assert.deepEqual(
+    openOnly.map(({ uid, body, done, page }) => ({ uid, body, done, page })),
+    [{ uid: "a", body: "Severance", done: false, page: "TV" }]
+  );
+
+  const withDone = await queryStatusTasks({
+    roamAlphaAPI,
+    statuses: CATALOG,
+    helpers,
+    includeDone: true,
+    includeEpisodes: false,
+  });
+  assert.deepEqual(
+    withDone.map(({ uid, body, done, page }) => ({ uid, body, done, page })),
+    [
+      { uid: "b", body: "Dark", done: true, page: "Archive" },
+      { uid: "a", body: "Severance", done: false, page: "TV" },
+    ]
+  );
+});
+
 // --- episodeStateFromChildren parity ---------------------------------------
 
 test("episodeStateFromChildren matches readEpisodeStateSync", () => {

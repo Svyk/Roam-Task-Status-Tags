@@ -6,6 +6,8 @@ import { createBetterTasksStatusRouter } from "../src/better-tasks-bridge.js";
 import { createTaskStatusTextHelpers } from "../src/extension.js";
 import { buildStatusPillColors } from "../src/status-checkbox.js";
 import {
+  API_FEATURES,
+  clearRenderedIcons,
   createPublicApi,
   emitStatusCatalog,
   emitStatusChange,
@@ -14,15 +16,18 @@ import {
   publicStatusRow,
   uninstallPublicApi,
 } from "../src/public-api.js";
+import { queryStatusTasks } from "../src/status-view.js";
 
 const WAITING_COLORS = buildStatusPillColors({ baseRgb: { r: 234, g: 179, b: 8 } });
 const ACTIVE_COLORS = buildStatusPillColors({ baseRgb: { r: 20, g: 184, b: 166 } });
 
 function catalog() {
   return [
-    { key: "ACTIVE", name: "Active", tag: "task-status/Active", glyph: "active" },
-    { key: "WAITING", name: "Waiting", tag: "task-status/Waiting", glyph: "waiting" },
-    { key: "CUSTOM_ON_HOLD", name: "On Hold", tag: "task-status/On Hold", glyph: "custom" },
+    { key: "ACTIVE", name: "Active", tag: "task-status/Active", glyph: "active", group: "task", inCycle: true },
+    { key: "WAITING", name: "Waiting", tag: "task-status/Waiting", glyph: "waiting", group: "task", inCycle: true },
+    { key: "WATCHING", name: "Watching", tag: "task-status/Watching", glyph: "watching", group: "media", inCycle: false },
+    { key: "IMPORTANT", name: "Important", tag: "task-status/Important", glyph: "important", group: "extra", inCycle: false },
+    { key: "CUSTOM_ON_HOLD", name: "On Hold", tag: "task-status/On Hold", glyph: "custom", group: "task", inCycle: true },
   ];
 }
 
@@ -41,18 +46,32 @@ function apiWith(overrides = {}) {
   });
 }
 
-test("frozen apiVersion 1 exposes the public methods and no palette command", () => {
+test("frozen apiVersion 1 exposes the public methods, frozen features, and no palette command", () => {
   const api = apiWith();
   assert.equal(Object.isFrozen(api), true);
   assert.equal(api.apiVersion, 1);
+  assert.equal(Object.isFrozen(api.features), true);
+  assert.deepEqual(api.features, API_FEATURES);
+  assert.deepEqual(api.features, [
+    "statusOfBlock",
+    "tasks",
+    "counts",
+    "renderIcon",
+    "aiTools",
+  ]);
   assert.deepEqual(Object.keys(api).sort(), [
     "addEventListener",
     "apiVersion",
+    "counts",
     "cycle",
+    "features",
     "removeEventListener",
+    "renderIcon",
     "setStatus",
     "statusOf",
+    "statusOfBlock",
     "statuses",
+    "tasks",
   ]);
   const source = readFileSync(new URL("../src/public-api.js", import.meta.url), "utf8");
   const extensionSource = readFileSync(new URL("../src/extension.js", import.meta.url), "utf8");
@@ -628,6 +647,8 @@ test("installed api exposes fourteen default rows, writes a plain TODO, routes B
     assert.equal(inReview.name, "In Review");
     assert.equal(inReview.tag, "task-status/In Review");
     assert.equal(inReview.glyph, "in-review");
+    assert.equal(inReview.group, "task");
+    assert.equal(inReview.inCycle, true);
     assert.equal(inReview.light.base, inReviewColors.lightBackgroundCss);
     assert.equal(inReview.light.text, inReviewColors.lightTextCss);
     assert.equal(inReview.dark.base, inReviewColors.darkBackgroundCss);
@@ -635,8 +656,24 @@ test("installed api exposes fourteen default rows, writes a plain TODO, routes B
     assert.notEqual(inReview.light.base, activeColors.lightBackgroundCss);
     assert.equal(rows.find((row) => row.key === "WAITING").glyph, "waiting");
     for (const glyph of ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"]) {
-      assert.equal(rows.find((row) => row.key === glyph.toUpperCase()).glyph, glyph);
+      const mediaRow = rows.find((row) => row.key === glyph.toUpperCase());
+      assert.equal(mediaRow.glyph, glyph);
+      assert.equal(mediaRow.group, "media");
+      assert.equal(mediaRow.inCycle, false);
     }
+
+    const iconHost = document.createElement("span");
+    const keepSibling = document.createElement("em");
+    iconHost.appendChild(keepSibling);
+    const stopIcon = api.renderIcon(iconHost, "Waiting");
+    assert.equal(iconHost.children.length, 2);
+    assert.equal(iconHost.children[1].getAttribute("data-ts-rendered-icon"), "true");
+    // Leave one live icon mounted to verify unload removes it too.
+    const liveHost = document.createElement("span");
+    api.renderIcon(liveHost, "Active");
+    assert.equal(liveHost.children.length, 1);
+    stopIcon();
+    assert.deepEqual(iconHost.children, [keepSibling]);
     assert.equal(
       api.statusOf("{{[[TODO]]}} #[[task-status/In Review]] Send SOP"),
       "In Review"
@@ -799,6 +836,7 @@ test("installed api exposes fourteen default rows, writes a plain TODO, routes B
     const replaced = { apiVersion: 1 };
     windowLike.RoamTaskStatusTags = replaced;
     await extension.onunload();
+    assert.equal(liveHost.children.length, 0, "unload must remove all live rendered icons");
     assert.equal(windowLike.RoamTaskStatusTags, replaced);
     assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
     delete windowLike.RoamTaskStatusTags;
@@ -830,4 +868,269 @@ test("setStatus surfaces the Better Tasks activity receipt only on updated resul
     mapPublicResult({ status: "unchanged", didWrite: false, reason: "already-current", activity: { recorded: true } }),
     { status: "unchanged", didWrite: false, reason: "already-current" }
   );
+});
+
+test("statuses() rows carry group and inCycle for task, media, and extra groups", () => {
+  const api = apiWith();
+  const rows = api.statuses();
+  assert.deepEqual(
+    rows.map(({ name, group, inCycle }) => ({ name, group, inCycle })),
+    [
+      { name: "Active", group: "task", inCycle: true },
+      { name: "Waiting", group: "task", inCycle: true },
+      { name: "Watching", group: "media", inCycle: false },
+      { name: "Important", group: "extra", inCycle: false },
+      { name: "On Hold", group: "task", inCycle: true },
+    ]
+  );
+});
+
+test("statusOfBlock distinguishes managed tasks from mid-line TODOs and never throws", async () => {
+  const blocks = new Map([
+    ["t1", "{{[[TODO]]}} #[[task-status/Waiting]] Call lab"],
+    ["t2", "{{[[DONE]]}} #[[task-status/Active]] Shipped"],
+    ["t3", "{{[[TODO]]}} Plain todo"],
+    ["p1", "Plain paragraph"],
+    ["p2", "Notes about [[TODO]] and #[[task-status/Waiting]]"],
+    ["p3", "Notes about {{[[TODO]]}} mid-line"],
+  ]);
+  const api = apiWith({
+    readBlockString: async (uid) => {
+      if (uid === "boom") throw new Error("graph offline");
+      return blocks.has(uid) ? blocks.get(uid) : null;
+    },
+  });
+
+  assert.deepEqual(await api.statusOfBlock("t1"), {
+    found: true,
+    isTask: true,
+    done: false,
+    status: "Waiting",
+  });
+  assert.deepEqual(await api.statusOfBlock("t2"), {
+    found: true,
+    isTask: true,
+    done: true,
+    status: "Active",
+  });
+  assert.deepEqual(await api.statusOfBlock("t3"), {
+    found: true,
+    isTask: true,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock("p1"), {
+    found: true,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock("p2"), {
+    found: true,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock("p3"), {
+    found: true,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock("missing"), {
+    found: false,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock("boom"), {
+    found: false,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+  assert.deepEqual(await api.statusOfBlock(""), {
+    found: false,
+    isTask: false,
+    done: false,
+    status: null,
+  });
+});
+
+test("tasks() filters by name or key, strips prefix, drops prose mentions, clamps limit, and rejects unknown names", async () => {
+  const datalogRows = [
+    ["u1", "{{[[TODO]]}} #[[task-status/Waiting]] Call lab", "task-status/Waiting", 300, "Work"],
+    ["u2", "{{[[DONE]]}} #[[task-status/Waiting]] Old item", "task-status/Waiting", 400, "Archive"],
+    ["u3", "{{[[TODO]]}} #[[task-status/Active]] Ship fix", "task-status/Active", 250, "Sprint"],
+    ["u4", "{{[[TODO]]}} Talk about #[[task-status/Waiting]] later", "task-status/Waiting", 500, "Notes"],
+    ["u5", "Plain note #[[task-status/Waiting]]", "task-status/Waiting", 600, "Notes"],
+    ["u6", "{{[[TODO]]}} #[[task-status/On Hold]] Wait on spec", "task-status/On Hold", 200, "Specs"],
+  ];
+  const roamAlphaAPI = {
+    data: {
+      async: {
+        q: async (_query, titles) => {
+          const wanted = new Set(titles);
+          return datalogRows.filter((row) => wanted.has(row[2]));
+        },
+      },
+    },
+  };
+  const api = apiWith({
+    queryTasks: ({ statuses, helpers, includeDone }) =>
+      queryStatusTasks({ roamAlphaAPI, statuses, helpers, includeDone, includeEpisodes: false }),
+  });
+
+  // By display name
+  assert.deepEqual(await api.tasks({ status: "Waiting" }), {
+    tasks: [{ uid: "u1", text: "Call lab", status: "Waiting", done: false, page: "Work" }],
+    truncated: false,
+  });
+
+  // By status key with includeDone
+  assert.deepEqual(await api.tasks({ status: "WAITING", includeDone: true }), {
+    tasks: [
+      { uid: "u2", text: "Old item", status: "Waiting", done: true, page: "Archive" },
+      { uid: "u1", text: "Call lab", status: "Waiting", done: false, page: "Work" },
+    ],
+    truncated: false,
+  });
+
+  // Omitted status returns all tasks with any configured status, respecting limit & truncated
+  assert.deepEqual(await api.tasks({ limit: 2 }), {
+    tasks: [
+      { uid: "u1", text: "Call lab", status: "Waiting", done: false, page: "Work" },
+      { uid: "u3", text: "Ship fix", status: "Active", done: false, page: "Sprint" },
+    ],
+    truncated: true,
+  });
+
+  // Limit clamp: 0 clamps to 1
+  const clampedLow = await api.tasks({ limit: 0 });
+  assert.equal(clampedLow.tasks.length, 1);
+  assert.equal(clampedLow.truncated, true);
+
+  // Limit clamp: above 200 clamps to 200
+  const manyRows = Array.from({ length: 205 }, (_, i) => [
+    `id-${String(i).padStart(3, "0")}`,
+    `{{[[TODO]]}} #[[task-status/Active]] Item ${i}`,
+    "task-status/Active",
+    1000 - i,
+    "BigPage",
+  ]);
+  const bigApi = apiWith({
+    queryTasks: ({ statuses, helpers, includeDone }) =>
+      queryStatusTasks({
+        roamAlphaAPI: { data: { async: { q: async () => manyRows } } },
+        statuses,
+        helpers,
+        includeDone,
+        includeEpisodes: false,
+      }),
+  });
+  const clampedHigh = await bigApi.tasks({ status: "Active", limit: 999 });
+  assert.equal(clampedHigh.tasks.length, 200);
+  assert.equal(clampedHigh.truncated, true);
+
+  // Unknown name and null both reject with an error listing valid status names
+  await assert.rejects(
+    () => api.tasks({ status: "Nope" }),
+    (err) => {
+      assert.match(err.message, /Nope/);
+      assert.match(err.message, /Active/);
+      assert.match(err.message, /Waiting/);
+      assert.match(err.message, /On Hold/);
+      return true;
+    }
+  );
+  await assert.rejects(
+    () => api.tasks({ status: null }),
+    (err) => /Valid statuses:/.test(err.message)
+  );
+});
+
+test("counts() returns every configured status including zeros and respects includeDone", async () => {
+  const datalogRows = [
+    ["u1", "{{[[TODO]]}} #[[task-status/Waiting]] One", "task-status/Waiting", 300, "Work"],
+    ["u2", "{{[[DONE]]}} #[[task-status/Waiting]] Two", "task-status/Waiting", 400, "Work"],
+    ["u3", "{{[[TODO]]}} #[[task-status/Active]] Three", "task-status/Active", 250, "Work"],
+    ["u4", "Prose mention #[[task-status/Important]]", "task-status/Important", 100, "Notes"],
+  ];
+  const roamAlphaAPI = {
+    data: {
+      async: {
+        q: async (_query, titles) => {
+          const wanted = new Set(titles);
+          return datalogRows.filter((row) => wanted.has(row[2]));
+        },
+      },
+    },
+  };
+  const api = apiWith({
+    queryTasks: ({ statuses, helpers, includeDone }) =>
+      queryStatusTasks({ roamAlphaAPI, statuses, helpers, includeDone, includeEpisodes: false }),
+  });
+
+  assert.deepEqual(await api.counts(), {
+    counts: {
+      Active: 1,
+      Waiting: 1,
+      Watching: 0,
+      Important: 0,
+      "On Hold": 0,
+    },
+    total: 2,
+  });
+
+  assert.deepEqual(await api.counts({ includeDone: true }), {
+    counts: {
+      Active: 1,
+      Waiting: 2,
+      Watching: 0,
+      Important: 0,
+      "On Hold": 0,
+    },
+    total: 3,
+  });
+});
+
+test("renderIcon appends owned preview markup, cleans up exactly what was added, ignores bad inputs, and clears on dispose", () => {
+  const doc = new FakeDocument();
+  const api = apiWith({ documentLike: doc });
+
+  // Non-element and unknown name are no-ops
+  assert.equal(typeof api.renderIcon(null, "Waiting"), "function");
+  assert.equal(typeof api.renderIcon({ nodeType: 3, tagName: "#text", appendChild() {} }, "Waiting"), "function");
+  const untouched = doc.createElement("div");
+  const noopCleanup = api.renderIcon(untouched, "DoesNotExist");
+  assert.equal(untouched.children.length, 0);
+  noopCleanup();
+
+  // Valid element + status name
+  const host = doc.createElement("div");
+  const existing = doc.createElement("span");
+  host.appendChild(existing);
+  const cleanup = api.renderIcon(host, "Waiting");
+  assert.equal(host.children.length, 2);
+  const wrap = host.children[1];
+  assert.equal(wrap.className, "ts-rendered-icon");
+  assert.equal(wrap.getAttribute("data-ts-rendered-icon"), "true");
+  assert.equal(wrap.getAttribute("data-task-status-key"), "WAITING");
+  const box = wrap.children[0];
+  assert.equal(box.className, "rm-checkbox rm-todo");
+  assert.equal(box.getAttribute("data-ts-checkbox-status"), "WAITING");
+  assert.equal(box.getAttribute("data-ts-checkbox-shape"), "waiting");
+
+  // Cleanup removes only what was added and is idempotent
+  cleanup();
+  assert.deepEqual(host.children, [existing]);
+  cleanup();
+  assert.deepEqual(host.children, [existing]);
+
+  // clearRenderedIcons removes all tracked live icons
+  const host2 = doc.createElement("div");
+  api.renderIcon(host2, "Important");
+  assert.equal(host2.children.length, 1);
+  clearRenderedIcons(api);
+  assert.equal(host2.children.length, 0);
 });
