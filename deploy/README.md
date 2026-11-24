@@ -32,6 +32,10 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 
 Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, ambient icon motion, transition bursts, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
 
+## Credits
+
+Roam Task Status Tags was created by [Harpreet Singh Chima](https://github.com/harpreetchima). The original extension is [harpreetchima/Roam-Task-Status-Tags](https://github.com/harpreetchima/Roam-Task-Status-Tags), and the core design is his: Roam's own TODO and DONE stay in charge, each task carries one managed `#[[task-status/<Name>]]` tag, the status list is configurable, and a chooser and commands change the tag while leaving the rest of the block alone. This repository is a fork that builds on that work.
+
 The status icon artwork, Glass / Solid / Minimal preset styles, ambient icon animations, transition bursts, and chooser picker styling are adapted from [BetterTask for Thymer](https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task) by imhalid under the MIT License (see `THIRD_PARTY_NOTICES.md`).
 
 ## Key Idea
