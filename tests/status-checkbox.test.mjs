@@ -9,6 +9,7 @@ import {
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
   CHECKBOX_UID_ATTRIBUTE,
+  EXTRA_STATUS_SHAPES,
   HIDDEN_STATUS_PILL_ATTRIBUTE,
   MANAGED_STATUS_PILL_ATTRIBUTE,
   applyStatusCheckboxAnnotation,
@@ -25,8 +26,10 @@ import {
   decideStatusCheckboxAnnotation,
   deriveAccessibleAccent,
   findSiblingTaskCheckbox,
+  getExtraStatusShape,
   getMediaStatusShape,
   getStatusCheckboxShape,
+  getStatusGroup,
   isMediaStatus,
   MEDIA_STATUS_SHAPES,
   isExactManagedStatusPill,
@@ -277,6 +280,47 @@ test("media keys and names map to their own shapes", () => {
   assert.equal(isMediaStatus("MOVIE"), true);
   assert.equal(isMediaStatus("ACTIVE", "Movie"), false);
   assert.equal(isMediaStatus("CUSTOM_DEEP_WORK", "Deep Work"), false);
+});
+
+test("extra keys and names map to their own shapes, extra group, and accessible colors", () => {
+  const extras = {
+    IMPORTANT: { shape: "important", color: "#dc2626" },
+    STARRED: { shape: "starred", color: "#d97706" },
+    DISCUSS: { shape: "discuss", color: "#8b5cf6" },
+    BILLABLE: { shape: "billable", color: "#10b981" },
+    BUG: { shape: "bug", color: "#65a30d" },
+    DRAFT: { shape: "draft", color: "#3b82f6" },
+    DEADLINE: { shape: "deadline", color: "#ea580c" },
+  };
+  assert.equal(Object.isFrozen(EXTRA_STATUS_SHAPES), true);
+  for (const [key, { shape, color }] of Object.entries(extras)) {
+    assert.equal(getStatusCheckboxShape(key), shape);
+    assert.equal(EXTRA_STATUS_SHAPES[shape], shape);
+    assert.equal(getExtraStatusShape(`  ${shape.toUpperCase()} `), shape);
+    assert.equal(getStatusCheckboxShape(`CUSTOM_${key}`, shape), shape);
+    assert.equal(getStatusGroup(key), "extra");
+    assert.equal(getStatusGroup(`CUSTOM_${key}`, shape.toUpperCase()), "extra");
+    assert.equal(isMediaStatus(key), false);
+    assert.equal(isMediaStatus(`CUSTOM_${key}`, shape), false);
+
+    const checkboxPalette = buildStatusCheckboxColors({ baseRgb: hexRgb(color) });
+    assert.ok(contrastRatio(checkboxPalette.lightAccent, checkboxPalette.lightSurface) >= 3.2);
+    assert.ok(contrastRatio(checkboxPalette.darkAccent, checkboxPalette.darkSurface) >= 3.2);
+    assert.ok(contrastRatio(hexRgb(checkboxPalette.lightOnAccentCss), checkboxPalette.lightAccent) >= 3.0);
+    assert.ok(contrastRatio(hexRgb(checkboxPalette.darkOnAccentCss), checkboxPalette.darkAccent) >= 3.0);
+
+    const pillPalette = buildStatusPillColors({ baseRgb: hexRgb(color) });
+    assert.ok(contrastRatio(pillPalette.lightText, pillPalette.lightBackground) >= 4.8);
+    assert.ok(contrastRatio(pillPalette.darkText, pillPalette.darkBackground) >= 4.8);
+  }
+  assert.equal(getExtraStatusShape("Deep Work"), null);
+  assert.equal(getExtraStatusShape(undefined), null);
+  assert.equal(getStatusCheckboxShape("ACTIVE", "Bug"), "active");
+  assert.equal(getStatusGroup("ACTIVE", "Bug"), "task");
+  assert.equal(getStatusGroup("ACTIVE"), "task");
+  assert.equal(getStatusGroup("SERIES"), "media");
+  assert.equal(getStatusGroup("CUSTOM_TV", "  watchlist "), "media");
+  assert.equal(getStatusGroup("CUSTOM_DEEP_WORK", "Deep Work"), "task");
 });
 
 test("decisions take the media shape from the status name", () => {

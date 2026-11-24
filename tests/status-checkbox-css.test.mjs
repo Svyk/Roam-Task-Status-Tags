@@ -331,6 +331,7 @@ test("the reveal control carries status shapes and light, dark, focus, motion, a
 });
 
 const MEDIA_SHAPES = ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"];
+const EXTRA_SHAPES = ["important", "starred", "discuss", "billable", "bug", "draft", "deadline"];
 
 function ruleBody(selectorFragment) {
   const at = css.indexOf(selectorFragment);
@@ -338,9 +339,9 @@ function ruleBody(selectorFragment) {
   return css.slice(at, css.indexOf("}", at));
 }
 
-test("each media shape has a checkbox mask rule and a pill marker rule", () => {
+test("each media and extra shape has a unique checkbox mask rule and pill marker rule", () => {
   const masks = new Set();
-  for (const shape of MEDIA_SHAPES) {
+  for (const shape of [...MEDIA_SHAPES, ...EXTRA_SHAPES]) {
     const checkbox = ruleBody(`.rm-checkbox[data-ts-checkbox-shape="${shape}"] {`);
     const mask = checkbox.match(/--ts-checkbox-glyph-mask: (url\("data:image\/svg\+xml[^"]+"\))/);
     assert.ok(mask, `${shape} checkbox mask`);
@@ -351,7 +352,7 @@ test("each media shape has a checkbox mask rule and a pill marker rule", () => {
     assert.match(pill, /--ts-pill-marker-mask: url\("data:image\/svg\+xml/);
     assert.match(pill, /--ts-pill-marker-background: currentColor/);
   }
-  assert.equal(masks.size, MEDIA_SHAPES.length);
+  assert.equal(masks.size, MEDIA_SHAPES.length + EXTRA_SHAPES.length);
 });
 
 test("masks are wired into the shared glyph and marker rules with a none default", () => {
@@ -383,7 +384,7 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   const glyphRules = [
     ...stripped.matchAll(/\.rm-checkbox\[data-ts-checkbox-shape="([^"]+)"\]\s*\{([^}]*)\}/g),
   ];
-  assert.ok(glyphRules.length >= 15, "expected built-in, media, and custom glyph rules");
+  assert.equal(glyphRules.length, 22, "expected all 21 built-in/media/extra shapes plus custom");
   for (const [, shape, body] of glyphRules) {
     assert.doesNotMatch(
       body,

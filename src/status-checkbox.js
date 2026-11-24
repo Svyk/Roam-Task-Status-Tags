@@ -57,6 +57,13 @@ const BUILTIN_SHAPES = Object.freeze({
   UPCOMING: "upcoming",
   REWATCH: "rewatch",
   DROPPED: "dropped",
+  IMPORTANT: "important",
+  STARRED: "starred",
+  DISCUSS: "discuss",
+  BILLABLE: "billable",
+  BUG: "bug",
+  DRAFT: "draft",
+  DEADLINE: "deadline",
 });
 
 export const MEDIA_STATUS_SHAPES = Object.freeze({
@@ -69,10 +76,27 @@ export const MEDIA_STATUS_SHAPES = Object.freeze({
   dropped: "dropped",
 });
 
+export const EXTRA_STATUS_SHAPES = Object.freeze({
+  important: "important",
+  starred: "starred",
+  discuss: "discuss",
+  billable: "billable",
+  bug: "bug",
+  draft: "draft",
+  deadline: "deadline",
+});
+
 export function getMediaStatusShape(name) {
   const key = String(name ?? "").trim().toLowerCase();
   return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key)
     ? MEDIA_STATUS_SHAPES[key]
+    : null;
+}
+
+export function getExtraStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(EXTRA_STATUS_SHAPES, key)
+    ? EXTRA_STATUS_SHAPES[key]
     : null;
 }
 
@@ -284,13 +308,23 @@ export function buildStatusPillColors({
 
 export function getStatusCheckboxShape(statusKey, statusName) {
   const key = String(statusKey || "").trim().toUpperCase();
-  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || "custom";
+  return (
+    BUILTIN_SHAPES[key] ||
+    getMediaStatusShape(statusName) ||
+    getExtraStatusShape(statusName) ||
+    "custom"
+  );
+}
+
+export function getStatusGroup(statusKey, statusName) {
+  const shape = getStatusCheckboxShape(statusKey, statusName);
+  if (Object.values(MEDIA_STATUS_SHAPES).includes(shape)) return "media";
+  if (Object.values(EXTRA_STATUS_SHAPES).includes(shape)) return "extra";
+  return "task";
 }
 
 export function isMediaStatus(statusKey, statusName) {
-  return Object.values(MEDIA_STATUS_SHAPES).includes(
-    getStatusCheckboxShape(statusKey, statusName)
-  );
+  return getStatusGroup(statusKey, statusName) === "media";
 }
 
 function lookupStatusName(statusNames, statusKey) {

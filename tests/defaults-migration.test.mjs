@@ -3,12 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  EXTRA_STATUS_DEFAULTS,
   MEDIA_STATUS_DEFAULTS,
   STATUS_DEFAULTS_VERSION,
+  mergeExtraStatuses,
   migrateStatusListDefaults,
   nextTaskCycleStatus,
 } from "../src/extension.js";
-import { isMediaStatus } from "../src/status-checkbox.js";
+import { getStatusGroup, isMediaStatus } from "../src/status-checkbox.js";
 
 const v1List = [
   { key: "ACTIVE", name: "Active" },
@@ -79,27 +81,76 @@ test("migration never mutates its input", () => {
   assert.equal(JSON.stringify(list), snapshot);
 });
 
-test("cycling walks task statuses only and skips media", () => {
-  const order = ["ACTIVE", "WAITING", "SERIES", "CANCELLED", "CUSTOM_TV", "MOVIE"];
-  const names = { CUSTOM_TV: "Watchlist" };
-  const media = (key) => isMediaStatus(key, names[key]);
-  assert.equal(nextTaskCycleStatus(order, null, media), "ACTIVE");
-  assert.equal(nextTaskCycleStatus(order, "ACTIVE", media), "WAITING");
-  assert.equal(nextTaskCycleStatus(order, "WAITING", media), "CANCELLED");
-  assert.equal(nextTaskCycleStatus(order, "CANCELLED", media), null);
-  assert.equal(nextTaskCycleStatus(order, "SERIES", media), "ACTIVE");
-  assert.equal(nextTaskCycleStatus(order, "CUSTOM_TV", media), "ACTIVE");
-  assert.equal(nextTaskCycleStatus(["SERIES", "MOVIE"], null, media), null);
+test("cycling walks task statuses only and skips media and extra", () => {
+  const order = ["ACTIVE", "WAITING", "SERIES", "BUG", "CANCELLED", "CUSTOM_TV", "CUSTOM_DRAFT", "MOVIE"];
+  const names = { CUSTOM_TV: "Watchlist", CUSTOM_DRAFT: "Draft" };
+  const nonTask = (key) => getStatusGroup(key, names[key]) !== "task";
+  assert.equal(nextTaskCycleStatus(order, null, nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "ACTIVE", nonTask), "WAITING");
+  assert.equal(nextTaskCycleStatus(order, "WAITING", nonTask), "CANCELLED");
+  assert.equal(nextTaskCycleStatus(order, "CANCELLED", nonTask), null);
+  assert.equal(nextTaskCycleStatus(order, "SERIES", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "BUG", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "CUSTOM_TV", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "CUSTOM_DRAFT", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(["SERIES", "MOVIE", "BUG"], null, nonTask), null);
   assert.equal(nextTaskCycleStatus(["ACTIVE", "WAITING"], "ACTIVE"), "WAITING");
+  assert.equal(isMediaStatus("BUG"), false);
+  assert.equal(isMediaStatus("CUSTOM_DRAFT", "Draft"), false);
 });
 
-test("the runtime wrapper and chooser use the media-aware helpers", async () => {
+test("Add more statuses merge appends missing extras in table order and is idempotent", () => {
+  const extraKeys = ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "BUG", "DRAFT", "DEADLINE"];
+  assert.deepEqual(EXTRA_STATUS_DEFAULTS.map((entry) => entry.key), extraKeys);
+  assert.equal(Object.isFrozen(EXTRA_STATUS_DEFAULTS), true);
+
+  const initial = [...v1List, ...MEDIA_STATUS_DEFAULTS.map((entry) => ({ ...entry }))];
+  const snapshot = JSON.stringify(initial);
+  const first = mergeExtraStatuses(initial);
+  assert.equal(JSON.stringify(initial), snapshot);
+  assert.equal(first.added.length, 7);
+  assert.deepEqual(first.list.slice(-7).map((entry) => entry.key), extraKeys);
+
+  // Idempotent when all seven are already present
+  const second = mergeExtraStatuses(first.list);
+  assert.equal(second.added.length, 0);
+  assert.equal(second.list, first.list);
+
+  // Skips existing key (even renamed) and existing name (any case)
+  const partial = [
+    ...v1List,
+    { key: "BUG", name: "Defect" },
+    { key: "CUSTOM_DRAFT", name: "  draft " },
+  ];
+  const merged = mergeExtraStatuses(partial);
+  assert.deepEqual(
+    merged.added.map((entry) => entry.key),
+    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE"]
+  );
+  assert.deepEqual(merged.list.slice(0, partial.length), partial);
+  assert.deepEqual(
+    merged.list.slice(partial.length).map((entry) => entry.key),
+    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE"]
+  );
+
+  // Deleting one and merging again appends it back
+  const withoutStarred = first.list.filter((entry) => entry.key !== "STARRED");
+  const readded = mergeExtraStatuses(withoutStarred);
+  assert.deepEqual(readded.added.map((entry) => entry.key), ["STARRED"]);
+  assert.equal(readded.list.at(-1).key, "STARRED");
+});
+
+test("the runtime wrapper and chooser use the group-aware helpers", async () => {
   const source = await readFile(new URL("../src/extension.js", import.meta.url), "utf8");
-  assert.match(source, /nextTaskCycleStatus\(CONFIG\.cycleOrder, currentStatus, statusIsMedia\)/);
+  assert.match(source, /nextTaskCycleStatus\(CONFIG\.cycleOrder, currentStatus, statusIsNonTask\)/);
   assert.match(source, /bp3-menu-divider ts-status-choice-divider/);
   assert.match(source, /setAttribute\("role", "separator"\)/);
-  assert.match(source, /const taskKeys = activeKeys\.filter\(\(key\) => !statusIsMedia\(key\)\)/);
-  assert.match(source, /if \(taskKeys\.length\) \{\n\s*const divider/);
+  assert.match(source, /const taskKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "task"\)/);
+  assert.match(source, /const mediaKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "media"\)/);
+  assert.match(source, /const extraKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "extra"\)/);
+  assert.match(source, /for \(const groupKeys of \[taskKeys, mediaKeys, extraKeys\]\)/);
+  assert.match(source, /Add more statuses/);
+  assert.match(source, /All seven are already in your list/);
   assert.match(source, /statusNames: getStatusNameMap\(\)/);
 });
 

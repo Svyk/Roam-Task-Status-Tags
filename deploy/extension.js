@@ -2610,7 +2610,14 @@ var BUILTIN_SHAPES = Object.freeze({
   WATCHLIST: "watchlist",
   UPCOMING: "upcoming",
   REWATCH: "rewatch",
-  DROPPED: "dropped"
+  DROPPED: "dropped",
+  IMPORTANT: "important",
+  STARRED: "starred",
+  DISCUSS: "discuss",
+  BILLABLE: "billable",
+  BUG: "bug",
+  DRAFT: "draft",
+  DEADLINE: "deadline"
 });
 var MEDIA_STATUS_SHAPES = Object.freeze({
   series: "series",
@@ -2621,9 +2628,22 @@ var MEDIA_STATUS_SHAPES = Object.freeze({
   rewatch: "rewatch",
   dropped: "dropped"
 });
+var EXTRA_STATUS_SHAPES = Object.freeze({
+  important: "important",
+  starred: "starred",
+  discuss: "discuss",
+  billable: "billable",
+  bug: "bug",
+  draft: "draft",
+  deadline: "deadline"
+});
 function getMediaStatusShape(name) {
   const key = String(name ?? "").trim().toLowerCase();
   return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key) ? MEDIA_STATUS_SHAPES[key] : null;
+}
+function getExtraStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(EXTRA_STATUS_SHAPES, key) ? EXTRA_STATUS_SHAPES[key] : null;
 }
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -2801,12 +2821,16 @@ function buildStatusPillColors({
 }
 function getStatusCheckboxShape(statusKey, statusName) {
   const key = String(statusKey || "").trim().toUpperCase();
-  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || "custom";
+  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || getExtraStatusShape(statusName) || "custom";
+}
+function getStatusGroup(statusKey, statusName) {
+  const shape = getStatusCheckboxShape(statusKey, statusName);
+  if (Object.values(MEDIA_STATUS_SHAPES).includes(shape)) return "media";
+  if (Object.values(EXTRA_STATUS_SHAPES).includes(shape)) return "extra";
+  return "task";
 }
 function isMediaStatus(statusKey, statusName) {
-  return Object.values(MEDIA_STATUS_SHAPES).includes(
-    getStatusCheckboxShape(statusKey, statusName)
-  );
+  return getStatusGroup(statusKey, statusName) === "media";
 }
 function lookupStatusName(statusNames, statusKey) {
   if (!statusKey) return null;
@@ -3596,6 +3620,30 @@ var MEDIA_STATUS_DEFAULTS = Object.freeze([
   Object.freeze({ key: "REWATCH", name: "Rewatch" }),
   Object.freeze({ key: "DROPPED", name: "Dropped" })
 ]);
+var EXTRA_STATUS_DEFAULTS = Object.freeze([
+  Object.freeze({ key: "IMPORTANT", name: "Important" }),
+  Object.freeze({ key: "STARRED", name: "Starred" }),
+  Object.freeze({ key: "DISCUSS", name: "Discuss" }),
+  Object.freeze({ key: "BILLABLE", name: "Billable" }),
+  Object.freeze({ key: "BUG", name: "Bug" }),
+  Object.freeze({ key: "DRAFT", name: "Draft" }),
+  Object.freeze({ key: "DEADLINE", name: "Deadline" })
+]);
+function mergeExtraStatuses(list) {
+  const source = Array.isArray(list) ? list : [];
+  const keys = new Set(source.map((entry) => entry?.key));
+  const names = new Set(
+    source.map((entry) => String(entry?.name || "").trim().toLowerCase())
+  );
+  const added = EXTRA_STATUS_DEFAULTS.filter(
+    (entry) => !keys.has(entry.key) && !names.has(entry.name.toLowerCase())
+  ).map((entry) => ({ ...entry }));
+  if (!added.length) return { list: source, added: [] };
+  return {
+    list: [...source.map((entry) => ({ ...entry })), ...added],
+    added
+  };
+}
 function migrateStatusListDefaults(list, defaultsVersion) {
   const version = Number.isFinite(Number(defaultsVersion)) ? Number(defaultsVersion) : 1;
   if (version >= STATUS_DEFAULTS_VERSION || !Array.isArray(list)) return list;
@@ -3998,7 +4046,14 @@ function createTaskStatusExtension({ extensionAPI }) {
     WATCHLIST: "Watchlist",
     UPCOMING: "Upcoming",
     REWATCH: "Rewatch",
-    DROPPED: "Dropped"
+    DROPPED: "Dropped",
+    IMPORTANT: "Important",
+    STARRED: "Starred",
+    DISCUSS: "Discuss",
+    BILLABLE: "Billable",
+    BUG: "Bug",
+    DRAFT: "Draft",
+    DEADLINE: "Deadline"
   };
   const DEFAULT_STATUS_LIST = [
     { key: "ACTIVE", name: "Active" },
@@ -4024,7 +4079,14 @@ function createTaskStatusExtension({ extensionAPI }) {
     WATCHLIST: "#ec4899",
     UPCOMING: "#0d87f2",
     REWATCH: "#84cc16",
-    DROPPED: "#7c2d12"
+    DROPPED: "#7c2d12",
+    IMPORTANT: "#dc2626",
+    STARRED: "#d97706",
+    DISCUSS: "#8b5cf6",
+    BILLABLE: "#10b981",
+    BUG: "#65a30d",
+    DRAFT: "#3b82f6",
+    DEADLINE: "#ea580c"
   };
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
   const STATUS_COLOR_PRESETS = [
@@ -4634,6 +4696,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     await registerAllCommands();
     return { key, name };
   }
+  async function addExtraStatuses() {
+    const { list: nextList, added } = mergeExtraStatuses(statusList);
+    if (!added.length) return { added: [] };
+    statusList = nextList;
+    await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
+    await unregisterAllCommands();
+    rebuildStatusIndexesFromMemory();
+    await registerAllCommands();
+    return { added };
+  }
   async function reorderStatus(statusKey, targetKey, placement = "before") {
     const idx = statusList.findIndex((entry2) => entry2.key === statusKey);
     if (idx === -1) throw new Error(`Unknown status key: ${statusKey}`);
@@ -4701,11 +4773,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       todoCanonical: TODO_CANONICAL
     });
   }
+  function statusGroup(statusKey) {
+    return getStatusGroup(statusKey, STATUSES[statusKey]?.name);
+  }
   function statusIsMedia(statusKey) {
     return isMediaStatus(statusKey, STATUSES[statusKey]?.name);
   }
+  function statusIsNonTask(statusKey) {
+    return statusGroup(statusKey) !== "task";
+  }
   function getStatusGlyph(statusKey) {
-    if (!statusKey || !statusIsMedia(statusKey)) return null;
+    if (!statusKey) return null;
+    const group = statusGroup(statusKey);
+    if (group !== "media" && group !== "extra") return null;
     return getStatusCheckboxShape(statusKey, STATUSES[statusKey]?.name);
   }
   function getStatusNameMap() {
@@ -5112,7 +5192,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return getTextHelpers().getCurrentStatus(text);
   }
   function getNextStatus(currentStatus) {
-    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsMedia);
+    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsNonTask);
   }
   function isDoneTask(text) {
     return getTextHelpers().isDoneTask(text);
@@ -5638,17 +5718,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         })
       );
     });
-    const taskKeys = activeKeys.filter((key) => !statusIsMedia(key));
-    appendChoices(taskKeys);
-    const mediaKeys = activeKeys.filter((key) => statusIsMedia(key));
-    if (mediaKeys.length) {
-      if (taskKeys.length) {
+    const taskKeys = activeKeys.filter((key) => statusGroup(key) === "task");
+    const mediaKeys = activeKeys.filter((key) => statusGroup(key) === "media");
+    const extraKeys = activeKeys.filter((key) => statusGroup(key) === "extra");
+    let hasPriorGroup = false;
+    for (const groupKeys of [taskKeys, mediaKeys, extraKeys]) {
+      if (!groupKeys.length) continue;
+      if (hasPriorGroup) {
         const divider = document.createElement("li");
         divider.className = "bp3-menu-divider ts-status-choice-divider";
         divider.setAttribute("role", "separator");
         choices.append(divider);
       }
-      appendChoices(mediaKeys);
+      appendChoices(groupKeys);
+      hasPriorGroup = true;
     }
     choices.append(
       makeStatusMenuItem({
@@ -5965,6 +6048,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const [newStatusName, setNewStatusName] = React.useState("");
       const [newStatusError, setNewStatusError] = React.useState(null);
       const [newStatusInfo, setNewStatusInfo] = React.useState(null);
+      const [extraStatusError, setExtraStatusError] = React.useState(null);
+      const [extraStatusInfo, setExtraStatusInfo] = React.useState(null);
       const [openStatusMenuKey, setOpenStatusMenuKey] = React.useState(null);
       const [dragState, setDragState] = React.useState({
         key: null,
@@ -6047,6 +6132,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setNewStatusInfo(null);
         } catch (e) {
           setNewStatusError(e?.message || String(e));
+        } finally {
+          setWorkingKey(null);
+        }
+      };
+      const addExtraStatusesFromPanel = async () => {
+        setExtraStatusError(null);
+        setExtraStatusInfo(null);
+        setWorkingKey("__EXTRA__");
+        try {
+          const result4 = await addExtraStatuses();
+          refreshStatusRows();
+          if (result4.added.length > 0) {
+            setExtraStatusInfo(
+              result4.added.length === 1 ? "Added 1 status" : `Added ${result4.added.length} statuses`
+            );
+          } else {
+            setExtraStatusInfo("All seven are already in your list");
+          }
+        } catch (e) {
+          setExtraStatusError(e?.message || String(e));
         } finally {
           setWorkingKey(null);
         }
@@ -6579,6 +6684,38 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           ) : null
         )
       );
+      const addMoreStatusesRow = React.createElement(
+        "div",
+        { className: "ts-status-add-row ts-status-extra-row", key: "add-more-statuses" },
+        React.createElement(
+          "div",
+          { className: "ts-status-row-main" },
+          React.createElement("span", {
+            className: "ts-status-add-spacer",
+            "aria-hidden": "true"
+          }),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: "bp3-button bp3-small",
+              disabled: Boolean(workingKey),
+              onClick: () => void addExtraStatusesFromPanel()
+            },
+            "Add more statuses"
+          ),
+          extraStatusError ? React.createElement(
+            "span",
+            { className: "bp3-text-small ts-status-row-error" },
+            extraStatusError
+          ) : null,
+          !extraStatusError && extraStatusInfo ? React.createElement(
+            "span",
+            { className: "bp3-text-small ts-status-row-info" },
+            extraStatusInfo
+          ) : null
+        )
+      );
       return React.createElement(
         "div",
         { className: "ts-status-names-panel", ref: rootRef },
@@ -6752,7 +6889,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               );
               return [row];
             }),
-            addStatusRow
+            addStatusRow,
+            addMoreStatusesRow
           )
         )
       );
@@ -7014,10 +7152,12 @@ async function onunload() {
 }
 var extension_default = { onload, onunload };
 export {
+  EXTRA_STATUS_DEFAULTS,
   MEDIA_STATUS_DEFAULTS,
   STATUS_DEFAULTS_VERSION,
   createTaskStatusTextHelpers,
   extension_default as default,
+  mergeExtraStatuses,
   migrateStatusListDefaults,
   nextTaskCycleStatus,
   onload,

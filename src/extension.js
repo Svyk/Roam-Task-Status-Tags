@@ -50,6 +50,7 @@ import {
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
   getStatusCheckboxShape,
+  getStatusGroup,
   isMediaStatus,
   normalizeCheckboxStyle,
   relativeLuminance,
@@ -92,6 +93,32 @@ export const MEDIA_STATUS_DEFAULTS = Object.freeze([
   Object.freeze({ key: "REWATCH", name: "Rewatch" }),
   Object.freeze({ key: "DROPPED", name: "Dropped" }),
 ]);
+
+export const EXTRA_STATUS_DEFAULTS = Object.freeze([
+  Object.freeze({ key: "IMPORTANT", name: "Important" }),
+  Object.freeze({ key: "STARRED", name: "Starred" }),
+  Object.freeze({ key: "DISCUSS", name: "Discuss" }),
+  Object.freeze({ key: "BILLABLE", name: "Billable" }),
+  Object.freeze({ key: "BUG", name: "Bug" }),
+  Object.freeze({ key: "DRAFT", name: "Draft" }),
+  Object.freeze({ key: "DEADLINE", name: "Deadline" }),
+]);
+
+export function mergeExtraStatuses(list) {
+  const source = Array.isArray(list) ? list : [];
+  const keys = new Set(source.map((entry) => entry?.key));
+  const names = new Set(
+    source.map((entry) => String(entry?.name || "").trim().toLowerCase())
+  );
+  const added = EXTRA_STATUS_DEFAULTS.filter(
+    (entry) => !keys.has(entry.key) && !names.has(entry.name.toLowerCase())
+  ).map((entry) => ({ ...entry }));
+  if (!added.length) return { list: source, added: [] };
+  return {
+    list: [...source.map((entry) => ({ ...entry })), ...added],
+    added,
+  };
+}
 
 export function migrateStatusListDefaults(list, defaultsVersion) {
   const version = Number.isFinite(Number(defaultsVersion)) ? Number(defaultsVersion) : 1;
@@ -568,6 +595,13 @@ function createTaskStatusExtension({ extensionAPI }) {
     UPCOMING: "Upcoming",
     REWATCH: "Rewatch",
     DROPPED: "Dropped",
+    IMPORTANT: "Important",
+    STARRED: "Starred",
+    DISCUSS: "Discuss",
+    BILLABLE: "Billable",
+    BUG: "Bug",
+    DRAFT: "Draft",
+    DEADLINE: "Deadline",
   };
 
   const DEFAULT_STATUS_LIST = [
@@ -596,6 +630,13 @@ function createTaskStatusExtension({ extensionAPI }) {
     UPCOMING: "#0d87f2",
     REWATCH: "#84cc16",
     DROPPED: "#7c2d12",
+    IMPORTANT: "#dc2626",
+    STARRED: "#d97706",
+    DISCUSS: "#8b5cf6",
+    BILLABLE: "#10b981",
+    BUG: "#65a30d",
+    DRAFT: "#3b82f6",
+    DEADLINE: "#ea580c",
   };
 
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
@@ -1316,6 +1357,19 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return { key, name };
   }
 
+  async function addExtraStatuses() {
+    const { list: nextList, added } = mergeExtraStatuses(statusList);
+    if (!added.length) return { added: [] };
+
+    statusList = nextList;
+    await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
+    await unregisterAllCommands();
+    rebuildStatusIndexesFromMemory();
+    await registerAllCommands();
+
+    return { added };
+  }
+
   async function reorderStatus(statusKey, targetKey, placement = "before") {
     const idx = statusList.findIndex((entry) => entry.key === statusKey);
     if (idx === -1) throw new Error(`Unknown status key: ${statusKey}`);
@@ -1401,12 +1455,22 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
   }
 
+  function statusGroup(statusKey) {
+    return getStatusGroup(statusKey, STATUSES[statusKey]?.name);
+  }
+
   function statusIsMedia(statusKey) {
     return isMediaStatus(statusKey, STATUSES[statusKey]?.name);
   }
 
+  function statusIsNonTask(statusKey) {
+    return statusGroup(statusKey) !== "task";
+  }
+
   function getStatusGlyph(statusKey) {
-    if (!statusKey || !statusIsMedia(statusKey)) return null;
+    if (!statusKey) return null;
+    const group = statusGroup(statusKey);
+    if (group !== "media" && group !== "extra") return null;
     return getStatusCheckboxShape(statusKey, STATUSES[statusKey]?.name);
   }
 
@@ -1884,7 +1948,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function getNextStatus(currentStatus) {
-    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsMedia);
+    return nextTaskCycleStatus(CONFIG.cycleOrder, currentStatus, statusIsNonTask);
   }
 
   function isDoneTask(text) {
@@ -2555,17 +2619,20 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           })
         );
       });
-    const taskKeys = activeKeys.filter((key) => !statusIsMedia(key));
-    appendChoices(taskKeys);
-    const mediaKeys = activeKeys.filter((key) => statusIsMedia(key));
-    if (mediaKeys.length) {
-      if (taskKeys.length) {
+    const taskKeys = activeKeys.filter((key) => statusGroup(key) === "task");
+    const mediaKeys = activeKeys.filter((key) => statusGroup(key) === "media");
+    const extraKeys = activeKeys.filter((key) => statusGroup(key) === "extra");
+    let hasPriorGroup = false;
+    for (const groupKeys of [taskKeys, mediaKeys, extraKeys]) {
+      if (!groupKeys.length) continue;
+      if (hasPriorGroup) {
         const divider = document.createElement("li");
         divider.className = "bp3-menu-divider ts-status-choice-divider";
         divider.setAttribute("role", "separator");
         choices.append(divider);
       }
-      appendChoices(mediaKeys);
+      appendChoices(groupKeys);
+      hasPriorGroup = true;
     }
 
     choices.append(
@@ -2958,6 +3025,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const [newStatusName, setNewStatusName] = React.useState("");
       const [newStatusError, setNewStatusError] = React.useState(null);
       const [newStatusInfo, setNewStatusInfo] = React.useState(null);
+      const [extraStatusError, setExtraStatusError] = React.useState(null);
+      const [extraStatusInfo, setExtraStatusInfo] = React.useState(null);
       const [openStatusMenuKey, setOpenStatusMenuKey] = React.useState(null);
       const [dragState, setDragState] = React.useState({
         key: null,
@@ -3052,6 +3121,29 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setNewStatusInfo(null);
         } catch (e) {
           setNewStatusError(e?.message || String(e));
+        } finally {
+          setWorkingKey(null);
+        }
+      };
+
+      const addExtraStatusesFromPanel = async () => {
+        setExtraStatusError(null);
+        setExtraStatusInfo(null);
+        setWorkingKey("__EXTRA__");
+        try {
+          const result = await addExtraStatuses();
+          refreshStatusRows();
+          if (result.added.length > 0) {
+            setExtraStatusInfo(
+              result.added.length === 1
+                ? "Added 1 status"
+                : `Added ${result.added.length} statuses`
+            );
+          } else {
+            setExtraStatusInfo("All seven are already in your list");
+          }
+        } catch (e) {
+          setExtraStatusError(e?.message || String(e));
         } finally {
           setWorkingKey(null);
         }
@@ -3653,6 +3745,43 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         )
       );
 
+      const addMoreStatusesRow = React.createElement(
+        "div",
+        { className: "ts-status-add-row ts-status-extra-row", key: "add-more-statuses" },
+        React.createElement(
+          "div",
+          { className: "ts-status-row-main" },
+          React.createElement("span", {
+            className: "ts-status-add-spacer",
+            "aria-hidden": "true",
+          }),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: "bp3-button bp3-small",
+              disabled: Boolean(workingKey),
+              onClick: () => void addExtraStatusesFromPanel(),
+            },
+            "Add more statuses"
+          ),
+          extraStatusError
+            ? React.createElement(
+                "span",
+                { className: "bp3-text-small ts-status-row-error" },
+                extraStatusError
+              )
+            : null,
+          !extraStatusError && extraStatusInfo
+            ? React.createElement(
+                "span",
+                { className: "bp3-text-small ts-status-row-info" },
+                extraStatusInfo
+              )
+            : null
+        )
+      );
+
       return React.createElement(
         "div",
         { className: "ts-status-names-panel", ref: rootRef },
@@ -3847,7 +3976,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
               return [row];
             }),
-            addStatusRow
+            addStatusRow,
+            addMoreStatusesRow
           )
         )
       );
