@@ -42,6 +42,7 @@ import {
 import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  CHECKBOX_SHAPE_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
@@ -579,7 +580,7 @@ function createTaskStatusExtension({
     "a.rm-page-ref[data-task-status-key]",
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
-  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview";
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
 
   const CONFIG = {
@@ -711,6 +712,15 @@ function createTaskStatusExtension({
   let portalRoot = null;
   let publicApi = null;
   let publicWriteDepth = 0;
+  const stylePreviewListeners = new Set();
+
+  function notifyStylePreviewListeners() {
+    stylePreviewListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (_) {}
+    });
+  }
 
   function ensureColorProbeElement() {
     if (colorProbeEl && colorProbeEl.isConnected) return colorProbeEl;
@@ -933,7 +943,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 .bt-pill[data-task-status-title="task-status/${cssString(STATUSES[statusKey]?.name || "")}"],
 .ts-status-pill-preview[data-task-status-key="${keySelector}"],
 .ts-status-peek[data-task-status-key="${keySelector}"],
-.ts-status-choice-dot[data-task-status-key="${keySelector}"] {
+.ts-status-choice-dot[data-task-status-key="${keySelector}"],
+.ts-status-choice-glyph[data-task-status-key="${keySelector}"] {
   --ts-status-bg-light: ${pillValues.lightBackgroundCss};
   --ts-status-fg-light: ${pillValues.lightTextCss};
   --ts-status-border-light: ${pillValues.lightBorderCss};
@@ -1226,6 +1237,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let statusTagToKey = buildTagTitleIndex(STATUSES);
 
   function publishStatuses() {
+    notifyStylePreviewListeners();
     if (!publicApi || publicWriteDepth > 0) return;
     emitStatusCatalog(publicApi, { apiVersion: 1 });
   }
@@ -1825,6 +1837,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const root = document?.documentElement;
     if (root?.getAttribute?.(THEME_ATTRIBUTE) !== next) {
       root?.setAttribute?.(THEME_ATTRIBUTE, next);
+      notifyStylePreviewListeners();
     }
     return next;
   }
@@ -1846,11 +1859,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setCheckboxStyleSetting(nextValue) {
     checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
     syncDocumentCheckboxStyle();
+    notifyStylePreviewListeners();
   }
 
   function setThemeSetting(nextValue) {
     themeSetting = normalizeThemeSetting(nextValue, THEME_SETTING_VALUES.FOLLOW_ROAM);
     syncDocumentTheme();
+    notifyStylePreviewListeners();
     scheduleThemeColorRefresh();
   }
 
@@ -2410,6 +2425,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     label,
     className = "",
     ariaCurrent = false,
+    glyphStatusKey = null,
     shortcutHint = "",
     onChoose,
   }) {
@@ -2422,6 +2438,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (ariaCurrent) {
       item.setAttribute("aria-current", "true");
       item.classList.add("bp3-active", "bp3-intent-primary");
+    }
+
+    if (glyphStatusKey) {
+      const glyph = document.createElement("span");
+      glyph.className = "ts-status-choice-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.setAttribute("data-task-status-key", glyphStatusKey);
+      setStatusGlyphAttribute(glyph, glyphStatusKey);
+      item.append(glyph);
     }
 
     const text = document.createElement("div");
@@ -2484,6 +2509,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const item = makeStatusMenuItem({
       label: status?.label || statusKey,
       ariaCurrent: statusKey === currentStatusKey,
+      glyphStatusKey: statusKey,
       shortcutHint,
       onChoose,
     });
@@ -4113,6 +4139,96 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       );
     };
 
+    const STYLE_PREVIEW_PREFERRED_KEYS = [
+      "ACTIVE",
+      "WAITING",
+      "IN_REVIEW",
+      "HOLDING",
+      "ALERT",
+      "WATCHING",
+    ];
+
+    const getStylePreviewSamples = () => {
+      const activeKeys = CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active);
+      const picked = [];
+      for (const key of STYLE_PREVIEW_PREFERRED_KEYS) {
+        if (STATUSES[key]?.active && !picked.includes(key)) picked.push(key);
+      }
+      for (const key of activeKeys) {
+        if (picked.length >= 6) break;
+        if (!picked.includes(key)) picked.push(key);
+      }
+      return picked.slice(0, 6).map((key) => ({
+        key,
+        label: STATUSES[key]?.label || STATUSES[key]?.name || key,
+        shape: getStatusCheckboxShape(key, STATUSES[key]?.name),
+      }));
+    };
+
+    const CheckboxStylePreview = () => {
+      if (!React?.createElement) return null;
+      const readSnapshot = () => ({
+        style: checkboxStyleSetting,
+        theme: resolveCurrentTheme(),
+        samples: getStylePreviewSamples(),
+      });
+      const [snapshot, setSnapshot] = React.useState
+        ? React.useState(readSnapshot)
+        : [readSnapshot(), () => {}];
+
+      if (React.useEffect) {
+        React.useEffect(() => {
+          const update = () => setSnapshot(readSnapshot());
+          stylePreviewListeners.add(update);
+          update();
+          return () => {
+            stylePreviewListeners.delete(update);
+          };
+        }, []);
+      }
+
+      return React.createElement(
+        "div",
+        {
+          className: "ts-style-preview",
+          "data-ts-preview-style": snapshot.style,
+          "data-ts-preview-theme": snapshot.theme,
+          "aria-label": `Checkbox style preview (${snapshot.style}, ${snapshot.theme})`,
+        },
+        snapshot.samples.map((sample) =>
+          React.createElement(
+            "span",
+            { className: "ts-style-preview-item", key: sample.key },
+            React.createElement(
+              "span",
+              {
+                className: "rm-checkbox rm-todo",
+                [CHECKBOX_STATUS_ATTRIBUTE]: sample.key,
+                [CHECKBOX_SHAPE_ATTRIBUTE]: sample.shape,
+              },
+              React.createElement(
+                "label",
+                { className: "check-container" },
+                React.createElement("input", {
+                  type: "checkbox",
+                  checked: false,
+                  readOnly: true,
+                  tabIndex: -1,
+                  "aria-hidden": "true",
+                }),
+                React.createElement("span", { className: "checkmark" })
+              )
+            ),
+            React.createElement(
+              "span",
+              { className: "ts-style-preview-label" },
+              sample.label
+            )
+          )
+        )
+      );
+    };
+
     const AboutRow = () => {
       if (!React?.createElement) return null;
       return React.createElement(
@@ -4154,6 +4270,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
             type: "select",
             items: Object.values(CHECKBOX_STYLE_VALUES),
             onChange: (value) => setCheckboxStyleSetting(value),
+          },
+        },
+        {
+          id: "task-status-style-preview",
+          name: "Style preview",
+          description: "Live preview of the chosen checkbox style and theme.",
+          action: {
+            type: "reactComponent",
+            component: CheckboxStylePreview,
           },
         },
         {
@@ -4336,6 +4461,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("mousedown", handleStatusMouseDown, true);
     window.removeEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.removeEventListener("click", handleStatusClick, true);
+    stylePreviewListeners.clear();
     pendingOperations.clear();
 
     await unregisterAllCommands();

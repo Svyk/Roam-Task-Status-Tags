@@ -262,7 +262,7 @@ test("Alert attention is a scoped two-beat beacon with a long quiet interval", (
 test("observer refreshes only status-bearing host mutations and ignores its own portal", () => {
   assert.match(source, /refreshMutationScopes\(mutations\)/);
   assert.match(source, /refreshStatusVisuals\(scope\)/);
-  assert.match(source, /EXTENSION_UI_SELECTOR = "\.ts-status-portal, \.ts-status-names-panel, \.ts-episode-counter"/);
+  assert.match(source, /EXTENSION_UI_SELECTOR = "\.ts-status-portal, \.ts-status-names-panel, \.ts-episode-counter, \.ts-style-preview"/);
   assert.match(source, /STATUS_MUTATION_SELECTOR/);
   assert.match(source, /containsStatusVisual\(node\)/);
   assert.match(source, /if \(isInsideExtensionUi\(mutation\.target\)\) continue/);
@@ -510,4 +510,13 @@ test("status-change pop CSS is unchecked-only, non-looping, owned-scoped, and gu
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
   assert.match(css, /@media print[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
+});
+
+test("chooser glyph column and settings style preview reuse status glyphs and real checkbox CSS", () => {
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-task-status-key\]/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-task-status-key\]::before/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-ts-status-glyph\]::before/);
+  assert.match(css, /\.ts-style-preview\s*\{/);
+  assert.match(css, /\.ts-style-preview \.rm-checkbox\[data-ts-checkbox-status\]/);
+  assert.doesNotMatch(css, /\.ts-style-preview[^}]*data-ts-checkbox-style/);
 });

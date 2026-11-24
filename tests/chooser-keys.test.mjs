@@ -92,6 +92,7 @@ class FakeElement extends EventTarget {
         return this.classList.contains("ts-status-choice") && this.getAttribute("aria-current") === "true";
       }
       if (part === ".ts-status-choice-shortcut") return this.classList.contains("ts-status-choice-shortcut");
+      if (part === ".ts-status-choice-glyph") return this.classList.contains("ts-status-choice-glyph");
       if (part === ".ts-status-chooser") return this.classList.contains("ts-status-chooser");
       if (part === ".bp3-popover-content") return this.classList.contains("bp3-popover-content");
       if (part === ".bp3-popover-arrow") return this.classList.contains("bp3-popover-arrow");
@@ -320,6 +321,12 @@ test("chooser renders hints on first nine rows, handles 1..9 and 0, and ignores 
       .filter((el) => el.getAttribute("data-task-status-choice"));
     assert.equal(statusChoices.length, 14);
     for (let i = 0; i < statusChoices.length; i += 1) {
+      const glyph = statusChoices[i].querySelector(".ts-status-choice-glyph");
+      assert.ok(glyph, `row ${i + 1} should show status glyph`);
+      assert.equal(
+        glyph.getAttribute("data-task-status-key"),
+        statusChoices[i].getAttribute("data-task-status-choice")
+      );
       const hint = statusChoices[i].querySelector(".ts-status-choice-shortcut");
       if (i < 9) {
         assert.ok(hint, `row ${i + 1} should show shortcut hint`);
@@ -328,6 +335,8 @@ test("chooser renders hints on first nine rows, handles 1..9 and 0, and ignores 
         assert.equal(hint, null, `row ${i + 1} should not show shortcut hint`);
       }
     }
+    const seriesChoice = statusChoices.find((el) => el.getAttribute("data-task-status-choice") === "SERIES");
+    assert.equal(seriesChoice.querySelector(".ts-status-choice-glyph").getAttribute("data-ts-status-glyph"), "series");
 
     // 2. While a date input has focus inside the chooser, digits are ignored
     const dateInput = new FakeElement("input");

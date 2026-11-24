@@ -264,6 +264,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
         [
           "task-status-theme",
           "task-status-checkbox-style",
+          "task-status-style-preview",
           "task-status-style-native-checkboxes",
           "task-status-label-display",
           "task-status-alert-beacon",
@@ -339,6 +340,43 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
       styleSetting.action.onChange("Solid");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+
+      const previewSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-style-preview"
+      );
+      assert.equal(previewSetting.action.type, "reactComponent");
+      let previewState = null;
+      let previewCleanup = null;
+      const origUseState = windowLike.React.useState;
+      const origUseEffect = windowLike.React.useEffect;
+      windowLike.React.useState = (init) => {
+        if (previewState === null) previewState = typeof init === "function" ? init() : init;
+        return [previewState, (next) => { previewState = typeof next === "function" ? next(previewState) : next; }];
+      };
+      windowLike.React.useEffect = (fn) => { previewCleanup = fn(); };
+      try {
+        const previewTree = previewSetting.action.component();
+        assert.equal(previewTree.props.className, "ts-style-preview");
+        assert.equal(previewTree.props["data-ts-preview-style"], "Solid");
+        assert.equal(previewTree.props["data-ts-preview-theme"], "light");
+        assert.equal(previewTree.children[0].length, 6);
+        const firstCheckbox = previewTree.children[0][0].children[0];
+        assert.equal(firstCheckbox.props.className, "rm-checkbox rm-todo");
+        assert.equal(firstCheckbox.props["data-ts-checkbox-status"], "ACTIVE");
+        assert.equal(firstCheckbox.props["data-ts-checkbox-shape"], "active");
+
+        styleSetting.action.onChange("Glass");
+        assert.equal(previewState.style, "Glass");
+        themeSetting.action.onChange("Dark");
+        assert.equal(previewState.theme, "dark");
+        themeSetting.action.onChange("Light");
+        assert.equal(previewState.theme, "light");
+        styleSetting.action.onChange("Solid");
+      } finally {
+        previewCleanup?.();
+        windowLike.React.useState = origUseState;
+        windowLike.React.useEffect = origUseEffect;
+      }
 
       const checkboxSetting = latestPanelConfig.settings.find(
         (entry) => entry.id === "task-status-style-native-checkboxes"

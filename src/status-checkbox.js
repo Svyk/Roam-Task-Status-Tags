@@ -578,7 +578,9 @@ function includingRoot(root, selector) {
 }
 
 export function clearOwnedStatusCheckboxes(root) {
-  const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR);
+  const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
+    (checkbox) => !checkbox.closest?.(".ts-style-preview")
+  );
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
 }
