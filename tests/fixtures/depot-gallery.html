@@ -28,11 +28,11 @@
         color-scheme: dark;
         --svy-canvas: #182026;
         --svy-surface: #202b33;
-        --svy-raised: #293742;
-        --svy-overlay: #30404d;
-        --svy-hover: #26333d;
+        --svy-raised: #202b33;
+        --svy-overlay: #24303a;
+        --svy-hover: #293742;
         --svy-selected: #33485c;
-        --svy-border-subtle: #394b59;
+        --svy-border-subtle: #32424f;
         --svy-border: #5c7080;
         --svy-text: #e1e8ed;
         --svy-text-muted: #b3c1cc;
@@ -50,10 +50,17 @@
         line-height: 1.45;
       }
 
+      body.motion-paused *,
+      body.motion-paused *::before,
+      body.motion-paused *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+
       main {
         max-width: 1120px;
         margin: 0 auto;
-        padding: 24px 28px 40px;
+        padding: 20px 26px 34px;
       }
 
       .toolbar {
@@ -62,8 +69,8 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 20px;
-        padding-bottom: 14px;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
         border-bottom: 1px solid var(--svy-border-subtle);
       }
 
@@ -110,8 +117,8 @@
       }
 
       .section-title {
-        margin: 24px 0 12px;
-        font-size: 13px;
+        margin: 20px 0 10px;
+        font-size: 12.5px;
         font-weight: 650;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -120,20 +127,25 @@
 
       .groups-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        align-items: start;
+      }
+
+      @media (max-width: 960px) {
+        .groups-grid { grid-template-columns: 1fr; }
       }
 
       .group-card {
         border: 1px solid var(--svy-border-subtle);
         border-radius: 10px;
-        padding: 14px 16px;
+        padding: 12px 14px;
         background: var(--svy-raised);
       }
 
       .group-card h2 {
-        margin: 0 0 10px;
-        font-size: 12px;
+        margin: 0 0 8px;
+        font-size: 11.5px;
         font-weight: 650;
         letter-spacing: 0.07em;
         text-transform: uppercase;
@@ -142,17 +154,27 @@
 
       .status-row {
         display: grid;
-        grid-template-columns: 24px 24px minmax(0, 1fr) auto;
+        grid-template-columns: 24px 24px minmax(0, 1fr) auto auto;
         align-items: center;
-        column-gap: 10px;
-        min-height: 32px;
+        column-gap: 8px;
+        min-height: 31px;
         border-bottom: 1px solid color-mix(in srgb, var(--svy-border-subtle) 55%, transparent);
+      }
+
+      body.hide-toolbar .status-row {
+        grid-template-columns: 24px 24px minmax(0, 1fr) auto;
+      }
+
+      body.hide-toolbar .burst-btn,
+      body.hide-toolbar .burst-col-head,
+      body.hide-toolbar .burst-hint {
+        display: none;
       }
 
       .status-row:last-child { border-bottom: 0; }
 
       .status-row-header {
-        font-size: 11px;
+        font-size: 10.5px;
         color: var(--svy-text-muted);
         min-height: 22px;
         border-bottom: 1px solid var(--svy-border-subtle);
@@ -161,6 +183,29 @@
       .status-name {
         font-size: 13px;
         font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .burst-btn {
+        appearance: none;
+        border: 1px solid var(--svy-border-subtle);
+        border-radius: 6px;
+        padding: 2px 7px;
+        background: var(--svy-surface);
+        color: var(--svy-text-muted);
+        font: inherit;
+        font-size: 10.5px;
+        font-weight: 550;
+        cursor: pointer;
+        line-height: 1.4;
+      }
+
+      .burst-btn:hover {
+        background: var(--svy-hover);
+        color: var(--svy-text);
+        border-color: var(--svy-border);
       }
 
       .rm-checkbox { display: inline-flex; align-items: center; }
@@ -211,7 +256,7 @@
       .style-frame-card iframe {
         display: block;
         width: 100%;
-        height: 760px;
+        height: 836px;
         border: 0;
       }
 
@@ -223,9 +268,13 @@
         display: none;
       }
 
+      body.hide-toolbar .section-title {
+        margin-top: 0;
+      }
+
       .preview-showcase {
         display: grid;
-        grid-template-columns: minmax(220px, 240px) minmax(0, 1fr);
+        grid-template-columns: minmax(236px, 252px) minmax(0, 1fr);
         gap: 20px;
         align-items: start;
       }
@@ -254,16 +303,6 @@
         letter-spacing: 0.07em;
         text-transform: uppercase;
         color: var(--svy-text-muted);
-      }
-
-      .pop-badge {
-        margin-left: 6px;
-        padding: 1px 5px;
-        border-radius: 4px;
-        font-size: 10.5px;
-        color: var(--svy-text-muted);
-        background: var(--svy-surface);
-        border: 1px solid var(--svy-border-subtle);
       }
     </style>
     <style id="ts-gallery-palette">
@@ -309,6 +348,14 @@
       .rm-checkbox[data-ts-checkbox-status="DRAFT"] { --ts-checkbox-accent-light: rgb(59, 130, 246); --ts-checkbox-accent-dark: rgb(59, 130, 246); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(59, 130, 246, 0.09); --ts-checkbox-wash-dark: rgba(59, 130, 246, 0.16); --ts-checkbox-beacon-light: rgba(59, 130, 246, 0.52); --ts-checkbox-beacon-dark: rgba(59, 130, 246, 0.68); }
       span.rm-page-ref[data-task-status-key="DEADLINE"], .ts-status-pill-preview[data-task-status-key="DEADLINE"], .ts-status-choice-glyph[data-task-status-key="DEADLINE"] { --ts-status-bg-light: rgba(234, 88, 12, 0.1); --ts-status-fg-light: rgb(174, 66, 9); --ts-status-border-light: rgba(234, 88, 12, 0.48); --ts-status-bg-dark: rgba(234, 88, 12, 0.2); --ts-status-fg-dark: rgb(241, 143, 92); --ts-status-border-dark: rgba(234, 88, 12, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="DEADLINE"] { --ts-checkbox-accent-light: rgb(234, 88, 12); --ts-checkbox-accent-dark: rgb(234, 88, 12); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(234, 88, 12, 0.09); --ts-checkbox-wash-dark: rgba(234, 88, 12, 0.16); --ts-checkbox-beacon-light: rgba(234, 88, 12, 0.52); --ts-checkbox-beacon-dark: rgba(234, 88, 12, 0.68); }
+      span.rm-page-ref[data-task-status-key="KAWAII"], .ts-status-pill-preview[data-task-status-key="KAWAII"], .ts-status-choice-glyph[data-task-status-key="KAWAII"] { --ts-status-bg-light: rgba(244, 114, 182, 0.1); --ts-status-fg-light: rgb(158, 74, 118); --ts-status-border-light: rgba(212, 99, 158, 0.48); --ts-status-bg-dark: rgba(244, 114, 182, 0.2); --ts-status-fg-dark: rgb(246, 144, 197); --ts-status-border-dark: rgba(244, 114, 182, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="KAWAII"] { --ts-checkbox-accent-light: rgb(212, 99, 158); --ts-checkbox-accent-dark: rgb(244, 114, 182); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(244, 114, 182, 0.09); --ts-checkbox-wash-dark: rgba(244, 114, 182, 0.16); --ts-checkbox-beacon-light: rgba(212, 99, 158, 0.52); --ts-checkbox-beacon-dark: rgba(244, 114, 182, 0.68); }
+      span.rm-page-ref[data-task-status-key="FLOWER"], .ts-status-pill-preview[data-task-status-key="FLOWER"], .ts-status-choice-glyph[data-task-status-key="FLOWER"] { --ts-status-bg-light: rgba(232, 121, 249, 0.1); --ts-status-fg-light: rgb(145, 76, 156); --ts-status-border-light: rgba(194, 101, 208, 0.48); --ts-status-bg-dark: rgba(232, 121, 249, 0.2); --ts-status-fg-dark: rgb(236, 144, 250); --ts-status-border-dark: rgba(232, 121, 249, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="FLOWER"] { --ts-checkbox-accent-light: rgb(194, 101, 208); --ts-checkbox-accent-dark: rgb(232, 121, 249); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(232, 121, 249, 0.09); --ts-checkbox-wash-dark: rgba(232, 121, 249, 0.16); --ts-checkbox-beacon-light: rgba(194, 101, 208, 0.52); --ts-checkbox-beacon-dark: rgba(232, 121, 249, 0.68); }
+      span.rm-page-ref[data-task-status-key="SUN"], .ts-status-pill-preview[data-task-status-key="SUN"], .ts-status-choice-glyph[data-task-status-key="SUN"] { --ts-status-bg-light: rgba(245, 158, 11, 0.1); --ts-status-fg-light: rgb(144, 93, 6); --ts-status-border-light: rgba(191, 123, 9, 0.48); --ts-status-bg-dark: rgba(245, 158, 11, 0.2); --ts-status-fg-dark: rgb(246, 165, 28); --ts-status-border-dark: rgba(245, 158, 11, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="SUN"] { --ts-checkbox-accent-light: rgb(191, 123, 9); --ts-checkbox-accent-dark: rgb(245, 158, 11); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(245, 158, 11, 0.09); --ts-checkbox-wash-dark: rgba(245, 158, 11, 0.16); --ts-checkbox-beacon-light: rgba(191, 123, 9, 0.52); --ts-checkbox-beacon-dark: rgba(245, 158, 11, 0.68); }
+      span.rm-page-ref[data-task-status-key="MOON"], .ts-status-pill-preview[data-task-status-key="MOON"], .ts-status-choice-glyph[data-task-status-key="MOON"] { --ts-status-bg-light: rgba(129, 140, 248, 0.1); --ts-status-fg-light: rgb(89, 96, 170); --ts-status-border-light: rgba(119, 129, 229, 0.48); --ts-status-bg-dark: rgba(129, 140, 248, 0.2); --ts-status-fg-dark: rgb(162, 170, 250); --ts-status-border-dark: rgba(129, 140, 248, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="MOON"] { --ts-checkbox-accent-light: rgb(119, 129, 229); --ts-checkbox-accent-dark: rgb(129, 140, 248); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(129, 140, 248, 0.09); --ts-checkbox-wash-dark: rgba(129, 140, 248, 0.16); --ts-checkbox-beacon-light: rgba(119, 129, 229, 0.52); --ts-checkbox-beacon-dark: rgba(129, 140, 248, 0.68); }
       span.rm-page-ref[data-task-status-key="CUSTOM_DEEP_WORK"], .ts-status-pill-preview[data-task-status-key="CUSTOM_DEEP_WORK"], .ts-status-choice-glyph[data-task-status-key="CUSTOM_DEEP_WORK"] { --ts-status-bg-light: rgba(100, 116, 139, 0.1); --ts-status-fg-light: rgb(88, 102, 122); --ts-status-border-light: rgba(100, 116, 139, 0.48); --ts-status-bg-dark: rgba(100, 116, 139, 0.2); --ts-status-fg-dark: rgb(158, 168, 183); --ts-status-border-dark: rgba(105, 121, 143, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="CUSTOM_DEEP_WORK"] { --ts-checkbox-accent-light: rgb(100, 116, 139); --ts-checkbox-accent-dark: rgb(105, 121, 143); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(100, 116, 139, 0.09); --ts-checkbox-wash-dark: rgba(100, 116, 139, 0.16); --ts-checkbox-beacon-light: rgba(100, 116, 139, 0.52); --ts-checkbox-beacon-dark: rgba(105, 121, 143, 0.68); }
     </style>
@@ -316,26 +363,27 @@
   <body>
     <main>
       <header class="toolbar">
-        <h1>Task Status Tags Gallery</h1>
+        <h1>Task Status Tags Gallery (v0.16.0)</h1>
         <div class="controls">
           <div class="control-group" role="group" aria-label="Theme">
             <button type="button" data-theme-choice="light" aria-pressed="true">Light</button>
             <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
           </div>
           <div class="control-group" role="group" aria-label="Checkbox style">
-            <button type="button" data-style-choice="outline" aria-pressed="true">Outline</button>
-            <button type="button" data-style-choice="glass" aria-pressed="false">Glass</button>
+            <button type="button" data-style-choice="outline" aria-pressed="false">Outline</button>
+            <button type="button" data-style-choice="glass" aria-pressed="true">Glass</button>
             <button type="button" data-style-choice="solid" aria-pressed="false">Solid</button>
             <button type="button" data-style-choice="minimal" aria-pressed="false">Minimal</button>
           </div>
-          <div class="control-group" role="group" aria-label="Pop animation">
-            <button type="button" id="replay-pop">Replay pop</button>
+          <div class="control-group" role="group" aria-label="Animate status icons">
+            <button type="button" data-ambient-choice="on" aria-pressed="true">Animate: On</button>
+            <button type="button" data-ambient-choice="off" aria-pressed="false">Off</button>
           </div>
         </div>
       </header>
 
       <section class="statuses-section" aria-label="All statuses">
-        <div class="section-title">All 21 statuses + custom (Active plays status-change pop on reload)</div>
+        <div class="section-title">All 25 statuses + custom<span class="burst-hint"> (click Burst to preview transition effects)</span></div>
         <div id="groups-grid" class="groups-grid"></div>
       </section>
 
@@ -345,7 +393,7 @@
       </section>
 
       <section class="extras-preview-section" aria-label="Chooser and settings preview">
-        <div class="section-title">Chooser glyph column and settings style preview</div>
+        <div class="section-title">Status chooser and settings style preview</div>
         <div class="preview-showcase">
           <div class="ts-status-portal" id="chooser-preview"></div>
           <div class="preview-card">
@@ -362,38 +410,42 @@
           {
             title: "Task statuses (7)",
             items: [
-              { key: "ACTIVE", shape: "active", name: "Active", glyph: null },
-              { key: "WAITING", shape: "waiting", name: "Waiting", glyph: null },
-              { key: "IN_REVIEW", shape: "in-review", name: "In Review", glyph: null },
-              { key: "HOLDING", shape: "holding", name: "Holding", glyph: null },
-              { key: "INCUBATING", shape: "incubating", name: "Incubating", glyph: null },
-              { key: "ALERT", shape: "alert", name: "Alert", glyph: null },
-              { key: "CANCELLED", shape: "cancelled", name: "Cancelled", glyph: null }
+              { key: "ACTIVE", shape: "active", name: "Active", glyph: null, color: "#14b8a6" },
+              { key: "WAITING", shape: "waiting", name: "Waiting", glyph: null, color: "#eab308" },
+              { key: "IN_REVIEW", shape: "in-review", name: "In Review", glyph: null, color: "#0ea5e9" },
+              { key: "HOLDING", shape: "holding", name: "Holding", glyph: null, color: "#94a3b8" },
+              { key: "INCUBATING", shape: "incubating", name: "Incubating", glyph: null, color: "#6366f1" },
+              { key: "ALERT", shape: "alert", name: "Alert", glyph: null, color: "#f43f5e" },
+              { key: "CANCELLED", shape: "cancelled", name: "Cancelled", glyph: null, color: "#1e293b" }
             ]
           },
           {
             title: "Media statuses (7)",
             items: [
-              { key: "SERIES", shape: "series", name: "Series", glyph: "series" },
-              { key: "MOVIE", shape: "movie", name: "Movie", glyph: "movie" },
-              { key: "WATCHING", shape: "watching", name: "Watching", glyph: "watching" },
-              { key: "WATCHLIST", shape: "watchlist", name: "Watchlist", glyph: "watchlist" },
-              { key: "UPCOMING", shape: "upcoming", name: "Upcoming", glyph: "upcoming" },
-              { key: "REWATCH", shape: "rewatch", name: "Rewatch", glyph: "rewatch" },
-              { key: "DROPPED", shape: "dropped", name: "Dropped", glyph: "dropped" }
+              { key: "SERIES", shape: "series", name: "Series", glyph: "series", color: "#c026d3" },
+              { key: "MOVIE", shape: "movie", name: "Movie", glyph: "movie", color: "#f97316" },
+              { key: "WATCHING", shape: "watching", name: "Watching", glyph: "watching", color: "#22c55e" },
+              { key: "WATCHLIST", shape: "watchlist", name: "Watchlist", glyph: "watchlist", color: "#ec4899" },
+              { key: "UPCOMING", shape: "upcoming", name: "Upcoming", glyph: "upcoming", color: "#0d87f2" },
+              { key: "REWATCH", shape: "rewatch", name: "Rewatch", glyph: "rewatch", color: "#84cc16" },
+              { key: "DROPPED", shape: "dropped", name: "Dropped", glyph: "dropped", color: "#7c2d12" }
             ]
           },
           {
-            title: "Extra statuses (7) + Custom (1)",
+            title: "Extra statuses (11) + Custom (1)",
             items: [
-              { key: "IMPORTANT", shape: "important", name: "Important", glyph: "important" },
-              { key: "STARRED", shape: "starred", name: "Starred", glyph: "starred" },
-              { key: "DISCUSS", shape: "discuss", name: "Discuss", glyph: "discuss" },
-              { key: "BILLABLE", shape: "billable", name: "Billable", glyph: "billable" },
-              { key: "BUG", shape: "bug", name: "Bug", glyph: "bug" },
-              { key: "DRAFT", shape: "draft", name: "Draft", glyph: "draft" },
-              { key: "DEADLINE", shape: "deadline", name: "Deadline", glyph: "deadline" },
-              { key: "CUSTOM_DEEP_WORK", shape: "custom", name: "Deep Work", glyph: null }
+              { key: "IMPORTANT", shape: "important", name: "Important", glyph: "important", color: "#dc2626" },
+              { key: "STARRED", shape: "starred", name: "Starred", glyph: "starred", color: "#d97706" },
+              { key: "DISCUSS", shape: "discuss", name: "Discuss", glyph: "discuss", color: "#8b5cf6" },
+              { key: "BILLABLE", shape: "billable", name: "Billable", glyph: "billable", color: "#10b981" },
+              { key: "BUG", shape: "bug", name: "Bug", glyph: "bug", color: "#65a30d" },
+              { key: "DRAFT", shape: "draft", name: "Draft", glyph: "draft", color: "#3b82f6" },
+              { key: "DEADLINE", shape: "deadline", name: "Deadline", glyph: "deadline", color: "#ea580c" },
+              { key: "KAWAII", shape: "kawaii", name: "Kawaii", glyph: "kawaii", color: "#f472b6" },
+              { key: "FLOWER", shape: "flower", name: "Flower", glyph: "flower", color: "#e879f9" },
+              { key: "SUN", shape: "sun", name: "Sun", glyph: "sun", color: "#f59e0b" },
+              { key: "MOON", shape: "moon", name: "Moon", glyph: "moon", color: "#818cf8" },
+              { key: "CUSTOM_DEEP_WORK", shape: "custom", name: "Deep Work", glyph: null, color: "#64748b" }
             ]
           }
         ];
@@ -409,14 +461,206 @@
           { id: "minimal", label: "Minimal" }
         ];
 
-        function checkboxMarkup(item, checked, pop) {
+        var BURST_SPECS = {
+          active: { kind: "started", colors: ["#38bdf8", "#22d3ee", "#bae6fd"] },
+          waiting: { kind: "blocked", colors: ["#fbbf24", "#f59e0b", "#fde68a"] },
+          billable: { kind: "dollar", colors: ["#4ade80", "#a3e635", "#fde047"] },
+          important: { kind: "exclaim", colors: ["#fb7185", "#f43f5e", "#fecdd3"] },
+          discuss: { kind: "question", colors: ["#c084fc", "#a78bfa", "#ede9fe"] },
+          alert: { kind: "alert", colors: ["#ef4444", "#f97316", "#fde047"] },
+          starred: { kind: "starred", colors: ["#fde047", "#facc15", "#f59e0b"] },
+          cancelled: { kind: "canceled", colors: ["#94a3b8", "#cbd5e1", "#64748b"] },
+          kawaii: { kind: "kawaii", colors: ["#f9a8d4", "#f472b6", "#c4b5fd"] },
+          bug: { kind: "bug", colors: ["#a3e635", "#65a30d", "#d9f99d"] },
+          draft: { kind: "draft", colors: ["#93c5fd", "#3b82f6", "#dbeafe"] },
+          deadline: { kind: "deadline", colors: ["#fb923c", "#f97316", "#fed7aa"] },
+          flower: { kind: "flower", colors: ["#f0abfc", "#e879f9", "#fde68a"] },
+          sun: { kind: "sun", colors: ["#fde047", "#fb923c", "#fef3c7"] },
+          moon: { kind: "moon", colors: ["#c7d2fe", "#a5b4fc", "#e0e7ff"] }
+        };
+
+        var burstCanvas = null;
+        var burstCtx = null;
+        var rings = [];
+        var motes = [];
+        var rafId = 0;
+        var lastMs = 0;
+
+        function hexToRgba(hex, a) {
+          var h = String(hex || "#38bdf8").replace("#", "");
+          if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+          var r = parseInt(h.slice(0, 2), 16) || 56;
+          var g = parseInt(h.slice(2, 4), 16) || 189;
+          var b = parseInt(h.slice(4, 6), 16) || 248;
+          return "rgba(" + r + "," + g + "," + b + "," + Math.max(0, Math.min(1, a)).toFixed(3) + ")";
+        }
+
+        function ensureBurstCanvas() {
+          if (burstCanvas) return;
+          burstCanvas = document.createElement("canvas");
+          burstCanvas.className = "ts-burst-canvas";
+          burstCanvas.setAttribute("data-ts-burst-canvas", "true");
+          burstCanvas.setAttribute("aria-hidden", "true");
+          document.body.appendChild(burstCanvas);
+          burstCtx = burstCanvas.getContext("2d");
+          resizeBurstCanvas();
+          window.addEventListener("resize", resizeBurstCanvas);
+        }
+
+        function resizeBurstCanvas() {
+          if (!burstCanvas) return;
+          var dpr = Math.min(2, window.devicePixelRatio || 1);
+          burstCanvas.width = Math.round(window.innerWidth * dpr);
+          burstCanvas.height = Math.round(window.innerHeight * dpr);
+        }
+
+        function burstFrame(now) {
+          rafId = 0;
+          if (!burstCtx || !burstCanvas) return;
+          var dpr = Math.min(2, window.devicePixelRatio || 1);
+          var dt = lastMs ? Math.min(0.05, Math.max(0.001, (now - lastMs) / 1000)) : 0.016;
+          lastMs = now;
+          burstCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          burstCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+          rings = rings.filter(function (r) {
+            var f = (now - r.t0) / r.dur;
+            if (f < 0) return true;
+            if (f >= 1) return false;
+            var ease = 1 - Math.pow(1 - f, 3);
+            var rad = r.r0 + (r.r1 - r.r0) * ease;
+            burstCtx.save();
+            if (r.dashed) burstCtx.setLineDash([3.5, 3]);
+            burstCtx.beginPath();
+            burstCtx.arc(r.x, r.y, rad, 0, Math.PI * 2);
+            burstCtx.lineWidth = Math.max(0.7, r.width * (1 - f * 0.7));
+            burstCtx.strokeStyle = hexToRgba(r.col, (1 - f) * 0.85);
+            burstCtx.stroke();
+            burstCtx.restore();
+            return true;
+          });
+
+          motes = motes.filter(function (m) {
+            var f = (now - m.t0) / m.life;
+            if (f >= 1) return false;
+            var drag = Math.exp(-(m.drag || 3) * dt);
+            m.vx *= drag;
+            m.vy *= drag;
+            m.vy += (m.grav || 0) * dt;
+            if (m.sway !== undefined) m.vx += Math.sin(now * 0.012 + m.sway) * 28 * dt;
+            m.x += m.vx * dt;
+            m.y += m.vy * dt;
+            if (m.vRot) m.rot = (m.rot || 0) + m.vRot * dt;
+            var alpha = 1 - f * f;
+            var s = m.size * (m.kind === "bubble" ? 0.65 + 0.55 * f : 1 - 0.35 * f);
+            burstCtx.save();
+            burstCtx.translate(m.x, m.y);
+            if (m.rot) burstCtx.rotate(m.rot);
+            if (m.kind === "star") {
+              burstCtx.beginPath();
+              burstCtx.moveTo(0, -s); burstCtx.lineTo(s * 0.28, -s * 0.28);
+              burstCtx.lineTo(s, 0); burstCtx.lineTo(s * 0.28, s * 0.28);
+              burstCtx.lineTo(0, s); burstCtx.lineTo(-s * 0.28, s * 0.28);
+              burstCtx.lineTo(-s, 0); burstCtx.lineTo(-s * 0.28, -s * 0.28);
+              burstCtx.closePath();
+              burstCtx.fillStyle = hexToRgba(m.col, alpha);
+              burstCtx.fill();
+            } else if (m.kind === "heart") {
+              burstCtx.beginPath();
+              burstCtx.moveTo(0, s * 0.8);
+              burstCtx.bezierCurveTo(-s * 1.25, 0, -s * 0.6, -s * 1.05, 0, -s * 0.35);
+              burstCtx.bezierCurveTo(s * 0.6, -s * 1.05, s * 1.25, 0, 0, s * 0.8);
+              burstCtx.closePath();
+              burstCtx.fillStyle = hexToRgba(m.col, alpha);
+              burstCtx.fill();
+            } else if (m.kind === "spike" || m.kind === "slash") {
+              burstCtx.beginPath();
+              burstCtx.moveTo(-s * 0.65, 0); burstCtx.lineTo(s * 0.65, 0);
+              burstCtx.lineWidth = Math.max(1.2, m.size * 0.32 * (1 - f * 0.6));
+              burstCtx.lineCap = "round";
+              burstCtx.strokeStyle = hexToRgba(m.col, alpha);
+              burstCtx.stroke();
+            } else if (m.kind === "bubble") {
+              burstCtx.beginPath();
+              burstCtx.arc(0, 0, s, 0, Math.PI * 2);
+              burstCtx.lineWidth = 1.25;
+              burstCtx.strokeStyle = hexToRgba(m.col, alpha * 0.9);
+              burstCtx.fillStyle = hexToRgba(m.col, alpha * 0.22);
+              burstCtx.fill();
+              burstCtx.stroke();
+            } else {
+              burstCtx.beginPath();
+              burstCtx.arc(0, 0, s, 0, Math.PI * 2);
+              burstCtx.fillStyle = hexToRgba(m.col, alpha);
+              burstCtx.fill();
+            }
+            burstCtx.restore();
+            return true;
+          });
+
+          if (rings.length || motes.length) {
+            rafId = requestAnimationFrame(burstFrame);
+          } else {
+            lastMs = 0;
+          }
+        }
+
+        function triggerBurstForItem(item, checkboxEl) {
+          if (currentStyle === "outline") {
+            checkboxEl.removeAttribute("data-ts-status-pop");
+            void checkboxEl.offsetWidth;
+            checkboxEl.setAttribute("data-ts-status-pop", "true");
+            setTimeout(function () { checkboxEl.removeAttribute("data-ts-status-pop"); }, 540);
+            return;
+          }
+          ensureBurstCanvas();
+          var rect = (checkboxEl.querySelector(".checkmark") || checkboxEl).getBoundingClientRect();
+          var x = rect.left + rect.width / 2;
+          var y = rect.top + rect.height / 2;
+          var spec = BURST_SPECS[item.shape];
+          var cols = spec ? spec.colors : [item.color || "#38bdf8", "#e2e8f0", item.color || "#38bdf8"];
+          var kind = spec ? spec.kind : "generic";
+          var now = performance.now();
+          rings.push({
+            x: x, y: y, t0: now,
+            dur: kind === "alert" || kind === "sun" ? 500 : 400,
+            r0: 5, r1: kind === "alert" || kind === "sun" ? 28 : 24,
+            width: 2.1, col: cols[0],
+            dashed: kind === "blocked" || kind === "deadline"
+          });
+          var count = 10;
+          for (var i = 0; i < count; i++) {
+            var a = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+            var spd = 65 + Math.random() * 105;
+            var pKind =
+              kind === "kawaii" ? (i % 2 === 0 ? "heart" : "star") :
+              kind === "starred" || kind === "sun" || kind === "moon" || kind === "dollar" ? "star" :
+              kind === "question" ? "bubble" :
+              kind === "exclaim" || kind === "alert" || kind === "canceled" || kind === "deadline" ? "spike" :
+              "spark";
+            motes.push({
+              x: x, y: y, t0: now, kind: pKind,
+              vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+              grav: pKind === "bubble" ? -35 : 80, drag: 3.4,
+              size: 2.6 + Math.random() * 2.2,
+              rot: a, vRot: pKind === "star" ? (Math.random() - 0.5) * 6 : 0,
+              life: 380 + Math.random() * 180,
+              col: cols[i % cols.length]
+            });
+          }
+          if (!rafId) {
+            lastMs = 0;
+            rafId = requestAnimationFrame(burstFrame);
+          }
+        }
+
+        function checkboxMarkup(item, checked) {
           var stateClass = checked ? "rm-done" : "rm-todo";
           var checkedAttr = checked ? " checked" : "";
-          var popAttr = !checked && pop ? ' data-ts-status-pop="true"' : "";
           return (
             '<span class="rm-checkbox ' + stateClass + '" ' +
             'data-ts-checkbox-status="' + item.key + '" ' +
-            'data-ts-checkbox-shape="' + item.shape + '"' + popAttr + ">" +
+            'data-ts-checkbox-shape="' + item.shape + '">' +
             '<label class="check-container">' +
             '<input type="checkbox"' + checkedAttr + ' aria-label="' + item.name + '" />' +
             '<span class="checkmark"></span>' +
@@ -440,14 +684,13 @@
           var container = document.getElementById("groups-grid");
           container.innerHTML = GROUPS.map(function (group) {
             var rows = group.items.map(function (item) {
-              var hasPop = item.key === "ACTIVE";
-              var popNote = hasPop ? '<span class="pop-badge">pop</span>' : "";
               return (
-                '<div class="status-row">' +
-                checkboxMarkup(item, false, hasPop) +
-                checkboxMarkup(item, true, false) +
-                '<span class="status-name">' + item.name + popNote + "</span>" +
+                '<div class="status-row" data-status-row="' + item.key + '">' +
+                checkboxMarkup(item, false) +
+                checkboxMarkup(item, true) +
+                '<span class="status-name">' + item.name + "</span>" +
                 pillMarkup(item) +
+                '<button type="button" class="burst-btn" data-burst-key="' + item.key + '" title="Play ' + item.name + ' burst">Burst</button>' +
                 "</div>"
               );
             }).join("");
@@ -455,20 +698,30 @@
               '<section class="group-card">' +
               "<h2>" + group.title + "</h2>" +
               '<div class="status-row status-row-header">' +
-              "<span>Open</span><span>Done</span><span>Status</span><span>Pill</span>" +
+              '<span>Open</span><span>Done</span><span>Status</span><span>Pill</span><span class="burst-col-head">FX</span>' +
               "</div>" +
               rows +
               "</section>"
             );
           }).join("");
+
+          container.querySelectorAll("[data-burst-key]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+              var key = btn.getAttribute("data-burst-key");
+              var item = ALL_ITEMS.find(function (it) { return it.key === key; });
+              var row = btn.closest(".status-row");
+              var cb = row && row.querySelector(".rm-checkbox.rm-todo");
+              if (item && cb) triggerBurstForItem(item, cb);
+            });
+          });
         }
 
         function renderChooserAndSettingsPreview() {
           var chooserHost = document.getElementById("chooser-preview");
           var sampleChooser = [
-            { group: "task", items: GROUPS[0].items.slice(0, 4) },
-            { group: "media", items: GROUPS[1].items.slice(0, 3) },
-            { group: "extra", items: GROUPS[2].items.slice(0, 3) }
+            { heading: "Task status", items: [GROUPS[0].items[0], GROUPS[0].items[1], GROUPS[0].items[5], GROUPS[0].items[6]] },
+            { heading: "Media", items: [GROUPS[1].items[0], GROUPS[1].items[2]] },
+            { heading: "Extra", items: [GROUPS[2].items[1], GROUPS[2].items[7], GROUPS[2].items[9]] }
           ];
           var digit = 1;
           var listItems = [];
@@ -476,15 +729,17 @@
             if (idx > 0) {
               listItems.push('<li class="bp3-menu-divider ts-status-choice-divider" role="separator"></li>');
             }
+            listItems.push('<li class="ts-status-choice-heading" role="presentation">' + section.heading + "</li>");
             section.items.forEach(function (item) {
               var isCurrent = item.key === "WAITING";
-              var glyphAttr = item.glyph ? ' data-ts-status-glyph="' + item.glyph + '"' : "";
               var hint = digit <= 9 ? '<span class="ts-status-choice-shortcut bp3-menu-item-label" aria-hidden="true">' + digit + "</span>" : "";
               digit += 1;
               listItems.push(
                 '<li><a class="ts-status-choice bp3-menu-item' + (isCurrent ? " bp3-active bp3-intent-primary" : "") + '"' +
                 (isCurrent ? ' aria-current="true"' : "") + ">" +
-                '<span class="ts-status-choice-glyph" aria-hidden="true" data-task-status-key="' + item.key + '"' + glyphAttr + "></span>" +
+                '<span class="ts-status-choice-glyph ts-status-choice-glyph--real" aria-hidden="true">' +
+                checkboxMarkup(item, false) +
+                "</span>" +
                 '<div class="ts-status-choice-label bp3-fill">' + item.name + "</div>" +
                 hint +
                 "</a></li>"
@@ -492,10 +747,16 @@
             });
           });
           listItems.push(
-            '<li><a class="ts-status-choice ts-status-choice-remove bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Remove status</div></a></li>',
+            '<li class="bp3-menu-divider ts-status-choice-divider" role="separator"></li>',
+            '<li><a class="ts-status-choice ts-status-choice-remove bp3-menu-item">' +
+            '<span class="ts-status-choice-glyph ts-status-choice-empty-wrap" aria-hidden="true"><span class="ts-status-choice-empty-icon"></span></span>' +
+            '<div class="ts-status-choice-label bp3-fill">Remove status</div>' +
+            '<span class="ts-status-choice-shortcut bp3-menu-item-label" aria-hidden="true">0</span>' +
+            "</a></li>",
             '<li class="bp3-menu-divider ts-status-choice-divider" role="separator"></li>',
             '<li><a class="ts-status-choice ts-status-choice-view bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Watching now\u2026</div></a></li>',
-            '<li><a class="ts-status-choice ts-status-choice-settings bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Settings\u2026</div></a></li>'
+            '<li><a class="ts-status-choice ts-status-choice-settings bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Settings\u2026</div></a></li>',
+            '<li class="ts-status-choice-footer" role="presentation">1\u20139 pick \u00b7 0 clear \u00b7 Esc close</li>'
           );
           chooserHost.innerHTML =
             '<div class="ts-status-chooser bp3-popover"><div class="bp3-popover-content"><ul class="ts-status-choice-list bp3-menu" role="menu">' +
@@ -503,7 +764,7 @@
             "</ul></div></div>";
 
           var previewHost = document.getElementById("settings-style-preview");
-          var previewKeys = ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "ALERT", "WATCHING"];
+          var previewKeys = ["ACTIVE", "WAITING", "ALERT", "STARRED", "KAWAII", "WATCHING"];
           var previewItems = previewKeys.map(function (key) {
             return ALL_ITEMS.find(function (item) { return item.key === key; });
           }).filter(Boolean);
@@ -512,7 +773,7 @@
             previewItems.map(function (item) {
               return (
                 '<span class="ts-style-preview-item">' +
-                checkboxMarkup(item, false, false) +
+                checkboxMarkup(item, false) +
                 '<span class="ts-style-preview-label">' + item.name + "</span>" +
                 "</span>"
               );
@@ -520,11 +781,13 @@
             "</div>";
         }
 
-        function buildStyleFrameDoc(style, theme) {
+        function buildStyleFrameDoc(style, theme, ambientOn, paused) {
           var cssHref = new URL("../../extension.css", window.location.href).href;
           var baseCss = document.getElementById("ts-gallery-base").textContent;
           var paletteCss = document.getElementById("ts-gallery-palette").textContent;
           var styleAttr = style.id === "outline" ? "" : ' data-ts-checkbox-style="' + style.id + '"';
+          var ambientAttr = ambientOn && !paused ? ' data-ts-ambient-motion="on"' : "";
+          var bodyClass = paused ? ' class="motion-paused"' : "";
           var rows = ALL_ITEMS.map(function (item) {
             return (
               '<div class="status-row" style="grid-template-columns: 24px 24px minmax(0, 1fr);">' +
@@ -535,15 +798,15 @@
             );
           }).join("");
           return (
-            '<!doctype html><html lang="en" data-ts-theme="' + theme + '"' + styleAttr + ">" +
+            '<!doctype html><html lang="en" data-ts-theme="' + theme + '"' + styleAttr + ambientAttr + ">" +
             '<head><meta charset="utf-8" />' +
             '<link rel="stylesheet" href="' + cssHref + '" />' +
             "<style>" + baseCss + "\n" + paletteCss + "\n" +
             "body { background: var(--svy-raised); padding: 12px 14px; }\n" +
             "h2 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }\n" +
-            ".status-row { min-height: 30px; }\n" +
+            ".status-row { min-height: 29.5px; }\n" +
             "</style></head>" +
-            "<body><h2>" + style.label + "</h2>" + rows + "</body></html>"
+            "<body" + bodyClass + "><h2>" + style.label + "</h2>" + rows + "</body></html>"
           );
         }
 
@@ -555,14 +818,16 @@
             card.className = "style-frame-card";
             var frame = document.createElement("iframe");
             frame.setAttribute("title", style.label + " checkbox style (" + theme + ")");
-            frame.srcdoc = buildStyleFrameDoc(style, theme);
+            frame.srcdoc = buildStyleFrameDoc(style, theme, currentAmbient, motionPaused);
             card.appendChild(frame);
             grid.appendChild(card);
           });
         }
 
         var currentTheme = "light";
-        var currentStyle = "outline";
+        var currentStyle = "glass";
+        var currentAmbient = true;
+        var motionPaused = false;
 
         function applyState() {
           document.documentElement.setAttribute("data-ts-theme", currentTheme);
@@ -571,11 +836,21 @@
           } else {
             document.documentElement.setAttribute("data-ts-checkbox-style", currentStyle);
           }
+          if (currentAmbient && !motionPaused) {
+            document.documentElement.setAttribute("data-ts-ambient-motion", "on");
+          } else {
+            document.documentElement.removeAttribute("data-ts-ambient-motion");
+          }
+          document.body.classList.toggle("motion-paused", motionPaused);
           document.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
             btn.setAttribute("aria-pressed", btn.getAttribute("data-theme-choice") === currentTheme ? "true" : "false");
           });
           document.querySelectorAll("[data-style-choice]").forEach(function (btn) {
             btn.setAttribute("aria-pressed", btn.getAttribute("data-style-choice") === currentStyle ? "true" : "false");
+          });
+          document.querySelectorAll("[data-ambient-choice]").forEach(function (btn) {
+            var isOn = btn.getAttribute("data-ambient-choice") === "on";
+            btn.setAttribute("aria-pressed", isOn === currentAmbient ? "true" : "false");
           });
           renderStyleFrames(currentTheme);
         }
@@ -585,6 +860,8 @@
         if (["outline", "glass", "solid", "minimal"].indexOf(params.get("style")) >= 0) {
           currentStyle = params.get("style");
         }
+        if (params.get("ambient") === "off" || params.get("ambient") === "0") currentAmbient = false;
+        if (params.get("motion") === "paused" || params.get("motion") === "0") motionPaused = true;
         if (params.get("section") === "statuses") document.body.classList.add("only-statuses");
         if (params.get("section") === "styles") document.body.classList.add("only-styles");
         if (params.get("toolbar") === "0") document.body.classList.add("hide-toolbar");
@@ -603,12 +880,11 @@
           });
         });
 
-        document.getElementById("replay-pop").addEventListener("click", function () {
-          var target = document.querySelector('#groups-grid .rm-checkbox[data-ts-checkbox-status="ACTIVE"].rm-todo');
-          if (!target) return;
-          target.removeAttribute("data-ts-status-pop");
-          void target.offsetWidth;
-          target.setAttribute("data-ts-status-pop", "true");
+        document.querySelectorAll("[data-ambient-choice]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            currentAmbient = btn.getAttribute("data-ambient-choice") === "on";
+            applyState();
+          });
         });
 
         renderMainGroups();

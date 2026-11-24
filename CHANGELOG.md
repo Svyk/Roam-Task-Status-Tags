@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0 - 2026-11-24
+
+- Port BetterTask for Thymer status icon artwork, Neon Glass / Vivid Solid / Minimal Crisp preset styles, ambient icon animations, canvas transition bursts, and picker styling under the MIT License with author permission. See `THIRD_PARTY_NOTICES.md`.
+- Map the Glass, Solid, and Minimal checkbox styles to the upstream Neon Glass, Vivid Solid, and Minimal Crisp presets in both light and dark modes. Outline keeps the v0.14.0 look for all built-in statuses.
+- Keep unmapped statuses (In Review, Holding, Incubating, the media statuses, and custom statuses) cohesive inside the same Glass, Solid, and Minimal tile language.
+- Add four new opt-in extra statuses (**Kawaii**, **Flower**, **Sun**, **Moon**) alongside the earlier seven. **Add more statuses** in settings now offers all eleven.
+- Replace the Important flag icon with the rose-coral exclamation badge across every style.
+- Add looping ambient icon animations for Glass, Solid, and Minimal, controlled by the new **Animate status icons** setting (on by default). Motion pauses under reduced motion, forced colors, and print, and stays off in Outline.
+- Add per-status canvas transition bursts when this extension sets or changes an unchecked task's status in Glass, Solid, or Minimal. Controlled by **Animate status changes**; Outline keeps its CSS pop and creates no canvas.
+- Restyle the status chooser after the BetterTask picker with small-caps group headings, full-size status icons, bold labels, right-aligned digit hints, a highlighted current row, and a keyboard shortcut footer.
+- Update the gallery fixture and regenerate light, dark, and styles screenshots.
+
 ## 0.15.0 - 2026-11-23
 
 - Add a single host theme resolver (`Follow Roam`, `Light`, `Dark`) stamped as `data-ts-theme` on `<html>`, replacing all `prefers-color-scheme` and host dark-class selectors in CSS. A dark OS no longer paints light Roam dark.
