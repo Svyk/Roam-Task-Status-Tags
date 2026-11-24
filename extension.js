@@ -2567,6 +2567,9 @@ var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
+var STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
+var STATUS_POP_RECENT_WINDOW_MS = 2e3;
+var STATUS_POP_DURATION_MS = 520;
 var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
 var HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
@@ -2885,6 +2888,7 @@ function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+  checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
 }
 function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
   if (!checkbox?.setAttribute || !decision?.statusKey) {
@@ -3032,6 +3036,138 @@ function clearOwnedStatusPillPresentations(root) {
   const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
   statusPills.forEach(clearStatusPillPresentation);
   return statusPills.length;
+}
+function createStatusPopTracker({
+  windowLike = typeof window !== "undefined" ? window : globalThis,
+  lifecycle = null,
+  recentWindowMs = STATUS_POP_RECENT_WINDOW_MS,
+  popDurationMs = STATUS_POP_DURATION_MS
+} = {}) {
+  const recentWrites = /* @__PURE__ */ new Map();
+  const activePops = /* @__PURE__ */ new Map();
+  let enabled = true;
+  let disposed = false;
+  const setTimer = (fn, delay) => (windowLike?.setTimeout || globalThis.setTimeout)(fn, delay);
+  const clearTimer = (id) => {
+    if (id == null) return;
+    (windowLike?.clearTimeout || globalThis.clearTimeout)(id);
+  };
+  function clearRecent(blockUid) {
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return;
+    clearTimer(entry.timerId);
+    recentWrites.delete(blockUid);
+  }
+  function clearPopForCheckbox(checkbox) {
+    const active = activePops.get(checkbox);
+    if (active) {
+      clearTimer(active.timerId);
+      if (active.onAnimationEnd) {
+        try {
+          checkbox?.removeEventListener?.("animationend", active.onAnimationEnd);
+        } catch (_) {
+        }
+      }
+      activePops.delete(checkbox);
+    }
+    checkbox?.removeAttribute?.(STATUS_POP_ATTRIBUTE);
+  }
+  function markWritten(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid || !statusKey) return false;
+    clearRecent(blockUid);
+    const timerId = setTimer(() => {
+      recentWrites.delete(blockUid);
+    }, recentWindowMs);
+    recentWrites.set(blockUid, { statusKey, timerId });
+    return true;
+  }
+  function hasPendingWrite(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid) return false;
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return false;
+    return !statusKey || entry.statusKey === statusKey;
+  }
+  function consumeWrite(blockUid) {
+    clearRecent(blockUid);
+  }
+  function isPopping(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox) return false;
+    const active = activePops.get(checkbox);
+    if (!active) return false;
+    return !statusKey || active.statusKey === statusKey;
+  }
+  function triggerPop(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox?.setAttribute || !statusKey) return false;
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    clearPopForCheckbox(checkbox);
+    checkbox.setAttribute(STATUS_POP_ATTRIBUTE, "true");
+    const finish = () => clearPopForCheckbox(checkbox);
+    const onAnimationEnd = (event) => {
+      if (event?.animationName && !String(event.animationName).startsWith("ts-status-pop-")) {
+        return;
+      }
+      finish();
+    };
+    const timerId = setTimer(finish, popDurationMs);
+    activePops.set(checkbox, { timerId, statusKey, onAnimationEnd });
+    try {
+      checkbox.addEventListener?.("animationend", onAnimationEnd);
+    } catch (_) {
+    }
+    return true;
+  }
+  function restorePopAttributeIfActive(checkbox, statusKey) {
+    if (!isPopping(checkbox, statusKey)) {
+      if (activePops.has(checkbox)) clearPopForCheckbox(checkbox);
+      return false;
+    }
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    checkbox.setAttribute?.(STATUS_POP_ATTRIBUTE, "true");
+    return true;
+  }
+  function clearAll() {
+    for (const uid of [...recentWrites.keys()]) clearRecent(uid);
+    for (const checkbox of [...activePops.keys()]) clearPopForCheckbox(checkbox);
+  }
+  function setEnabled(nextValue) {
+    enabled = Boolean(nextValue);
+    if (!enabled) clearAll();
+  }
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearAll();
+  }
+  lifecycle?.add?.(dispose);
+  return {
+    get enabled() {
+      return enabled;
+    },
+    get pendingCount() {
+      return recentWrites.size;
+    },
+    get activeCount() {
+      return activePops.size;
+    },
+    setEnabled,
+    markWritten,
+    hasPendingWrite,
+    consumeWrite,
+    isPopping,
+    triggerPop,
+    restorePopAttributeIfActive,
+    clearPopForCheckbox,
+    clearAll,
+    dispose
+  };
 }
 
 // src/status-peek.js
@@ -4018,7 +4154,11 @@ function resolveChooserDigitAction(event, { activeElement = null, statusActions 
   }
   return null;
 }
-function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERSION }) {
+function createTaskStatusExtension({
+  extensionAPI,
+  runtimeVersion = BUNDLED_VERSION,
+  lifecycle = null
+}) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const STATUS_PILL_SELECTOR = [
     'span.rm-page-ref[data-tag^="task-status/"]',
@@ -4048,6 +4188,7 @@ function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERS
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
+    statusChangeAnimation: "task-status-change-animation",
     repeatCarryOver: "task-status-repeat-carry-over",
     followUpPrompt: "task-status-follow-up-prompt"
   };
@@ -4130,6 +4271,15 @@ function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERS
     true
   );
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
+  let statusChangeAnimationEnabled = loadBooleanSetting(
+    SETTINGS_KEYS.statusChangeAnimation,
+    true
+  );
+  const statusPopTracker = createStatusPopTracker({
+    windowLike: window,
+    lifecycle
+  });
+  statusPopTracker.setEnabled(statusChangeAnimationEnabled);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
   let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
@@ -4893,6 +5043,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const blockStringsByUid = /* @__PURE__ */ new Map();
     const textHelpers = getTextHelpers();
     const keptEpisodeCounters = /* @__PURE__ */ new Set();
+    const consumedPopUids = /* @__PURE__ */ new Set();
     pills.forEach((pill) => {
       const tagTitle = pill.getAttribute?.("data-tag");
       const statusKey = pill.getAttribute?.("data-task-status-key");
@@ -4918,10 +5069,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         blockString: blockStringsByUid.get(blockUid),
         textHelpers
       });
+      if (presentation?.annotated && presentation.checkbox) {
+        if (statusChangeAnimationEnabled && statusPopTracker.hasPendingWrite(blockUid, presentation.statusKey)) {
+          if (statusPopTracker.triggerPop(presentation.checkbox, presentation.statusKey)) {
+            consumedPopUids.add(blockUid);
+          }
+        } else {
+          statusPopTracker.restorePopAttributeIfActive(
+            presentation.checkbox,
+            presentation.statusKey
+          );
+        }
+      }
       if (presentation?.managed && EPISODE_GLYPHS.includes(getStatusGlyph(statusKey))) {
         episodeCounter.sync({ pill, uid: blockUid, kept: keptEpisodeCounters });
       }
     });
+    consumedPopUids.forEach((uid) => statusPopTracker.consumeWrite(uid));
     episodeCounter.sweep(scope, keptEpisodeCounters);
     statusPeekController?.refresh?.();
   }
@@ -4934,6 +5098,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       refreshStatusVisuals(document);
       statusPeekController?.setEnabled?.(isStatusPeekEnabled());
     } else {
+      statusPopTracker.clearAll();
       clearOwnedStatusPillPresentations(document);
       statusPeekController?.setEnabled?.(false);
       clearOwnedStatusCheckboxes(document);
@@ -4953,6 +5118,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
     refreshStatusVisuals(document);
+  }
+  function setStatusChangeAnimationEnabled(nextValue) {
+    statusChangeAnimationEnabled = normalizeBooleanSetting(
+      nextValue,
+      statusChangeAnimationEnabled
+    );
+    statusPopTracker.setEnabled(statusChangeAnimationEnabled);
   }
   function setFollowUpPromptEnabled(nextValue) {
     followUpPromptEnabled = normalizeBooleanSetting(nextValue, followUpPromptEnabled);
@@ -5278,6 +5450,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         });
       }
       if (outcome?.status === "updated") {
+        if (statusKey !== null && statusChangeAnimationEnabled && checkboxStylingEnabled) {
+          statusPopTracker.markWritten(blockUid, statusKey);
+          const alreadyRendered = Array.from(
+            document.querySelectorAll?.(
+              `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}="${cssStatusKeySelector(statusKey)}"][${CHECKBOX_UID_ATTRIBUTE}="${cssString(blockUid)}"]`
+            ) || []
+          );
+          if (alreadyRendered.length) {
+            let popped = false;
+            alreadyRendered.forEach((checkbox) => {
+              if (statusPopTracker.triggerPop(checkbox, statusKey)) popped = true;
+            });
+            if (popped) statusPopTracker.consumeWrite(blockUid);
+          }
+        }
         publishChange(blockUid, statusKey);
         if (statusKey !== null) repeatStatusReset.sync();
       }
@@ -7034,6 +7221,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.statusChangeAnimation,
+          name: "Animate status changes",
+          description: "Plays a short pop and ring when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+          action: {
+            type: "switch",
+            onChange: (value) => setStatusChangeAnimationEnabled(value)
+          }
+        },
+        {
           id: SETTINGS_KEYS.followUpPrompt,
           name: "Ask for a follow-up date on Waiting / In Review",
           description: "Asks when to check back after you pick Waiting or In Review in the chooser, and sets the task's due date in place. Needs Better Tasks.",
@@ -7138,6 +7334,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusView?.dispose();
     statusView = null;
     stopStatusPillObserver();
+    statusPopTracker.dispose();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
@@ -7190,7 +7387,7 @@ async function onload({ extensionAPI, extension }) {
   }
   const lifecycle = createLifecycle();
   const runtimeVersion = resolveTaskStatusRuntimeVersion(extension?.version);
-  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion });
+  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion, lifecycle });
   const runtime = Object.freeze({
     version: runtimeVersion,
     dispose: () => lifecycle.dispose()

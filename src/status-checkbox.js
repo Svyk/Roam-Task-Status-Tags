@@ -3,6 +3,9 @@ export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 export const CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
+export const STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
+export const STATUS_POP_RECENT_WINDOW_MS = 2000;
+export const STATUS_POP_DURATION_MS = 520;
 export const OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 export const MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
 export const HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
@@ -395,6 +398,7 @@ export function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+  checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
 }
 
 export function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
@@ -583,4 +587,154 @@ export function clearOwnedStatusPillPresentations(root) {
   const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
   statusPills.forEach(clearStatusPillPresentation);
   return statusPills.length;
+}
+
+export function createStatusPopTracker({
+  windowLike = typeof window !== "undefined" ? window : globalThis,
+  lifecycle = null,
+  recentWindowMs = STATUS_POP_RECENT_WINDOW_MS,
+  popDurationMs = STATUS_POP_DURATION_MS,
+} = {}) {
+  const recentWrites = new Map();
+  const activePops = new Map();
+  let enabled = true;
+  let disposed = false;
+
+  const setTimer = (fn, delay) =>
+    (windowLike?.setTimeout || globalThis.setTimeout)(fn, delay);
+  const clearTimer = (id) => {
+    if (id == null) return;
+    (windowLike?.clearTimeout || globalThis.clearTimeout)(id);
+  };
+
+  function clearRecent(blockUid) {
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return;
+    clearTimer(entry.timerId);
+    recentWrites.delete(blockUid);
+  }
+
+  function clearPopForCheckbox(checkbox) {
+    const active = activePops.get(checkbox);
+    if (active) {
+      clearTimer(active.timerId);
+      if (active.onAnimationEnd) {
+        try {
+          checkbox?.removeEventListener?.("animationend", active.onAnimationEnd);
+        } catch (_) {}
+      }
+      activePops.delete(checkbox);
+    }
+    checkbox?.removeAttribute?.(STATUS_POP_ATTRIBUTE);
+  }
+
+  function markWritten(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid || !statusKey) return false;
+    clearRecent(blockUid);
+    const timerId = setTimer(() => {
+      recentWrites.delete(blockUid);
+    }, recentWindowMs);
+    recentWrites.set(blockUid, { statusKey, timerId });
+    return true;
+  }
+
+  function hasPendingWrite(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid) return false;
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return false;
+    return !statusKey || entry.statusKey === statusKey;
+  }
+
+  function consumeWrite(blockUid) {
+    clearRecent(blockUid);
+  }
+
+  function isPopping(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox) return false;
+    const active = activePops.get(checkbox);
+    if (!active) return false;
+    return !statusKey || active.statusKey === statusKey;
+  }
+
+  function triggerPop(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox?.setAttribute || !statusKey) return false;
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    clearPopForCheckbox(checkbox);
+    checkbox.setAttribute(STATUS_POP_ATTRIBUTE, "true");
+
+    const finish = () => clearPopForCheckbox(checkbox);
+    const onAnimationEnd = (event) => {
+      if (
+        event?.animationName &&
+        !String(event.animationName).startsWith("ts-status-pop-")
+      ) {
+        return;
+      }
+      finish();
+    };
+    const timerId = setTimer(finish, popDurationMs);
+    activePops.set(checkbox, { timerId, statusKey, onAnimationEnd });
+    try {
+      checkbox.addEventListener?.("animationend", onAnimationEnd);
+    } catch (_) {}
+    return true;
+  }
+
+  function restorePopAttributeIfActive(checkbox, statusKey) {
+    if (!isPopping(checkbox, statusKey)) {
+      if (activePops.has(checkbox)) clearPopForCheckbox(checkbox);
+      return false;
+    }
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    checkbox.setAttribute?.(STATUS_POP_ATTRIBUTE, "true");
+    return true;
+  }
+
+  function clearAll() {
+    for (const uid of [...recentWrites.keys()]) clearRecent(uid);
+    for (const checkbox of [...activePops.keys()]) clearPopForCheckbox(checkbox);
+  }
+
+  function setEnabled(nextValue) {
+    enabled = Boolean(nextValue);
+    if (!enabled) clearAll();
+  }
+
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearAll();
+  }
+
+  lifecycle?.add?.(dispose);
+
+  return {
+    get enabled() {
+      return enabled;
+    },
+    get pendingCount() {
+      return recentWrites.size;
+    },
+    get activeCount() {
+      return activePops.size;
+    },
+    setEnabled,
+    markWritten,
+    hasPendingWrite,
+    consumeWrite,
+    isPopping,
+    triggerPop,
+    restorePopAttributeIfActive,
+    clearPopForCheckbox,
+    clearAll,
+    dispose,
+  };
 }

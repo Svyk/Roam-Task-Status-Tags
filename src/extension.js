@@ -42,6 +42,7 @@ import {
 import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
   CHECKBOX_UID_ATTRIBUTE,
@@ -49,6 +50,7 @@ import {
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
+  createStatusPopTracker,
   getStatusCheckboxShape,
   getStatusGroup,
   isMediaStatus,
@@ -564,7 +566,11 @@ export function resolveChooserDigitAction(
   return null;
 }
 
-function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERSION }) {
+function createTaskStatusExtension({
+  extensionAPI,
+  runtimeVersion = BUNDLED_VERSION,
+  lifecycle = null,
+}) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const STATUS_PILL_SELECTOR = [
     'span.rm-page-ref[data-tag^="task-status/"]',
@@ -598,6 +604,7 @@ function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERS
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
+    statusChangeAnimation: "task-status-change-animation",
     repeatCarryOver: "task-status-repeat-carry-over",
     followUpPrompt: "task-status-follow-up-prompt",
   };
@@ -687,6 +694,15 @@ function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERS
     true
   );
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
+  let statusChangeAnimationEnabled = loadBooleanSetting(
+    SETTINGS_KEYS.statusChangeAnimation,
+    true
+  );
+  const statusPopTracker = createStatusPopTracker({
+    windowLike: window,
+    lifecycle,
+  });
+  statusPopTracker.setEnabled(statusChangeAnimationEnabled);
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
   let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
@@ -1597,6 +1613,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const blockStringsByUid = new Map();
     const textHelpers = getTextHelpers();
     const keptEpisodeCounters = new Set();
+    const consumedPopUids = new Set();
 
     pills.forEach((pill) => {
       const tagTitle = pill.getAttribute?.("data-tag");
@@ -1626,10 +1643,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         blockString: blockStringsByUid.get(blockUid),
         textHelpers,
       });
+      if (presentation?.annotated && presentation.checkbox) {
+        if (
+          statusChangeAnimationEnabled &&
+          statusPopTracker.hasPendingWrite(blockUid, presentation.statusKey)
+        ) {
+          if (statusPopTracker.triggerPop(presentation.checkbox, presentation.statusKey)) {
+            consumedPopUids.add(blockUid);
+          }
+        } else {
+          statusPopTracker.restorePopAttributeIfActive(
+            presentation.checkbox,
+            presentation.statusKey
+          );
+        }
+      }
       if (presentation?.managed && EPISODE_GLYPHS.includes(getStatusGlyph(statusKey))) {
         episodeCounter.sync({ pill, uid: blockUid, kept: keptEpisodeCounters });
       }
     });
+    consumedPopUids.forEach((uid) => statusPopTracker.consumeWrite(uid));
     episodeCounter.sweep(scope, keptEpisodeCounters);
     statusPeekController?.refresh?.();
   }
@@ -1648,6 +1681,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       statusPeekController?.setEnabled?.(isStatusPeekEnabled());
     } else {
       // Restore readable metadata before removing either alternate visual cue.
+      statusPopTracker.clearAll();
       clearOwnedStatusPillPresentations(document);
       statusPeekController?.setEnabled?.(false);
       clearOwnedStatusCheckboxes(document);
@@ -1669,6 +1703,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setAlertBeaconEnabled(nextValue) {
     alertBeaconEnabled = normalizeBooleanSetting(nextValue, alertBeaconEnabled);
     refreshStatusVisuals(document);
+  }
+
+  function setStatusChangeAnimationEnabled(nextValue) {
+    statusChangeAnimationEnabled = normalizeBooleanSetting(
+      nextValue,
+      statusChangeAnimationEnabled
+    );
+    statusPopTracker.setEnabled(statusChangeAnimationEnabled);
   }
 
   function setFollowUpPromptEnabled(nextValue) {
@@ -2059,6 +2101,21 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         });
       }
       if (outcome?.status === "updated") {
+        if (statusKey !== null && statusChangeAnimationEnabled && checkboxStylingEnabled) {
+          statusPopTracker.markWritten(blockUid, statusKey);
+          const alreadyRendered = Array.from(
+            document.querySelectorAll?.(
+              `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}="${cssStatusKeySelector(statusKey)}"][${CHECKBOX_UID_ATTRIBUTE}="${cssString(blockUid)}"]`
+            ) || []
+          );
+          if (alreadyRendered.length) {
+            let popped = false;
+            alreadyRendered.forEach((checkbox) => {
+              if (statusPopTracker.triggerPop(checkbox, statusKey)) popped = true;
+            });
+            if (popped) statusPopTracker.consumeWrite(blockUid);
+          }
+        }
         publishChange(blockUid, statusKey);
         if (statusKey !== null) repeatStatusReset.sync();
       }
@@ -4131,6 +4188,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.statusChangeAnimation,
+          name: "Animate status changes",
+          description:
+            "Plays a short pop and ring when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+          action: {
+            type: "switch",
+            onChange: (value) => setStatusChangeAnimationEnabled(value),
+          },
+        },
+        {
           id: SETTINGS_KEYS.followUpPrompt,
           name: "Ask for a follow-up date on Waiting / In Review",
           description:
@@ -4255,6 +4322,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusView?.dispose();
     statusView = null;
     stopStatusPillObserver();
+    statusPopTracker.dispose();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
@@ -4316,7 +4384,7 @@ export async function onload({ extensionAPI, extension }) {
 
   const lifecycle = createLifecycle();
   const runtimeVersion = resolveTaskStatusRuntimeVersion(extension?.version);
-  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion });
+  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion, lifecycle });
   const runtime = Object.freeze({
     version: runtimeVersion,
     dispose: () => lifecycle.dispose(),

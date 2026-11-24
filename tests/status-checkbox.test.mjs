@@ -12,6 +12,7 @@ import {
   EXTRA_STATUS_SHAPES,
   HIDDEN_STATUS_PILL_ATTRIBUTE,
   MANAGED_STATUS_PILL_ATTRIBUTE,
+  STATUS_POP_ATTRIBUTE,
   applyStatusCheckboxAnnotation,
   applyManagedStatusPillPresentation,
   buildStatusCheckboxColors,
@@ -23,6 +24,7 @@ import {
   clearStatusPillPresentation,
   contrastRatio,
   countExactStatusTagOccurrences,
+  createStatusPopTracker,
   decideStatusCheckboxAnnotation,
   deriveAccessibleAccent,
   findSiblingTaskCheckbox,
@@ -998,4 +1000,95 @@ test("owned pill cleanup is idempotent, view-local, and preserves foreign attrib
 
   clearStatusPillPresentation(first);
   assert.equal(first.getAttribute("data-foreign-owner"), "keep");
+});
+
+test("status pop tracker sets attribute only after marked write, clears on timeout/animationend, ignores checked or disabled, and releases timers on dispose", () => {
+  const timers = new Map();
+  let nextId = 1;
+  const fakeWindow = {
+    setTimeout(fn, delay) {
+      const id = nextId++;
+      timers.set(id, { fn, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
+  };
+  const disposers = [];
+  const lifecycle = { add: (fn) => disposers.push(fn) };
+  const tracker = createStatusPopTracker({
+    windowLike: fakeWindow,
+    lifecycle,
+    recentWindowMs: 2000,
+    popDurationMs: 520,
+  });
+
+  const render = taskRender();
+  const listeners = new Map();
+  render.checkbox.addEventListener = (type, fn) => listeners.set(type, fn);
+  render.checkbox.removeEventListener = (type, fn) => {
+    if (listeners.get(type) === fn) listeners.delete(type);
+  };
+
+  // Unmarked block has no pending write
+  assert.equal(tracker.hasPendingWrite("uid1", "ACTIVE"), false);
+
+  // Mark written and trigger pop on unchecked checkbox
+  assert.equal(tracker.markWritten("uid1", "WAITING"), true);
+  assert.equal(tracker.hasPendingWrite("uid1", "WAITING"), true);
+  assert.equal(tracker.hasPendingWrite("uid1", "ACTIVE"), false);
+  assert.equal(tracker.pendingCount, 1);
+  assert.equal(timers.size, 1);
+
+  assert.equal(tracker.triggerPop(render.checkbox, "WAITING"), true);
+  tracker.consumeWrite("uid1");
+  assert.equal(tracker.pendingCount, 0);
+  assert.equal(tracker.activeCount, 1);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), "true");
+
+  // Timeout clears attribute and timer
+  assert.equal(timers.size, 1);
+  const [[popTimerId, popTimer]] = [...timers.entries()];
+  assert.equal(popTimer.delay, 520);
+  popTimer.fn();
+  timers.delete(popTimerId);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), null);
+  assert.equal(tracker.activeCount, 0);
+  assert.equal(listeners.size, 0);
+
+  // animationend clears early
+  assert.equal(tracker.triggerPop(render.checkbox, "ACTIVE"), true);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), "true");
+  listeners.get("animationend")({ animationName: "ts-status-pop-ring" });
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), null);
+  assert.equal(timers.size, 0);
+
+  // Checked checkbox never pops
+  render.input.checked = true;
+  assert.equal(tracker.triggerPop(render.checkbox, "ACTIVE"), false);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), null);
+  render.input.checked = false;
+
+  // Disabled setting clears and prevents pops
+  tracker.markWritten("uid2", "ALERT");
+  tracker.triggerPop(render.checkbox, "ALERT");
+  tracker.setEnabled(false);
+  assert.equal(tracker.pendingCount, 0);
+  assert.equal(tracker.activeCount, 0);
+  assert.equal(timers.size, 0);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), null);
+  assert.equal(tracker.markWritten("uid2", "ALERT"), false);
+  assert.equal(tracker.triggerPop(render.checkbox, "ALERT"), false);
+
+  // Lifecycle dispose releases every timer and clears map
+  tracker.setEnabled(true);
+  tracker.markWritten("uid3", "ACTIVE");
+  tracker.triggerPop(render.checkbox, "ACTIVE");
+  assert.equal(timers.size, 2);
+  disposers.forEach((fn) => fn());
+  assert.equal(timers.size, 0);
+  assert.equal(tracker.pendingCount, 0);
+  assert.equal(tracker.activeCount, 0);
+  assert.equal(render.checkbox.getAttribute(STATUS_POP_ATTRIBUTE), null);
 });

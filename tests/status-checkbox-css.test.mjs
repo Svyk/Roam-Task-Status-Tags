@@ -483,3 +483,31 @@ test("hover lift, active press, forbidden selectors, and static Solid on-accent 
     }
   }
 });
+
+test("status-change pop CSS is unchecked-only, non-looping, owned-scoped, and guarded for reduced motion, forced colors, and print", () => {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const popHeaders = [
+    ...stripped.matchAll(/([^{}@]*data-ts-status-pop[^{}@]*)\{/g),
+  ].map((match) => match[1].trim());
+  assert.ok(popHeaders.length >= 2, "expected status pop CSS rules");
+  for (const header of popHeaders) {
+    for (const selector of header.split(",").map((s) => s.trim()).filter(Boolean)) {
+      if (!selector.includes("data-ts-status-pop")) continue;
+      assert.match(
+        selector,
+        /\.rm-checkbox\.rm-todo\[data-ts-checkbox-status\]\[data-ts-status-pop="true"\]/,
+        `pop selector must require .rm-checkbox.rm-todo and owned status: ${selector}`
+      );
+      assert.doesNotMatch(selector, /rm-done|input:checked/);
+      if (selector.includes(".checkmark")) {
+        assert.match(selector, /input:not\(:checked\)\s*~\s*\.checkmark/);
+      }
+    }
+  }
+  assert.match(css, /@keyframes ts-status-pop-scale/);
+  assert.match(css, /@keyframes ts-status-pop-ring/);
+  assert.doesNotMatch(css, /ts-status-pop-(?:scale|ring)[^;]*infinite/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
+  assert.match(css, /@media \(forced-colors: active\)[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
+  assert.match(css, /@media print[\s\S]*?data-ts-status-pop="true"[\s\S]*?animation: none !important/);
+});

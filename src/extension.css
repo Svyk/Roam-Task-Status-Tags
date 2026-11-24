@@ -413,6 +413,60 @@
   }
 }
 
+/*
+ * One-shot status-change pop for extension writes only (unchecked tasks only).
+ * Animates only transform and opacity so layout never shifts.
+ */
+.rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  will-change: transform;
+  animation: ts-status-pop-scale 380ms cubic-bezier(0.22, 1.35, 0.36, 1) 1;
+}
+
+.rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+  > .check-container::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  box-sizing: border-box;
+  border: 2px solid var(--ts-checkbox-accent);
+  border-radius: 7px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.84);
+  transform-origin: center;
+  will-change: opacity, transform;
+  animation: ts-status-pop-ring 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 1 forwards;
+}
+
+@keyframes ts-status-pop-scale {
+  0% {
+    transform: scale(0.84);
+  }
+  48% {
+    transform: scale(1.18);
+  }
+  76% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ts-status-pop-ring {
+  0% {
+    opacity: 0.82;
+    transform: scale(0.86);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.56);
+  }
+}
+
 .rm-checkbox[data-ts-checkbox-shape="cancelled"] {
   --ts-checkbox-glyph-width: 9px;
   --ts-checkbox-glyph-height: 9px;
@@ -756,9 +810,18 @@
   }
 
   .rm-checkbox[data-ts-alert-beacon="true"]
+    > .check-container::before,
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
     > .check-container::before {
     animation: none !important;
     opacity: 0 !important;
+  }
+
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+    > .check-container
+    > input:not(:checked)
+    ~ .checkmark {
+    animation: none !important;
   }
 }
 
@@ -848,9 +911,18 @@
   }
 
   .rm-checkbox[data-ts-alert-beacon="true"]
+    > .check-container::before,
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
     > .check-container::before {
     animation: none !important;
     opacity: 0 !important;
+  }
+
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+    > .check-container
+    > input:not(:checked)
+    ~ .checkmark {
+    animation: none !important;
   }
 
   .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {
@@ -1804,10 +1876,19 @@ a.rm-page-ref[data-task-status-key]:hover {
 
   span.rm-page-ref[data-ts-alert-beacon="true"],
   a.rm-page-ref[data-ts-alert-beacon="true"],
-  .rm-checkbox[data-ts-alert-beacon="true"] > .check-container::before {
+  .rm-checkbox[data-ts-alert-beacon="true"] > .check-container::before,
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+    > .check-container::before {
     animation: none !important;
     outline-color: transparent !important;
     opacity: 0 !important;
+  }
+
+  .rm-checkbox.rm-todo[data-ts-checkbox-status][data-ts-status-pop="true"]
+    > .check-container
+    > input:not(:checked)
+    ~ .checkmark {
+    animation: none !important;
   }
 }
 

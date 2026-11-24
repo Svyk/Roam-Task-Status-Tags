@@ -267,6 +267,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
           "task-status-style-native-checkboxes",
           "task-status-label-display",
           "task-status-alert-beacon",
+          "task-status-change-animation",
           "task-status-follow-up-prompt",
           "task-status-repeat-carry-over",
           "task-status-status-names",
@@ -368,6 +369,14 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(alertBeaconSetting.action.type, "switch");
       alertBeaconSetting.action.onChange(false);
       alertBeaconSetting.action.onChange(true);
+
+      const popSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-change-animation"
+      );
+      assert.equal(popSetting.name, "Animate status changes");
+      assert.equal(popSetting.action.type, "switch");
+      popSetting.action.onChange(false);
+      popSetting.action.onChange(true);
       assert.equal(graphWriteCalls, 0);
 
       ownedCheckbox.setAttribute("data-ts-checkbox-status", "ALERT");
@@ -412,6 +421,228 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       console.info = originalConsoleInfo;
     }
   } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+    globalThis.MutationObserver = originalMutationObserver;
+  }
+});
+
+test("status-change pop triggers only on extension writes, respects setting off, and releases timers on cleanup", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const originalMutationObserver = globalThis.MutationObserver;
+
+  class PopFakeElement extends FakeElement {
+    constructor(tagName = "div") {
+      super(tagName);
+      this.nodeType = 1;
+      this.parentElement = null;
+      this.checked = false;
+    }
+    append(...nodes) {
+      for (const node of nodes) {
+        node.parentNode = this;
+        node.parentElement = this;
+        node.isConnected = true;
+        this.children.push(node);
+      }
+    }
+    matches(selector) {
+      return selector.split(",").map((s) => s.trim()).some((part) => {
+        if (part === 'span.rm-page-ref[data-tag^="task-status/"]') {
+          return this.tagName === "SPAN" && this.classList.contains("rm-page-ref") && String(this.getAttribute("data-tag") || "").startsWith("task-status/");
+        }
+        if (part === "span.rm-page-ref[data-task-status-key]") {
+          return this.tagName === "SPAN" && this.classList.contains("rm-page-ref") && this.attributes.has("data-task-status-key");
+        }
+        if (part === ".rm-checkbox") return this.classList.contains("rm-checkbox");
+        if (part === ".rm-checkbox[data-ts-checkbox-status]") {
+          return this.classList.contains("rm-checkbox") && this.attributes.has("data-ts-checkbox-status");
+        }
+        if (part === "[data-ts-managed-status-pill]") return this.attributes.has("data-ts-managed-status-pill");
+        if (part === 'input[type="checkbox"]') return this.tagName === "INPUT" && this.getAttribute("type") === "checkbox";
+        if (part === ".checkmark") return this.classList.contains("checkmark");
+        if (part === "[data-uid]") return this.attributes.has("data-uid");
+        if (part === ".rm-block__input") return this.classList.contains("rm-block__input");
+        if (part.startsWith(".rm-checkbox[data-ts-checkbox-status=\"")) {
+          const m = part.match(/data-ts-checkbox-status="([^"]+)"\]\[data-ts-checkbox-block-uid="([^"]+)"/);
+          return Boolean(
+            m &&
+              this.classList.contains("rm-checkbox") &&
+              this.getAttribute("data-ts-checkbox-status") === m[1] &&
+              this.getAttribute("data-ts-checkbox-block-uid") === m[2]
+          );
+        }
+        return false;
+      });
+    }
+    closest(selector) {
+      let cur = this;
+      while (cur) {
+        if (cur.matches?.(selector)) return cur;
+        cur = cur.parentElement;
+      }
+      return null;
+    }
+  }
+
+  const document = new FakeDocument();
+  document.body = new PopFakeElement("body");
+  document.head = new PopFakeElement("head");
+  document.documentElement = new PopFakeElement("html");
+  document.body.isConnected = true;
+  document.head.isConnected = true;
+  document.documentElement.isConnected = true;
+  document.createElement = (name) => new PopFakeElement(name);
+
+  let blockString = "{{[[TODO]]}} #[[task-status/Active]] Ship pop";
+  const blockEl = new PopFakeElement("div");
+  blockEl.className = "rm-block__input";
+  blockEl.setAttribute("data-uid", "popuid123");
+  const checkbox = new PopFakeElement("span");
+  checkbox.className = "rm-checkbox rm-todo";
+  const label = new PopFakeElement("label");
+  label.className = "check-container";
+  const input = new PopFakeElement("input");
+  input.setAttribute("type", "checkbox");
+  input.checked = false;
+  const checkmark = new PopFakeElement("span");
+  checkmark.className = "checkmark";
+  label.append(input, checkmark);
+  checkbox.append(label);
+  const pill = new PopFakeElement("span");
+  pill.className = "rm-page-ref";
+  pill.setAttribute("data-tag", "task-status/Active");
+  blockEl.append(checkbox, pill);
+  document.body.append(blockEl);
+
+  const timers = new Map();
+  let nextTimerId = 1;
+  const fakeSetTimeout = (fn, delay = 0) => {
+    const id = nextTimerId++;
+    timers.set(id, { fn, delay });
+    return id;
+  };
+  const fakeClearTimeout = (id) => {
+    timers.delete(id);
+  };
+
+  const observers = [];
+  class PopMutationObserver {
+    constructor(cb) {
+      this.cb = cb;
+      this.targets = [];
+      observers.push(this);
+    }
+    observe(target, opts) { this.targets.push({ target, opts }); }
+    disconnect() {}
+  }
+
+  const noopApi = { addCommand: async () => {}, removeCommand: async () => {} };
+  const windowLike = new EventTarget();
+  Object.assign(windowLike, {
+    document,
+    CSS: { supports: () => true },
+    React: { createElement: () => null },
+    getComputedStyle: () => ({ backgroundColor: "rgb(255, 255, 255)", color: "rgb(20, 184, 166)" }),
+    setTimeout: fakeSetTimeout,
+    clearTimeout: fakeClearTimeout,
+    requestAnimationFrame: (cb) => fakeSetTimeout(cb, 0),
+    cancelAnimationFrame: fakeClearTimeout,
+    innerWidth: 1280,
+    innerHeight: 800,
+    roamAlphaAPI: {
+      data: {
+        pull: () => ({ ":block/uid": "popuid123", ":block/string": blockString }),
+        async: { pull: async () => ({ ":block/uid": "popuid123", ":block/string": blockString }) },
+        block: {
+          update: async ({ block }) => {
+            blockString = block.string;
+          },
+        },
+      },
+      ui: {
+        commandPalette: noopApi,
+        blockContextMenu: noopApi,
+        msContextMenu: noopApi,
+      },
+    },
+  });
+
+  globalThis.window = windowLike;
+  globalThis.document = document;
+  globalThis.MutationObserver = PopMutationObserver;
+
+  let panelConfig = null;
+  const extensionAPI = {
+    settings: {
+      get: () => null,
+      set: async () => {},
+      panel: { create: async (cfg) => { panelConfig = cfg; } },
+    },
+    ui: { commandPalette: noopApi, slashCommand: noopApi },
+  };
+
+  let mod = null;
+  try {
+    mod = await import(`../src/extension.js?pop=${Date.now()}`);
+    await mod.onload({ extensionAPI, extension: { version: "0.15.0" } });
+
+    // Initial render claims checkbox without popping
+    assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "ACTIVE");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+
+    const bodyObserver = observers.find((o) =>
+      o.targets.some((t) => t.target === document.body && t.opts?.subtree === true)
+    );
+    assert.ok(bodyObserver, "pill observer should be registered on document.body");
+
+    // Manual edit / observer mutation without extension write never pops
+    blockString = "{{[[TODO]]}} #[[task-status/Holding]] Ship pop";
+    pill.setAttribute("data-tag", "task-status/Holding");
+    bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
+    assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "HOLDING");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+
+    // Extension write via public API triggers pop once Roam re-renders
+    const writeRes = await windowLike.RoamTaskStatusTags.setStatus("popuid123", "Waiting");
+    assert.equal(writeRes.status, "updated");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+
+    pill.setAttribute("data-tag", "task-status/Waiting");
+    bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
+    assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "WAITING");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), "true");
+
+    // Running the pop timeout clears the attribute
+    const popTimerEntry = [...timers.entries()].find(([, t]) => t.delay === 520);
+    assert.ok(popTimerEntry, "expected pop cleanup timeout");
+    popTimerEntry[1].fn();
+    timers.delete(popTimerEntry[0]);
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+
+    // Turning the setting off prevents future pops
+    const popSetting = panelConfig.settings.find((s) => s.id === "task-status-change-animation");
+    popSetting.action.onChange(false);
+    const writeOff = await windowLike.RoamTaskStatusTags.setStatus("popuid123", "Alert");
+    assert.equal(writeOff.status, "updated");
+    pill.setAttribute("data-tag", "task-status/Alert");
+    bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
+    assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "ALERT");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+
+    // Re-enable, start a pop, then onunload releases all timers and clears attribute
+    popSetting.action.onChange(true);
+    await windowLike.RoamTaskStatusTags.setStatus("popuid123", "Active");
+    pill.setAttribute("data-tag", "task-status/Active");
+    bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), "true");
+
+    await mod.onunload();
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+    assert.equal(timers.size, 0);
+  } finally {
+    await mod?.onunload?.();
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;
     globalThis.MutationObserver = originalMutationObserver;
