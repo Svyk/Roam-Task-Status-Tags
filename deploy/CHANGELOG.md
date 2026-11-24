@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0 - 2026-11-23
+
+- Add a single host theme resolver (`Follow Roam`, `Light`, `Dark`) stamped as `data-ts-theme` on `<html>`, replacing all `prefers-color-scheme` and host dark-class selectors in CSS. A dark OS no longer paints light Roam dark.
+- Add three opt-in checkbox styles (**Glass**, **Solid**, **Minimal**) alongside the default **Outline**, powered by `--ts-checkbox-ink` and contrast-checked `--ts-checkbox-on-accent`. Outline sets no attribute so existing installs keep the same appearance.
+- Add seven opt-in extra statuses (**Important**, **Starred**, **Discuss**, **Billable**, **Bug**, **Draft**, **Deadline**) via the **Add more statuses** button in settings. Each has a new 10x10 SVG mask glyph, by-name glyph lookup, and a third section in the chooser. Cycling stays on task statuses only.
+- The three new styles and seven extra statuses are modelled on [BetterTask for Thymer](https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task) by imhalid, re-implemented without its code or artwork.
+- Add number keys in the status chooser: `1` to `9` pick the first nine displayed statuses (with muted digit hints on those rows), and `0` picks Remove status. Digits are ignored while focus is in an input or date field.
+- Reorder the settings panel, add an **About** row with the running version and README link, remove `Print Help`, and remove all `console.log` and `console.info` output from the bundle.
+- Add `tests/fixtures/depot-gallery.html` and rewrite the top of `README.md` for Roam Depot.
+
 ## 0.14.0 — 2026-11-11
 
 - New read-only **Watching now** panel: open tasks grouped by status, each row showing the task, its status icon, and its episode (`S2E5`) when it has an `Episode::` block. An unreadable or duplicate `Episode::` shows `?`.

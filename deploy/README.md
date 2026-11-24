@@ -1,12 +1,28 @@
 # Roam Task Status Tags
 
-Roam Task Status Tags keeps Roam's native `{{[[TODO]]}}` behavior and adds one managed status tag on the same line.
-
-Example:
+Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's native `{{[[TODO]]}}` and `{{[[DONE]]}}` checkboxes intact. Each status is stored as a single `#[[task-status/<Name>]]` tag on the task line, so Roam queries, backlinks, and exports continue to work. Unchecked checkboxes show a color-and-shape icon in your choice of four styles (Outline, Glass, Solid, or Minimal), and checked tasks return to your Roam theme.
 
 ```text
 {{[[TODO]]}} #[[task-status/Active]] Call landlord about repairs
 ```
+
+![Task Status Tags statuses in light mode](https://raw.githubusercontent.com/Svyk/Roam-Task-Status-Tags/master/docs/images/statuses-light.png)
+
+![Task Status Tags statuses in dark mode](https://raw.githubusercontent.com/Svyk/Roam-Task-Status-Tags/master/docs/images/statuses-dark.png)
+
+![Task Status Tags checkbox styles](https://raw.githubusercontent.com/Svyk/Roam-Task-Status-Tags/master/docs/images/styles.png)
+
+## Quick Start
+
+1. Open any block with a `{{[[TODO]]}}` checkbox.
+2. Type `/task status: Active` or run `Task Status: Set Active` from the command palette.
+3. Hover or focus the styled checkbox to reveal its status label in the left gutter.
+4. Click the revealed label (or press `Enter` / `Alt+ArrowDown`) to open the chooser, then press `1` to `9` to pick a status or `0` to clear it.
+5. Open `Settings -> Extensions -> Task Status Tags` to pick a theme, choose a checkbox style, or click **Add more statuses** to add seven extra statuses.
+
+Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
+
+The three new checkbox styles (Glass, Solid, Minimal) and seven opt-in extra statuses (Important, Starred, Discuss, Billable, Bug, Draft, Deadline) are modelled on [BetterTask for Thymer](https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task) by imhalid, re-implemented without its code or artwork.
 
 ## Key Idea
 

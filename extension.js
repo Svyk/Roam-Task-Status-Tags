@@ -1,4 +1,4 @@
-/* Roam Task Status Tags v0.14.0 | generated; edit src/ */
+/* Roam Task Status Tags v0.15.0 | generated; edit src/ */
 
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
@@ -3605,7 +3605,7 @@ function createStatusPeekController({
 
 // src/extension.js
 var GLOBAL_KEY = "__svyk_roamTaskStatusTags";
-var BUNDLED_VERSION = true ? "0.14.0" : "development";
+var BUNDLED_VERSION = true ? "0.15.0" : "development";
 function resolveTaskStatusRuntimeVersion(extensionVersion) {
   const reported = typeof extensionVersion === "string" ? extensionVersion.trim() : "";
   return reported && reported.toUpperCase() !== "DEV" ? reported : BUNDLED_VERSION;
