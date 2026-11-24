@@ -4,11 +4,14 @@
 
 - Add a single host theme resolver (`Follow Roam`, `Light`, `Dark`) stamped as `data-ts-theme` on `<html>`, replacing all `prefers-color-scheme` and host dark-class selectors in CSS. A dark OS no longer paints light Roam dark.
 - Add three opt-in checkbox styles (**Glass**, **Solid**, **Minimal**) alongside the default **Outline**, powered by `--ts-checkbox-ink` and contrast-checked `--ts-checkbox-on-accent`. Outline sets no attribute so existing installs keep the same appearance.
+- Add a quick hover lift and active press on owned unchecked checkboxes using transform only, disabled for reduced motion.
+- Add a short status-change pop (scale overshoot and expanding ring) when this extension sets or changes an unchecked task's status. Turn it on or off with **Animate status changes** in settings. It stays off for reduced motion, forced colors, print, and checked tasks.
 - Add seven opt-in extra statuses (**Important**, **Starred**, **Discuss**, **Billable**, **Bug**, **Draft**, **Deadline**) via the **Add more statuses** button in settings. Each has a new 10x10 SVG mask glyph, by-name glyph lookup, and a third section in the chooser. Cycling stays on task statuses only.
 - The three new styles and seven extra statuses are modelled on [BetterTask for Thymer](https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task) by imhalid, re-implemented without its code or artwork.
-- Add number keys in the status chooser: `1` to `9` pick the first nine displayed statuses (with muted digit hints on those rows), and `0` picks Remove status. Digits are ignored while focus is in an input or date field.
-- Reorder the settings panel, add an **About** row with the running version and README link, remove `Print Help`, and remove all `console.log` and `console.info` output from the bundle.
-- Add `tests/fixtures/depot-gallery.html` and rewrite the top of `README.md` for Roam Depot.
+- Show each status's colored glyph in a left column inside the chooser, with quiet group dividers and number keys (`1` to `9` pick the first nine displayed statuses, `0` removes status). Digits are ignored while focus is in an input or date field.
+- Add a **Settings…** item at the bottom of the chooser and a `Task Status: Open settings` command palette command when Roam's Depot settings API is available.
+- Reorder the settings panel, add a live **Style preview** row under **Checkbox style**, add an **About** row with the running version and README link, remove `Print Help`, and remove all `console.log` and `console.info` output from the bundle.
+- Add `tests/fixtures/depot-gallery.html` and update `README.md` for Roam Depot.
 
 ## 0.14.0 — 2026-11-11
 

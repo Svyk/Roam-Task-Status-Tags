@@ -216,55 +216,100 @@
       }
 
       body.only-statuses .styles-section,
+      body.only-statuses .extras-preview-section,
       body.only-styles .statuses-section,
+      body.only-styles .extras-preview-section,
       body.hide-toolbar .toolbar {
         display: none;
       }
+
+      .preview-showcase {
+        display: grid;
+        grid-template-columns: minmax(220px, 240px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      @media (max-width: 720px) {
+        .preview-showcase { grid-template-columns: 1fr; }
+      }
+
+      .preview-showcase .ts-status-chooser.bp3-popover {
+        position: static;
+        display: inline-block;
+        max-width: 100%;
+      }
+
+      .preview-card {
+        border: 1px solid var(--svy-border-subtle);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: var(--svy-raised);
+      }
+
+      .preview-card h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--svy-text-muted);
+      }
+
+      .pop-badge {
+        margin-left: 6px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        color: var(--svy-text-muted);
+        background: var(--svy-surface);
+        border: 1px solid var(--svy-border-subtle);
+      }
     </style>
     <style id="ts-gallery-palette">
-      span.rm-page-ref[data-task-status-key="ACTIVE"], .ts-status-pill-preview[data-task-status-key="ACTIVE"] { --ts-status-bg-light: rgba(20, 184, 166, 0.1); --ts-status-fg-light: rgb(13, 116, 104); --ts-status-border-light: rgba(17, 155, 139, 0.48); --ts-status-bg-dark: rgba(20, 184, 166, 0.2); --ts-status-fg-dark: rgb(68, 198, 184); --ts-status-border-dark: rgba(20, 184, 166, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="ACTIVE"] { --ts-checkbox-accent-light: rgb(17, 155, 139); --ts-checkbox-accent-dark: rgb(20, 184, 166); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(20, 184, 166, 0.09); --ts-checkbox-wash-dark: rgba(20, 184, 166, 0.16); --ts-checkbox-beacon-light: rgba(17, 155, 139, 0.52); --ts-checkbox-beacon-dark: rgba(20, 184, 166, 0.68); }
-      span.rm-page-ref[data-task-status-key="WAITING"], .ts-status-pill-preview[data-task-status-key="WAITING"] { --ts-status-bg-light: rgba(234, 179, 8, 0.1); --ts-status-fg-light: rgb(131, 100, 4); --ts-status-border-light: rgba(172, 132, 6, 0.48); --ts-status-bg-dark: rgba(234, 179, 8, 0.2); --ts-status-fg-dark: rgb(234, 179, 8); --ts-status-border-dark: rgba(234, 179, 8, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="WAITING"] { --ts-checkbox-accent-light: rgb(172, 132, 6); --ts-checkbox-accent-dark: rgb(234, 179, 8); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(234, 179, 8, 0.09); --ts-checkbox-wash-dark: rgba(234, 179, 8, 0.16); --ts-checkbox-beacon-light: rgba(172, 132, 6, 0.52); --ts-checkbox-beacon-dark: rgba(234, 179, 8, 0.68); }
-      span.rm-page-ref[data-task-status-key="IN_REVIEW"], .ts-status-pill-preview[data-task-status-key="IN_REVIEW"] { --ts-status-bg-light: rgba(14, 165, 233, 0.1); --ts-status-fg-light: rgb(9, 109, 154); --ts-status-border-light: rgba(12, 146, 207, 0.48); --ts-status-bg-dark: rgba(14, 165, 233, 0.2); --ts-status-fg-dark: rgb(76, 188, 239); --ts-status-border-dark: rgba(14, 165, 233, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="IN_REVIEW"] { --ts-checkbox-accent-light: rgb(12, 146, 207); --ts-checkbox-accent-dark: rgb(14, 165, 233); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(14, 165, 233, 0.09); --ts-checkbox-wash-dark: rgba(14, 165, 233, 0.16); --ts-checkbox-beacon-light: rgba(12, 146, 207, 0.52); --ts-checkbox-beacon-dark: rgba(14, 165, 233, 0.68); }
-      span.rm-page-ref[data-task-status-key="HOLDING"], .ts-status-pill-preview[data-task-status-key="HOLDING"] { --ts-status-bg-light: rgba(148, 163, 184, 0.1); --ts-status-fg-light: rgb(95, 104, 118); --ts-status-border-light: rgba(126, 139, 157, 0.48); --ts-status-bg-dark: rgba(148, 163, 184, 0.2); --ts-status-fg-dark: rgb(169, 181, 198); --ts-status-border-dark: rgba(148, 163, 184, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="HOLDING"] { --ts-checkbox-accent-light: rgb(126, 139, 157); --ts-checkbox-accent-dark: rgb(148, 163, 184); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(148, 163, 184, 0.09); --ts-checkbox-wash-dark: rgba(148, 163, 184, 0.16); --ts-checkbox-beacon-light: rgba(126, 139, 157, 0.52); --ts-checkbox-beacon-dark: rgba(148, 163, 184, 0.68); }
-      span.rm-page-ref[data-task-status-key="INCUBATING"], .ts-status-pill-preview[data-task-status-key="INCUBATING"] { --ts-status-bg-light: rgba(99, 102, 241, 0.1); --ts-status-fg-light: rgb(84, 86, 203); --ts-status-border-light: rgba(99, 102, 241, 0.48); --ts-status-bg-dark: rgba(99, 102, 241, 0.2); --ts-status-fg-dark: rgb(158, 160, 246); --ts-status-border-dark: rgba(100, 103, 241, 0.62); }
+      span.rm-page-ref[data-task-status-key="ACTIVE"], .ts-status-pill-preview[data-task-status-key="ACTIVE"], .ts-status-choice-glyph[data-task-status-key="ACTIVE"] { --ts-status-bg-light: rgba(20, 184, 166, 0.1); --ts-status-fg-light: rgb(13, 116, 104); --ts-status-border-light: rgba(17, 155, 139, 0.48); --ts-status-bg-dark: rgba(20, 184, 166, 0.2); --ts-status-fg-dark: rgb(68, 198, 184); --ts-status-border-dark: rgba(20, 184, 166, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="ACTIVE"] { --ts-checkbox-accent-light: rgb(17, 155, 139); --ts-checkbox-accent-dark: rgb(20, 184, 166); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(20, 184, 166, 0.09); --ts-checkbox-wash-dark: rgba(20, 184, 166, 0.16); --ts-checkbox-beacon-light: rgba(17, 155, 139, 0.52); --ts-checkbox-beacon-dark: rgba(20, 184, 166, 0.68); }
+      span.rm-page-ref[data-task-status-key="WAITING"], .ts-status-pill-preview[data-task-status-key="WAITING"], .ts-status-choice-glyph[data-task-status-key="WAITING"] { --ts-status-bg-light: rgba(234, 179, 8, 0.1); --ts-status-fg-light: rgb(131, 100, 4); --ts-status-border-light: rgba(172, 132, 6, 0.48); --ts-status-bg-dark: rgba(234, 179, 8, 0.2); --ts-status-fg-dark: rgb(234, 179, 8); --ts-status-border-dark: rgba(234, 179, 8, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="WAITING"] { --ts-checkbox-accent-light: rgb(172, 132, 6); --ts-checkbox-accent-dark: rgb(234, 179, 8); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(234, 179, 8, 0.09); --ts-checkbox-wash-dark: rgba(234, 179, 8, 0.16); --ts-checkbox-beacon-light: rgba(172, 132, 6, 0.52); --ts-checkbox-beacon-dark: rgba(234, 179, 8, 0.68); }
+      span.rm-page-ref[data-task-status-key="IN_REVIEW"], .ts-status-pill-preview[data-task-status-key="IN_REVIEW"], .ts-status-choice-glyph[data-task-status-key="IN_REVIEW"] { --ts-status-bg-light: rgba(14, 165, 233, 0.1); --ts-status-fg-light: rgb(9, 109, 154); --ts-status-border-light: rgba(12, 146, 207, 0.48); --ts-status-bg-dark: rgba(14, 165, 233, 0.2); --ts-status-fg-dark: rgb(76, 188, 239); --ts-status-border-dark: rgba(14, 165, 233, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="IN_REVIEW"] { --ts-checkbox-accent-light: rgb(12, 146, 207); --ts-checkbox-accent-dark: rgb(14, 165, 233); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(14, 165, 233, 0.09); --ts-checkbox-wash-dark: rgba(14, 165, 233, 0.16); --ts-checkbox-beacon-light: rgba(12, 146, 207, 0.52); --ts-checkbox-beacon-dark: rgba(14, 165, 233, 0.68); }
+      span.rm-page-ref[data-task-status-key="HOLDING"], .ts-status-pill-preview[data-task-status-key="HOLDING"], .ts-status-choice-glyph[data-task-status-key="HOLDING"] { --ts-status-bg-light: rgba(148, 163, 184, 0.1); --ts-status-fg-light: rgb(95, 104, 118); --ts-status-border-light: rgba(126, 139, 157, 0.48); --ts-status-bg-dark: rgba(148, 163, 184, 0.2); --ts-status-fg-dark: rgb(169, 181, 198); --ts-status-border-dark: rgba(148, 163, 184, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="HOLDING"] { --ts-checkbox-accent-light: rgb(126, 139, 157); --ts-checkbox-accent-dark: rgb(148, 163, 184); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(148, 163, 184, 0.09); --ts-checkbox-wash-dark: rgba(148, 163, 184, 0.16); --ts-checkbox-beacon-light: rgba(126, 139, 157, 0.52); --ts-checkbox-beacon-dark: rgba(148, 163, 184, 0.68); }
+      span.rm-page-ref[data-task-status-key="INCUBATING"], .ts-status-pill-preview[data-task-status-key="INCUBATING"], .ts-status-choice-glyph[data-task-status-key="INCUBATING"] { --ts-status-bg-light: rgba(99, 102, 241, 0.1); --ts-status-fg-light: rgb(84, 86, 203); --ts-status-border-light: rgba(99, 102, 241, 0.48); --ts-status-bg-dark: rgba(99, 102, 241, 0.2); --ts-status-fg-dark: rgb(158, 160, 246); --ts-status-border-dark: rgba(100, 103, 241, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="INCUBATING"] { --ts-checkbox-accent-light: rgb(99, 102, 241); --ts-checkbox-accent-dark: rgb(100, 103, 241); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(99, 102, 241, 0.09); --ts-checkbox-wash-dark: rgba(99, 102, 241, 0.16); --ts-checkbox-beacon-light: rgba(99, 102, 241, 0.52); --ts-checkbox-beacon-dark: rgba(100, 103, 241, 0.68); }
-      span.rm-page-ref[data-task-status-key="ALERT"], .ts-status-pill-preview[data-task-status-key="ALERT"] { --ts-status-bg-light: rgba(244, 63, 94, 0.1); --ts-status-fg-light: rgb(184, 48, 71); --ts-status-border-light: rgba(244, 63, 94, 0.48); --ts-status-bg-dark: rgba(244, 63, 94, 0.2); --ts-status-fg-dark: rgb(248, 130, 150); --ts-status-border-dark: rgba(244, 63, 94, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="ALERT"] { --ts-checkbox-accent-light: rgb(244, 63, 94); --ts-checkbox-accent-dark: rgb(244, 63, 94); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(244, 63, 94, 0.09); --ts-checkbox-wash-dark: rgba(244, 63, 94, 0.16); --ts-checkbox-beacon-light: rgba(244, 63, 94, 0.52); --ts-checkbox-beacon-dark: rgba(244, 63, 94, 0.68); }
-      span.rm-page-ref[data-task-status-key="CANCELLED"], .ts-status-pill-preview[data-task-status-key="CANCELLED"] { --ts-status-bg-light: rgba(30, 41, 59, 0.1); --ts-status-fg-light: rgb(30, 41, 59); --ts-status-border-light: rgba(30, 41, 59, 0.48); --ts-status-bg-dark: rgba(30, 41, 59, 0.2); --ts-status-fg-dark: rgb(145, 150, 159); --ts-status-border-dark: rgba(113, 120, 131, 0.62); }
+      span.rm-page-ref[data-task-status-key="ALERT"], .ts-status-pill-preview[data-task-status-key="ALERT"], .ts-status-choice-glyph[data-task-status-key="ALERT"] { --ts-status-bg-light: rgba(244, 63, 94, 0.1); --ts-status-fg-light: rgb(184, 48, 71); --ts-status-border-light: rgba(244, 63, 94, 0.48); --ts-status-bg-dark: rgba(244, 63, 94, 0.2); --ts-status-fg-dark: rgb(248, 130, 150); --ts-status-border-dark: rgba(244, 63, 94, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="ALERT"] { --ts-checkbox-accent-light: rgb(244, 63, 94); --ts-checkbox-accent-dark: rgb(244, 63, 94); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(244, 63, 94, 0.09); --ts-checkbox-wash-dark: rgba(244, 63, 94, 0.16); --ts-checkbox-beacon-light: rgba(244, 63, 94, 0.52); --ts-checkbox-beacon-dark: rgba(244, 63, 94, 0.68); }
+      span.rm-page-ref[data-task-status-key="CANCELLED"], .ts-status-pill-preview[data-task-status-key="CANCELLED"], .ts-status-choice-glyph[data-task-status-key="CANCELLED"] { --ts-status-bg-light: rgba(30, 41, 59, 0.1); --ts-status-fg-light: rgb(30, 41, 59); --ts-status-border-light: rgba(30, 41, 59, 0.48); --ts-status-bg-dark: rgba(30, 41, 59, 0.2); --ts-status-fg-dark: rgb(145, 150, 159); --ts-status-border-dark: rgba(113, 120, 131, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="CANCELLED"] { --ts-checkbox-accent-light: rgb(30, 41, 59); --ts-checkbox-accent-dark: rgb(113, 120, 131); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(30, 41, 59, 0.09); --ts-checkbox-wash-dark: rgba(30, 41, 59, 0.16); --ts-checkbox-beacon-light: rgba(30, 41, 59, 0.52); --ts-checkbox-beacon-dark: rgba(113, 120, 131, 0.68); }
-      span.rm-page-ref[data-task-status-key="SERIES"], .ts-status-pill-preview[data-task-status-key="SERIES"] { --ts-status-bg-light: rgba(192, 38, 211, 0.1); --ts-status-fg-light: rgb(165, 33, 181); --ts-status-border-light: rgba(192, 38, 211, 0.48); --ts-status-bg-dark: rgba(192, 38, 211, 0.2); --ts-status-fg-dark: rgb(218, 127, 229); --ts-status-border-dark: rgba(195, 49, 213, 0.62); }
+      span.rm-page-ref[data-task-status-key="SERIES"], .ts-status-pill-preview[data-task-status-key="SERIES"], .ts-status-choice-glyph[data-task-status-key="SERIES"] { --ts-status-bg-light: rgba(192, 38, 211, 0.1); --ts-status-fg-light: rgb(165, 33, 181); --ts-status-border-light: rgba(192, 38, 211, 0.48); --ts-status-bg-dark: rgba(192, 38, 211, 0.2); --ts-status-fg-dark: rgb(218, 127, 229); --ts-status-border-dark: rgba(195, 49, 213, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="SERIES"] { --ts-checkbox-accent-light: rgb(192, 38, 211); --ts-checkbox-accent-dark: rgb(195, 49, 213); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(192, 38, 211, 0.09); --ts-checkbox-wash-dark: rgba(192, 38, 211, 0.16); --ts-checkbox-beacon-light: rgba(192, 38, 211, 0.52); --ts-checkbox-beacon-dark: rgba(195, 49, 213, 0.68); }
-      span.rm-page-ref[data-task-status-key="MOVIE"], .ts-status-pill-preview[data-task-status-key="MOVIE"] { --ts-status-bg-light: rgba(249, 115, 22, 0.1); --ts-status-fg-light: rgb(165, 76, 15); --ts-status-border-light: rgba(222, 103, 20, 0.48); --ts-status-bg-dark: rgba(249, 115, 22, 0.2); --ts-status-fg-dark: rgb(250, 148, 77); --ts-status-border-dark: rgba(249, 115, 22, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="MOVIE"] { --ts-checkbox-accent-light: rgb(222, 103, 20); --ts-checkbox-accent-dark: rgb(249, 115, 22); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(249, 115, 22, 0.09); --ts-checkbox-wash-dark: rgba(249, 115, 22, 0.16); --ts-checkbox-beacon-light: rgba(222, 103, 20, 0.52); --ts-checkbox-beacon-dark: rgba(249, 115, 22, 0.68); }
-      span.rm-page-ref[data-task-status-key="WATCHING"], .ts-status-pill-preview[data-task-status-key="WATCHING"] { --ts-status-bg-light: rgba(34, 197, 94, 0.1); --ts-status-fg-light: rgb(21, 119, 57); --ts-status-border-light: rgba(27, 158, 76, 0.48); --ts-status-bg-dark: rgba(34, 197, 94, 0.2); --ts-status-fg-dark: rgb(66, 205, 117); --ts-status-border-dark: rgba(34, 197, 94, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="WATCHING"] { --ts-checkbox-accent-light: rgb(27, 158, 76); --ts-checkbox-accent-dark: rgb(34, 197, 94); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(34, 197, 94, 0.09); --ts-checkbox-wash-dark: rgba(34, 197, 94, 0.16); --ts-checkbox-beacon-light: rgba(27, 158, 76, 0.52); --ts-checkbox-beacon-dark: rgba(34, 197, 94, 0.68); }
-      span.rm-page-ref[data-task-status-key="WATCHLIST"], .ts-status-pill-preview[data-task-status-key="WATCHLIST"] { --ts-status-bg-light: rgba(236, 72, 153, 0.1); --ts-status-fg-light: rgb(175, 53, 113); --ts-status-border-light: rgba(236, 72, 153, 0.48); --ts-status-bg-dark: rgba(236, 72, 153, 0.2); --ts-status-fg-dark: rgb(242, 133, 187); --ts-status-border-dark: rgba(236, 72, 153, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="WATCHLIST"] { --ts-checkbox-accent-light: rgb(236, 72, 153); --ts-checkbox-accent-dark: rgb(236, 72, 153); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(236, 72, 153, 0.09); --ts-checkbox-wash-dark: rgba(236, 72, 153, 0.16); --ts-checkbox-beacon-light: rgba(236, 72, 153, 0.52); --ts-checkbox-beacon-dark: rgba(236, 72, 153, 0.68); }
-      span.rm-page-ref[data-task-status-key="UPCOMING"], .ts-status-pill-preview[data-task-status-key="UPCOMING"] { --ts-status-bg-light: rgba(13, 135, 242, 0.1); --ts-status-fg-light: rgb(10, 102, 183); --ts-status-border-light: rgba(13, 135, 242, 0.48); --ts-status-bg-dark: rgba(13, 135, 242, 0.2); --ts-status-fg-dark: rgb(97, 177, 247); --ts-status-border-dark: rgba(13, 135, 242, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="UPCOMING"] { --ts-checkbox-accent-light: rgb(13, 135, 242); --ts-checkbox-accent-dark: rgb(13, 135, 242); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(13, 135, 242, 0.09); --ts-checkbox-wash-dark: rgba(13, 135, 242, 0.16); --ts-checkbox-beacon-light: rgba(13, 135, 242, 0.52); --ts-checkbox-beacon-dark: rgba(13, 135, 242, 0.68); }
-      span.rm-page-ref[data-task-status-key="REWATCH"], .ts-status-pill-preview[data-task-status-key="REWATCH"] { --ts-status-bg-light: rgba(132, 204, 22, 0.1); --ts-status-fg-light: rgb(75, 116, 12); --ts-status-border-light: rgba(99, 152, 16, 0.48); --ts-status-bg-dark: rgba(132, 204, 22, 0.2); --ts-status-fg-dark: rgb(134, 205, 25); --ts-status-border-dark: rgba(132, 204, 22, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="REWATCH"] { --ts-checkbox-accent-light: rgb(99, 152, 16); --ts-checkbox-accent-dark: rgb(132, 204, 22); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(132, 204, 22, 0.09); --ts-checkbox-wash-dark: rgba(132, 204, 22, 0.16); --ts-checkbox-beacon-light: rgba(99, 152, 16, 0.52); --ts-checkbox-beacon-dark: rgba(132, 204, 22, 0.68); }
-      span.rm-page-ref[data-task-status-key="DROPPED"], .ts-status-pill-preview[data-task-status-key="DROPPED"] { --ts-status-bg-light: rgba(124, 45, 18, 0.1); --ts-status-fg-light: rgb(124, 45, 18); --ts-status-border-light: rgba(124, 45, 18, 0.48); --ts-status-bg-dark: rgba(124, 45, 18, 0.2); --ts-status-fg-dark: rgb(186, 145, 130); --ts-status-border-dark: rgba(162, 106, 87, 0.62); }
+      span.rm-page-ref[data-task-status-key="MOVIE"], .ts-status-pill-preview[data-task-status-key="MOVIE"], .ts-status-choice-glyph[data-task-status-key="MOVIE"] { --ts-status-bg-light: rgba(249, 115, 22, 0.1); --ts-status-fg-light: rgb(165, 76, 15); --ts-status-border-light: rgba(222, 103, 20, 0.48); --ts-status-bg-dark: rgba(249, 115, 22, 0.2); --ts-status-fg-dark: rgb(250, 148, 77); --ts-status-border-dark: rgba(249, 115, 22, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="MOVIE"] { --ts-checkbox-accent-light: rgb(222, 103, 20); --ts-checkbox-accent-dark: rgb(249, 115, 22); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(249, 115, 22, 0.09); --ts-checkbox-wash-dark: rgba(249, 115, 22, 0.16); --ts-checkbox-beacon-light: rgba(222, 103, 20, 0.52); --ts-checkbox-beacon-dark: rgba(249, 115, 22, 0.68); }
+      span.rm-page-ref[data-task-status-key="WATCHING"], .ts-status-pill-preview[data-task-status-key="WATCHING"], .ts-status-choice-glyph[data-task-status-key="WATCHING"] { --ts-status-bg-light: rgba(34, 197, 94, 0.1); --ts-status-fg-light: rgb(21, 119, 57); --ts-status-border-light: rgba(27, 158, 76, 0.48); --ts-status-bg-dark: rgba(34, 197, 94, 0.2); --ts-status-fg-dark: rgb(66, 205, 117); --ts-status-border-dark: rgba(34, 197, 94, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="WATCHING"] { --ts-checkbox-accent-light: rgb(27, 158, 76); --ts-checkbox-accent-dark: rgb(34, 197, 94); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(34, 197, 94, 0.09); --ts-checkbox-wash-dark: rgba(34, 197, 94, 0.16); --ts-checkbox-beacon-light: rgba(27, 158, 76, 0.52); --ts-checkbox-beacon-dark: rgba(34, 197, 94, 0.68); }
+      span.rm-page-ref[data-task-status-key="WATCHLIST"], .ts-status-pill-preview[data-task-status-key="WATCHLIST"], .ts-status-choice-glyph[data-task-status-key="WATCHLIST"] { --ts-status-bg-light: rgba(236, 72, 153, 0.1); --ts-status-fg-light: rgb(175, 53, 113); --ts-status-border-light: rgba(236, 72, 153, 0.48); --ts-status-bg-dark: rgba(236, 72, 153, 0.2); --ts-status-fg-dark: rgb(242, 133, 187); --ts-status-border-dark: rgba(236, 72, 153, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="WATCHLIST"] { --ts-checkbox-accent-light: rgb(236, 72, 153); --ts-checkbox-accent-dark: rgb(236, 72, 153); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(236, 72, 153, 0.09); --ts-checkbox-wash-dark: rgba(236, 72, 153, 0.16); --ts-checkbox-beacon-light: rgba(236, 72, 153, 0.52); --ts-checkbox-beacon-dark: rgba(236, 72, 153, 0.68); }
+      span.rm-page-ref[data-task-status-key="UPCOMING"], .ts-status-pill-preview[data-task-status-key="UPCOMING"], .ts-status-choice-glyph[data-task-status-key="UPCOMING"] { --ts-status-bg-light: rgba(13, 135, 242, 0.1); --ts-status-fg-light: rgb(10, 102, 183); --ts-status-border-light: rgba(13, 135, 242, 0.48); --ts-status-bg-dark: rgba(13, 135, 242, 0.2); --ts-status-fg-dark: rgb(97, 177, 247); --ts-status-border-dark: rgba(13, 135, 242, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="UPCOMING"] { --ts-checkbox-accent-light: rgb(13, 135, 242); --ts-checkbox-accent-dark: rgb(13, 135, 242); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(13, 135, 242, 0.09); --ts-checkbox-wash-dark: rgba(13, 135, 242, 0.16); --ts-checkbox-beacon-light: rgba(13, 135, 242, 0.52); --ts-checkbox-beacon-dark: rgba(13, 135, 242, 0.68); }
+      span.rm-page-ref[data-task-status-key="REWATCH"], .ts-status-pill-preview[data-task-status-key="REWATCH"], .ts-status-choice-glyph[data-task-status-key="REWATCH"] { --ts-status-bg-light: rgba(132, 204, 22, 0.1); --ts-status-fg-light: rgb(75, 116, 12); --ts-status-border-light: rgba(99, 152, 16, 0.48); --ts-status-bg-dark: rgba(132, 204, 22, 0.2); --ts-status-fg-dark: rgb(134, 205, 25); --ts-status-border-dark: rgba(132, 204, 22, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="REWATCH"] { --ts-checkbox-accent-light: rgb(99, 152, 16); --ts-checkbox-accent-dark: rgb(132, 204, 22); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(132, 204, 22, 0.09); --ts-checkbox-wash-dark: rgba(132, 204, 22, 0.16); --ts-checkbox-beacon-light: rgba(99, 152, 16, 0.52); --ts-checkbox-beacon-dark: rgba(132, 204, 22, 0.68); }
+      span.rm-page-ref[data-task-status-key="DROPPED"], .ts-status-pill-preview[data-task-status-key="DROPPED"], .ts-status-choice-glyph[data-task-status-key="DROPPED"] { --ts-status-bg-light: rgba(124, 45, 18, 0.1); --ts-status-fg-light: rgb(124, 45, 18); --ts-status-border-light: rgba(124, 45, 18, 0.48); --ts-status-bg-dark: rgba(124, 45, 18, 0.2); --ts-status-fg-dark: rgb(186, 145, 130); --ts-status-border-dark: rgba(162, 106, 87, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="DROPPED"] { --ts-checkbox-accent-light: rgb(124, 45, 18); --ts-checkbox-accent-dark: rgb(162, 106, 87); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(124, 45, 18, 0.09); --ts-checkbox-wash-dark: rgba(124, 45, 18, 0.16); --ts-checkbox-beacon-light: rgba(124, 45, 18, 0.52); --ts-checkbox-beacon-dark: rgba(162, 106, 87, 0.68); }
-      span.rm-page-ref[data-task-status-key="IMPORTANT"], .ts-status-pill-preview[data-task-status-key="IMPORTANT"] { --ts-status-bg-light: rgba(220, 38, 38, 0.1); --ts-status-fg-light: rgb(191, 33, 33); --ts-status-border-light: rgba(220, 38, 38, 0.48); --ts-status-bg-dark: rgba(220, 38, 38, 0.2); --ts-status-fg-dark: rgb(235, 129, 129); --ts-status-border-dark: rgba(223, 55, 55, 0.62); }
+      span.rm-page-ref[data-task-status-key="IMPORTANT"], .ts-status-pill-preview[data-task-status-key="IMPORTANT"], .ts-status-choice-glyph[data-task-status-key="IMPORTANT"] { --ts-status-bg-light: rgba(220, 38, 38, 0.1); --ts-status-fg-light: rgb(191, 33, 33); --ts-status-border-light: rgba(220, 38, 38, 0.48); --ts-status-bg-dark: rgba(220, 38, 38, 0.2); --ts-status-fg-dark: rgb(235, 129, 129); --ts-status-border-dark: rgba(223, 55, 55, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="IMPORTANT"] { --ts-checkbox-accent-light: rgb(220, 38, 38); --ts-checkbox-accent-dark: rgb(223, 55, 55); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(220, 38, 38, 0.09); --ts-checkbox-wash-dark: rgba(220, 38, 38, 0.16); --ts-checkbox-beacon-light: rgba(220, 38, 38, 0.52); --ts-checkbox-beacon-dark: rgba(223, 55, 55, 0.68); }
-      span.rm-page-ref[data-task-status-key="STARRED"], .ts-status-pill-preview[data-task-status-key="STARRED"] { --ts-status-bg-light: rgba(217, 119, 6, 0.1); --ts-status-fg-light: rgb(154, 84, 4); --ts-status-border-light: rgba(207, 114, 6, 0.48); --ts-status-bg-dark: rgba(217, 119, 6, 0.2); --ts-status-fg-dark: rgb(228, 157, 76); --ts-status-border-dark: rgba(217, 119, 6, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="STARRED"] { --ts-checkbox-accent-light: rgb(207, 114, 6); --ts-checkbox-accent-dark: rgb(217, 119, 6); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(217, 119, 6, 0.09); --ts-checkbox-wash-dark: rgba(217, 119, 6, 0.16); --ts-checkbox-beacon-light: rgba(207, 114, 6, 0.52); --ts-checkbox-beacon-dark: rgba(217, 119, 6, 0.68); }
-      span.rm-page-ref[data-task-status-key="DISCUSS"], .ts-status-pill-preview[data-task-status-key="DISCUSS"] { --ts-status-bg-light: rgba(139, 92, 246, 0.1); --ts-status-fg-light: rgb(114, 75, 202); --ts-status-border-light: rgba(139, 92, 246, 0.48); --ts-status-bg-dark: rgba(139, 92, 246, 0.2); --ts-status-fg-dark: rgb(181, 152, 249); --ts-status-border-dark: rgba(139, 92, 246, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="DISCUSS"] { --ts-checkbox-accent-light: rgb(139, 92, 246); --ts-checkbox-accent-dark: rgb(139, 92, 246); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(139, 92, 246, 0.09); --ts-checkbox-wash-dark: rgba(139, 92, 246, 0.16); --ts-checkbox-beacon-light: rgba(139, 92, 246, 0.52); --ts-checkbox-beacon-dark: rgba(139, 92, 246, 0.68); }
-      span.rm-page-ref[data-task-status-key="BILLABLE"], .ts-status-pill-preview[data-task-status-key="BILLABLE"] { --ts-status-bg-light: rgba(16, 185, 129, 0.1); --ts-status-fg-light: rgb(10, 117, 82); --ts-status-border-light: rgba(14, 157, 109, 0.48); --ts-status-bg-dark: rgba(16, 185, 129, 0.2); --ts-status-fg-dark: rgb(67, 200, 156); --ts-status-border-dark: rgba(16, 185, 129, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="BILLABLE"] { --ts-checkbox-accent-light: rgb(14, 157, 109); --ts-checkbox-accent-dark: rgb(16, 185, 129); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(16, 185, 129, 0.09); --ts-checkbox-wash-dark: rgba(16, 185, 129, 0.16); --ts-checkbox-beacon-light: rgba(14, 157, 109, 0.52); --ts-checkbox-beacon-dark: rgba(16, 185, 129, 0.68); }
-      span.rm-page-ref[data-task-status-key="BUG"], .ts-status-pill-preview[data-task-status-key="BUG"] { --ts-status-bg-light: rgba(101, 163, 13, 0.1); --ts-status-fg-light: rgb(71, 114, 9); --ts-status-border-light: rgba(95, 153, 12, 0.48); --ts-status-bg-dark: rgba(101, 163, 13, 0.2); --ts-status-fg-dark: rgb(144, 189, 80); --ts-status-border-dark: rgba(101, 163, 13, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="BUG"] { --ts-checkbox-accent-light: rgb(95, 153, 12); --ts-checkbox-accent-dark: rgb(101, 163, 13); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(101, 163, 13, 0.09); --ts-checkbox-wash-dark: rgba(101, 163, 13, 0.16); --ts-checkbox-beacon-light: rgba(95, 153, 12, 0.52); --ts-checkbox-beacon-dark: rgba(101, 163, 13, 0.68); }
-      span.rm-page-ref[data-task-status-key="DRAFT"], .ts-status-pill-preview[data-task-status-key="DRAFT"] { --ts-status-bg-light: rgba(59, 130, 246, 0.1); --ts-status-fg-light: rgb(45, 99, 187); --ts-status-border-light: rgba(59, 130, 246, 0.48); --ts-status-bg-dark: rgba(59, 130, 246, 0.2); --ts-status-fg-dark: rgb(126, 172, 249); --ts-status-border-dark: rgba(59, 130, 246, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="DRAFT"] { --ts-checkbox-accent-light: rgb(59, 130, 246); --ts-checkbox-accent-dark: rgb(59, 130, 246); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(59, 130, 246, 0.09); --ts-checkbox-wash-dark: rgba(59, 130, 246, 0.16); --ts-checkbox-beacon-light: rgba(59, 130, 246, 0.52); --ts-checkbox-beacon-dark: rgba(59, 130, 246, 0.68); }
-      span.rm-page-ref[data-task-status-key="DEADLINE"], .ts-status-pill-preview[data-task-status-key="DEADLINE"] { --ts-status-bg-light: rgba(234, 88, 12, 0.1); --ts-status-fg-light: rgb(174, 66, 9); --ts-status-border-light: rgba(234, 88, 12, 0.48); --ts-status-bg-dark: rgba(234, 88, 12, 0.2); --ts-status-fg-dark: rgb(241, 143, 92); --ts-status-border-dark: rgba(234, 88, 12, 0.62); }
-      .rm-checkbox[data-ts-checkbox-status="DEADLINE"] { --ts-checkbox-accent-light: rgb(234, 88, 12); --ts-checkbox-accent-dark: rgb(234, 88, 12); --ts-checkbox-on-accent-light: #10161a; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(234, 88, 12, 0.09); --ts-checkbox-wash-dark: rgba(234, 88, 12, 0.16); --ts-checkbox-beacon-light: rgba(234, 88, 12, 0.52); --ts-checkbox-beacon-dark: rgba(234, 88, 12, 0.68); }
-      span.rm-page-ref[data-task-status-key="CUSTOM_DEEP_WORK"], .ts-status-pill-preview[data-task-status-key="CUSTOM_DEEP_WORK"] { --ts-status-bg-light: rgba(100, 116, 139, 0.1); --ts-status-fg-light: rgb(88, 102, 122); --ts-status-border-light: rgba(100, 116, 139, 0.48); --ts-status-bg-dark: rgba(100, 116, 139, 0.2); --ts-status-fg-dark: rgb(158, 168, 183); --ts-status-border-dark: rgba(105, 121, 143, 0.62); }
+      span.rm-page-ref[data-task-status-key="STARRED"], .ts-status-pill-preview[data-task-status-key="STARRED"], .ts-status-choice-glyph[data-task-status-key="STARRED"] { --ts-status-bg-light: rgba(217, 119, 6, 0.1); --ts-status-fg-light: rgb(154, 84, 4); --ts-status-border-light: rgba(207, 114, 6, 0.48); --ts-status-bg-dark: rgba(217, 119, 6, 0.2); --ts-status-fg-dark: rgb(228, 157, 76); --ts-status-border-dark: rgba(217, 119, 6, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="STARRED"] { --ts-checkbox-accent-light: rgb(207, 114, 6); --ts-checkbox-accent-dark: rgb(217, 119, 6); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(217, 119, 6, 0.09); --ts-checkbox-wash-dark: rgba(217, 119, 6, 0.16); --ts-checkbox-beacon-light: rgba(207, 114, 6, 0.52); --ts-checkbox-beacon-dark: rgba(217, 119, 6, 0.68); }
+      span.rm-page-ref[data-task-status-key="DISCUSS"], .ts-status-pill-preview[data-task-status-key="DISCUSS"], .ts-status-choice-glyph[data-task-status-key="DISCUSS"] { --ts-status-bg-light: rgba(139, 92, 246, 0.1); --ts-status-fg-light: rgb(114, 75, 202); --ts-status-border-light: rgba(139, 92, 246, 0.48); --ts-status-bg-dark: rgba(139, 92, 246, 0.2); --ts-status-fg-dark: rgb(181, 152, 249); --ts-status-border-dark: rgba(139, 92, 246, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="DISCUSS"] { --ts-checkbox-accent-light: rgb(139, 92, 246); --ts-checkbox-accent-dark: rgb(139, 92, 246); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(139, 92, 246, 0.09); --ts-checkbox-wash-dark: rgba(139, 92, 246, 0.16); --ts-checkbox-beacon-light: rgba(139, 92, 246, 0.52); --ts-checkbox-beacon-dark: rgba(139, 92, 246, 0.68); }
+      span.rm-page-ref[data-task-status-key="BILLABLE"], .ts-status-pill-preview[data-task-status-key="BILLABLE"], .ts-status-choice-glyph[data-task-status-key="BILLABLE"] { --ts-status-bg-light: rgba(16, 185, 129, 0.1); --ts-status-fg-light: rgb(10, 117, 82); --ts-status-border-light: rgba(14, 157, 109, 0.48); --ts-status-bg-dark: rgba(16, 185, 129, 0.2); --ts-status-fg-dark: rgb(67, 200, 156); --ts-status-border-dark: rgba(16, 185, 129, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="BILLABLE"] { --ts-checkbox-accent-light: rgb(14, 157, 109); --ts-checkbox-accent-dark: rgb(16, 185, 129); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(16, 185, 129, 0.09); --ts-checkbox-wash-dark: rgba(16, 185, 129, 0.16); --ts-checkbox-beacon-light: rgba(14, 157, 109, 0.52); --ts-checkbox-beacon-dark: rgba(16, 185, 129, 0.68); }
+      span.rm-page-ref[data-task-status-key="BUG"], .ts-status-pill-preview[data-task-status-key="BUG"], .ts-status-choice-glyph[data-task-status-key="BUG"] { --ts-status-bg-light: rgba(101, 163, 13, 0.1); --ts-status-fg-light: rgb(71, 114, 9); --ts-status-border-light: rgba(95, 153, 12, 0.48); --ts-status-bg-dark: rgba(101, 163, 13, 0.2); --ts-status-fg-dark: rgb(144, 189, 80); --ts-status-border-dark: rgba(101, 163, 13, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="BUG"] { --ts-checkbox-accent-light: rgb(95, 153, 12); --ts-checkbox-accent-dark: rgb(101, 163, 13); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #10161a; --ts-checkbox-wash-light: rgba(101, 163, 13, 0.09); --ts-checkbox-wash-dark: rgba(101, 163, 13, 0.16); --ts-checkbox-beacon-light: rgba(95, 153, 12, 0.52); --ts-checkbox-beacon-dark: rgba(101, 163, 13, 0.68); }
+      span.rm-page-ref[data-task-status-key="DRAFT"], .ts-status-pill-preview[data-task-status-key="DRAFT"], .ts-status-choice-glyph[data-task-status-key="DRAFT"] { --ts-status-bg-light: rgba(59, 130, 246, 0.1); --ts-status-fg-light: rgb(45, 99, 187); --ts-status-border-light: rgba(59, 130, 246, 0.48); --ts-status-bg-dark: rgba(59, 130, 246, 0.2); --ts-status-fg-dark: rgb(126, 172, 249); --ts-status-border-dark: rgba(59, 130, 246, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="DRAFT"] { --ts-checkbox-accent-light: rgb(59, 130, 246); --ts-checkbox-accent-dark: rgb(59, 130, 246); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(59, 130, 246, 0.09); --ts-checkbox-wash-dark: rgba(59, 130, 246, 0.16); --ts-checkbox-beacon-light: rgba(59, 130, 246, 0.52); --ts-checkbox-beacon-dark: rgba(59, 130, 246, 0.68); }
+      span.rm-page-ref[data-task-status-key="DEADLINE"], .ts-status-pill-preview[data-task-status-key="DEADLINE"], .ts-status-choice-glyph[data-task-status-key="DEADLINE"] { --ts-status-bg-light: rgba(234, 88, 12, 0.1); --ts-status-fg-light: rgb(174, 66, 9); --ts-status-border-light: rgba(234, 88, 12, 0.48); --ts-status-bg-dark: rgba(234, 88, 12, 0.2); --ts-status-fg-dark: rgb(241, 143, 92); --ts-status-border-dark: rgba(234, 88, 12, 0.62); }
+      .rm-checkbox[data-ts-checkbox-status="DEADLINE"] { --ts-checkbox-accent-light: rgb(234, 88, 12); --ts-checkbox-accent-dark: rgb(234, 88, 12); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(234, 88, 12, 0.09); --ts-checkbox-wash-dark: rgba(234, 88, 12, 0.16); --ts-checkbox-beacon-light: rgba(234, 88, 12, 0.52); --ts-checkbox-beacon-dark: rgba(234, 88, 12, 0.68); }
+      span.rm-page-ref[data-task-status-key="CUSTOM_DEEP_WORK"], .ts-status-pill-preview[data-task-status-key="CUSTOM_DEEP_WORK"], .ts-status-choice-glyph[data-task-status-key="CUSTOM_DEEP_WORK"] { --ts-status-bg-light: rgba(100, 116, 139, 0.1); --ts-status-fg-light: rgb(88, 102, 122); --ts-status-border-light: rgba(100, 116, 139, 0.48); --ts-status-bg-dark: rgba(100, 116, 139, 0.2); --ts-status-fg-dark: rgb(158, 168, 183); --ts-status-border-dark: rgba(105, 121, 143, 0.62); }
       .rm-checkbox[data-ts-checkbox-status="CUSTOM_DEEP_WORK"] { --ts-checkbox-accent-light: rgb(100, 116, 139); --ts-checkbox-accent-dark: rgb(105, 121, 143); --ts-checkbox-on-accent-light: #ffffff; --ts-checkbox-on-accent-dark: #ffffff; --ts-checkbox-wash-light: rgba(100, 116, 139, 0.09); --ts-checkbox-wash-dark: rgba(100, 116, 139, 0.16); --ts-checkbox-beacon-light: rgba(100, 116, 139, 0.52); --ts-checkbox-beacon-dark: rgba(105, 121, 143, 0.68); }
     </style>
   </head>
@@ -283,17 +328,31 @@
             <button type="button" data-style-choice="solid" aria-pressed="false">Solid</button>
             <button type="button" data-style-choice="minimal" aria-pressed="false">Minimal</button>
           </div>
+          <div class="control-group" role="group" aria-label="Pop animation">
+            <button type="button" id="replay-pop">Replay pop</button>
+          </div>
         </div>
       </header>
 
       <section class="statuses-section" aria-label="All statuses">
-        <div class="section-title">All 21 statuses + custom</div>
+        <div class="section-title">All 21 statuses + custom (Active plays status-change pop on reload)</div>
         <div id="groups-grid" class="groups-grid"></div>
       </section>
 
       <section class="styles-section" aria-label="Four checkbox styles">
         <div class="section-title">Checkbox styles side by side</div>
         <div id="styles-grid" class="styles-grid"></div>
+      </section>
+
+      <section class="extras-preview-section" aria-label="Chooser and settings preview">
+        <div class="section-title">Chooser glyph column and settings style preview</div>
+        <div class="preview-showcase">
+          <div class="ts-status-portal" id="chooser-preview"></div>
+          <div class="preview-card">
+            <h2>Settings style preview</h2>
+            <div id="settings-style-preview"></div>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -350,13 +409,14 @@
           { id: "minimal", label: "Minimal" }
         ];
 
-        function checkboxMarkup(item, checked) {
+        function checkboxMarkup(item, checked, pop) {
           var stateClass = checked ? "rm-done" : "rm-todo";
           var checkedAttr = checked ? " checked" : "";
+          var popAttr = !checked && pop ? ' data-ts-status-pop="true"' : "";
           return (
             '<span class="rm-checkbox ' + stateClass + '" ' +
             'data-ts-checkbox-status="' + item.key + '" ' +
-            'data-ts-checkbox-shape="' + item.shape + '">' +
+            'data-ts-checkbox-shape="' + item.shape + '"' + popAttr + ">" +
             '<label class="check-container">' +
             '<input type="checkbox"' + checkedAttr + ' aria-label="' + item.name + '" />' +
             '<span class="checkmark"></span>' +
@@ -380,11 +440,13 @@
           var container = document.getElementById("groups-grid");
           container.innerHTML = GROUPS.map(function (group) {
             var rows = group.items.map(function (item) {
+              var hasPop = item.key === "ACTIVE";
+              var popNote = hasPop ? '<span class="pop-badge">pop</span>' : "";
               return (
                 '<div class="status-row">' +
-                checkboxMarkup(item, false) +
-                checkboxMarkup(item, true) +
-                '<span class="status-name">' + item.name + "</span>" +
+                checkboxMarkup(item, false, hasPop) +
+                checkboxMarkup(item, true, false) +
+                '<span class="status-name">' + item.name + popNote + "</span>" +
                 pillMarkup(item) +
                 "</div>"
               );
@@ -399,6 +461,63 @@
               "</section>"
             );
           }).join("");
+        }
+
+        function renderChooserAndSettingsPreview() {
+          var chooserHost = document.getElementById("chooser-preview");
+          var sampleChooser = [
+            { group: "task", items: GROUPS[0].items.slice(0, 4) },
+            { group: "media", items: GROUPS[1].items.slice(0, 3) },
+            { group: "extra", items: GROUPS[2].items.slice(0, 3) }
+          ];
+          var digit = 1;
+          var listItems = [];
+          sampleChooser.forEach(function (section, idx) {
+            if (idx > 0) {
+              listItems.push('<li class="bp3-menu-divider ts-status-choice-divider" role="separator"></li>');
+            }
+            section.items.forEach(function (item) {
+              var isCurrent = item.key === "WAITING";
+              var glyphAttr = item.glyph ? ' data-ts-status-glyph="' + item.glyph + '"' : "";
+              var hint = digit <= 9 ? '<span class="ts-status-choice-shortcut bp3-menu-item-label" aria-hidden="true">' + digit + "</span>" : "";
+              digit += 1;
+              listItems.push(
+                '<li><a class="ts-status-choice bp3-menu-item' + (isCurrent ? " bp3-active bp3-intent-primary" : "") + '"' +
+                (isCurrent ? ' aria-current="true"' : "") + ">" +
+                '<span class="ts-status-choice-glyph" aria-hidden="true" data-task-status-key="' + item.key + '"' + glyphAttr + "></span>" +
+                '<div class="ts-status-choice-label bp3-fill">' + item.name + "</div>" +
+                hint +
+                "</a></li>"
+              );
+            });
+          });
+          listItems.push(
+            '<li><a class="ts-status-choice ts-status-choice-remove bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Remove status</div></a></li>',
+            '<li class="bp3-menu-divider ts-status-choice-divider" role="separator"></li>',
+            '<li><a class="ts-status-choice ts-status-choice-view bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Watching now\u2026</div></a></li>',
+            '<li><a class="ts-status-choice ts-status-choice-settings bp3-menu-item"><div class="ts-status-choice-label bp3-fill">Settings\u2026</div></a></li>'
+          );
+          chooserHost.innerHTML =
+            '<div class="ts-status-chooser bp3-popover"><div class="bp3-popover-content"><ul class="ts-status-choice-list bp3-menu" role="menu">' +
+            listItems.join("") +
+            "</ul></div></div>";
+
+          var previewHost = document.getElementById("settings-style-preview");
+          var previewKeys = ["ACTIVE", "WAITING", "IN_REVIEW", "HOLDING", "ALERT", "WATCHING"];
+          var previewItems = previewKeys.map(function (key) {
+            return ALL_ITEMS.find(function (item) { return item.key === key; });
+          }).filter(Boolean);
+          previewHost.innerHTML =
+            '<div class="ts-style-preview">' +
+            previewItems.map(function (item) {
+              return (
+                '<span class="ts-style-preview-item">' +
+                checkboxMarkup(item, false, false) +
+                '<span class="ts-style-preview-label">' + item.name + "</span>" +
+                "</span>"
+              );
+            }).join("") +
+            "</div>";
         }
 
         function buildStyleFrameDoc(style, theme) {
@@ -484,7 +603,16 @@
           });
         });
 
+        document.getElementById("replay-pop").addEventListener("click", function () {
+          var target = document.querySelector('#groups-grid .rm-checkbox[data-ts-checkbox-status="ACTIVE"].rm-todo');
+          if (!target) return;
+          target.removeAttribute("data-ts-status-pop");
+          void target.offsetWidth;
+          target.setAttribute("data-ts-status-pop", "true");
+        });
+
         renderMainGroups();
+        renderChooserAndSettingsPreview();
         applyState();
       })();
     </script>

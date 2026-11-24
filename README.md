@@ -1,6 +1,6 @@
 # Roam Task Status Tags
 
-Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's native `{{[[TODO]]}}` and `{{[[DONE]]}}` checkboxes intact. Each status is stored as a single `#[[task-status/<Name>]]` tag on the task line, so Roam queries, backlinks, and exports continue to work. Unchecked checkboxes show a color-and-shape icon in your choice of four styles (Outline, Glass, Solid, or Minimal), and checked tasks return to your Roam theme.
+Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's native `{{[[TODO]]}}` and `{{[[DONE]]}}` checkboxes intact. Each status is stored as a single `#[[task-status/<Name>]]` tag on the task line, so Roam queries, backlinks, and exports continue to work. Unchecked checkboxes show a color-and-shape icon in your choice of four styles, and checked tasks return to your Roam theme.
 
 ```text
 {{[[TODO]]}} #[[task-status/Active]] Call landlord about repairs
@@ -18,9 +18,16 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 2. Type `/task status: Active` or run `Task Status: Set Active` from the command palette.
 3. Hover or focus the styled checkbox to reveal its status label in the left gutter.
 4. Click the revealed label (or press `Enter` / `Alt+ArrowDown`) to open the chooser, then press `1` to `9` to pick a status or `0` to clear it.
-5. Open `Settings -> Extensions -> Task Status Tags` to pick a theme, choose a checkbox style, or click **Add more statuses** to add seven extra statuses.
+5. Open **Settings…** at the bottom of the chooser (or run `Task Status: Open settings`) to pick a theme, choose a checkbox style with live preview, toggle **Animate status changes**, or click **Add more statuses** to add seven extra statuses.
 
-Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
+## Checkbox Styles
+
+- **Outline** (default): colored border and subtle tinted wash with a centered status glyph.
+- **Glass**: translucent tinted tile with a bright top highlight and a soft colored glow.
+- **Solid**: saturated app-icon tile with a top-to-bottom gradient, inner highlight, and high-contrast glyph.
+- **Minimal**: larger status glyph alone with no box, plus a faint tinted wash on hover.
+
+Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, status-change pop animation, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
 
 The three new checkbox styles (Glass, Solid, Minimal) and seven opt-in extra statuses (Important, Starred, Discuss, Billable, Bug, Draft, Deadline) are modelled on [BetterTask for Thymer](https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task) by imhalid, re-implemented without its code or artwork.
 
@@ -31,10 +38,15 @@ The three new checkbox styles (Glass, Solid, Minimal) and seven opt-in extra sta
 - Unnamespaced tags like `#[[Active]]` and old macro-style statuses are not managed by this extension.
 - Statuses are configurable in the extension settings.
 
+<details>
+<summary>Behavior &amp; Status-aware Checkboxes</summary>
+
 ## Behavior
 
 - The recommended **Checkbox only — reveal on intent** mode keeps task lines quiet at rest: only the status-aware native checkbox and task text are visible.
 - Hover or focus that checkbox to reveal a compact status control in the quiet gutter left of the current block bullet. Click it, or press `Enter` / `Alt+ArrowDown` on the focused checkbox, to open the full chooser in the same gutter without covering task text.
+- Each chooser row displays its colored status glyph in one aligned column, with muted `1` to `9` shortcut hints at the right, quiet group dividers, **Remove status** (`0`), **Watching now…**, and **Settings…** (when Roam's Depot settings API is available).
+- Owned unchecked checkboxes give a quick hover lift and active press (transform only), and play a short status-change pop (scale overshoot and expanding ring) when this extension sets or changes a status. Disable the pop anytime under **Animate status changes**.
 - Shift+click the revealed control to remove the status while keeping TODO.
 - Ordinary checkbox click and `Space` remain Roam's native complete/reopen interactions.
 - **Checkbox + status pill** mode keeps the persistent v0.4-style label and its click/Shift+click interactions.
@@ -89,7 +101,7 @@ accent, radius, and font tokens; complete light/dark fallbacks keep it usable wi
 Svy Theme. This positioning and hover path performs no graph reads.
 
 Status pills use their own paired light/dark palette with at least 4.8:1 text contrast.
-The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, diamond, or one of the media glyphs),
+The small pill marker repeats the checkbox cue (play, pause, stop, ring, exclamation, X, diamond, or one of the media/extra glyphs),
 making statuses readable by shape as well as color. Dark base colors such as Cancelled
 are automatically lightened on Svy Theme's dark canvas without changing the configured
 hue used in light mode.
@@ -126,6 +138,11 @@ the exact rendered managed-prefix tag after it has successfully styled the exact
 checkbox; later-prose tags, ambiguous renders, and query results without a proven
 checkbox remain visible.
 
+</details>
+
+<details>
+<summary>Default Statuses &amp; Usage</summary>
+
 ## Default Statuses
 
 - Active
@@ -146,17 +163,26 @@ Media statuses, listed after the task statuses:
 - Rewatch
 - Dropped
 
+Optional extra statuses (add via **Add more statuses** in settings):
+
+- Important (flag)
+- Starred (star)
+- Discuss (speech bubble)
+- Billable (coin)
+- Bug (beetle)
+- Draft (pencil)
+- Deadline (hourglass)
+
 Default order:
 
 ```text
 Active -> Waiting -> In Review -> Holding -> Incubating -> Alert -> Cancelled -> Series -> Movie -> Watching -> Watchlist -> Upcoming -> Rewatch -> Dropped
 ```
 
-Click-to-cycle and `Task Status: Cycle` walk the task statuses only; media statuses are
-set from the chooser (shown below a divider), slash commands, or the palette. A status you
-add yourself named Series, Movie, Watching, Watchlist, Upcoming, Rewatch, or Dropped gets
-the matching glyph by name, keeps its own key and colour, and is left out of click-to-cycle like the other media statuses. Existing installs get the media
-statuses once, appended at the end, unless a status with that name already exists.
+Click-to-cycle and `Task Status: Cycle` walk the task statuses only; media and extra statuses are
+set from the chooser (shown below quiet dividers), slash commands, or the palette. A status you
+add yourself named Series, Movie, Watching, Watchlist, Upcoming, Rewatch, Dropped, Important, Starred, Discuss, Billable, Bug, Draft, or Deadline gets
+the matching glyph by name, keeps its own key and colour, and is left out of click-to-cycle.
 
 You can add, rename, delete, and reorder statuses in settings.
 
@@ -171,6 +197,8 @@ Command palette and Roam hotkeys:
 - `Task Status: Set <StatusName>`
 - `Task Status: Cycle`
 - `Task Status: Remove`
+- `Task Status: Watching now`
+- `Task Status: Open settings` (shown when Roam's Depot settings API is available)
 
 Block context menu:
 
@@ -180,6 +208,11 @@ Selected blocks:
 
 - Select multiple blocks in Roam, then use a `Task Status: Set ...` command, multiselect context menu command, or the status chooser.
 - The command palette supports Roam individual multiselect and drag/blue multiselect.
+
+</details>
+
+<details>
+<summary>Better Tasks Integrations (Repeating Tasks &amp; Follow-up Dates)</summary>
 
 ## Repeating Better Tasks tasks
 
@@ -204,6 +237,11 @@ Pick **Waiting** or **In Review** in the status chooser on an open Better Tasks 
 - Arrow keys move, Enter picks, Escape cancels. Roam's shortcuts do not fire while the prompt has focus.
 - Only from the chooser, only for one task at a time, and only when Better Tasks is present. A DONE task, a plain block, or several selected blocks get no prompt.
 - Turn it off with the setting `Ask for a follow-up date on Waiting / In Review`.
+
+</details>
+
+<details>
+<summary>Episode Counter &amp; Watching Now View</summary>
 
 ## Episode counter for Series, Watching and Rewatch
 
@@ -231,13 +269,27 @@ A read-only panel that lists open tasks grouped by status.
 - It refreshes on status changes made through this extension and on episode clicks. Edits typed by hand, or completing a task in Roam, show after **Refresh** or reopening (no polling).
 - A panel docked in the right sidebar, not a query page: nothing is added to your graph, and the order, episode and filter are not tied to a query block.
 
+</details>
+
+<details>
+<summary>Settings</summary>
+
 ## Settings
 
-Open `Settings -> Extensions -> Task Status Tags`.
+Open `Settings -> Extensions -> Task Status Tags`, pick **Settings…** at the bottom of the chooser, or run `Task Status: Open settings` from the command palette.
+
+- `Theme` matches your Roam theme (`Follow Roam`, default) or forces `Light` or `Dark`.
+- `Checkbox style` selects `Outline`, `Glass`, `Solid`, or `Minimal`, with a live **Style preview** row directly underneath.
+- `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
+- `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
+- `Animate Alert status` toggles the two-beat halo on unchecked Alert tasks.
+- `Animate status changes` (on by default) toggles the short pop and expanding ring played when this extension sets or changes an unchecked task's status.
+- `Ask for a follow-up date on Waiting / In Review` (on by default) turns the follow-up date prompt on or off (needs Better Tasks).
+- `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Statuses:
 
-- Add a status.
+- Add a status, or click **Add more statuses** to append the seven optional extra statuses.
 - Edit a status name.
 - Drag the handle to reorder statuses.
 - Use the row action menu (`...`) to delete a status.
@@ -246,14 +298,15 @@ Statuses:
 - When renaming, `Yes` renames the existing `task-status/<Old>` page to `task-status/<New>`. `No` changes the configured status name without aliasing the old tag.
 - Deleting a status removes it from commands, chooser, and styling. Existing tags remain in the graph as ordinary Roam tags.
 - `Reset colors` returns all statuses to their built-in defaults.
-- `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
-- `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
-- `Ask for a follow-up date on Waiting / In Review` (on by default) turns the follow-up date prompt on or off.
-- `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Hotkeys note:
 
 - Roam binds hotkeys to command labels. If you rename a status, you may need to re-bind that `Task Status: Set ...` hotkey.
+
+</details>
+
+<details>
+<summary>Public API</summary>
 
 ## Public API
 
@@ -262,7 +315,7 @@ Other extensions can call the frozen `window.RoamTaskStatusTags` object (`apiVer
 | Member | Call | Result |
 |---|---|---|
 | `apiVersion` | — | `1` |
-| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. `glyph` is the checkbox shape id: a built-in one, `custom`, or `series`, `movie`, `watching`, `watchlist`, `upcoming`, `rewatch`, `dropped`. |
+| `statuses` | `statuses()` | Frozen array of `{ key, name, tag, glyph, light: { base, text }, dark: { base, text } }`. Re-reads settings on every call, so rename, recolour, and reorder show up without a reload. Colours are the pill colours. `glyph` is the checkbox shape id: a built-in one, `custom`, media (`series`, `movie`, `watching`, `watchlist`, `upcoming`, `rewatch`, `dropped`), or extra (`important`, `starred`, `discuss`, `billable`, `bug`, `draft`, `deadline`). |
 | `statusOf` | `statusOf(blockString)` | The status display name, or `null` when the string has no managed status tag. |
 | `setStatus` | `setStatus(uid, nameOrNull)` | Promise of `{ status, didWrite, reason? }`. `name` is the display name (`"Waiting"`, `"In Review"`); `null` clears the tag. |
 | `cycle` | `cycle(uid)` | Promise of the same result shape. |
@@ -295,6 +348,11 @@ window.addEventListener("roam-task-status-tags:ready", async () => {
   console.log(waiting.glyph, waiting.light, waiting.dark);
 });
 ```
+
+</details>
+
+<details>
+<summary>Install (Developer Extension)</summary>
 
 ## Install (Developer Extension)
 
@@ -336,6 +394,11 @@ Files:
 - `extension.js`
 - `extension.css`
 
+</details>
+
+<details>
+<summary>Development</summary>
+
 ## Development
 
 Source lives in `src/`; the pinned build emits the root and `deploy/` artifacts Roam loads.
@@ -351,10 +414,17 @@ The tests cover status text transforms, Better Tasks routing, certified writes, 
 checkbox and hidden-pill ownership, reveal timing and keyboard semantics, ARIA cleanup,
 light/dark contrast derivation, graph-read-free hover, zero-JavaScript native completion,
 current-bullet gutter placement and viewport fallbacks, scoped Svy Theme menu tokens,
-scoped observer behavior, CSS scoping and theme signals, lifecycle cleanup, build
-determinism, secret scanning, and multiselect target resolution.
+scoped observer behavior, CSS scoping and theme signals, status-change pop timing and lifecycle cleanup,
+Depot settings lookup, build determinism, secret scanning, and multiselect target resolution.
+
+</details>
+
+<details>
+<summary>Troubleshooting</summary>
 
 ## Troubleshooting
 
 - If commands or clicks behave twice, make sure you're not running another Task Status script at the same time.
 - If a DONE block elsewhere in the graph still contains a status tag, that is expected. Cleanup is intentionally local to blocks you directly toggle or edit.
+
+</details>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="bp3-light">
+<html lang="en" data-ts-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -24,7 +24,7 @@
         --svy-ff-main: Inter, ui-sans-serif, system-ui, sans-serif;
       }
 
-      :root.bp3-dark {
+      :root[data-ts-theme="dark"] {
         color-scheme: dark;
         --svy-canvas: #182026;
         --svy-surface: #202b33;
@@ -87,7 +87,7 @@
         <h2>Light · unchecked</h2>
         <div id="light-rows"></div>
       </section>
-      <section class="panel dark rm-dark-theme" aria-label="Dark mode statuses">
+      <section class="panel dark" aria-label="Dark mode statuses">
         <h2>Dark · unchecked</h2>
         <div id="dark-rows"></div>
       </section>
@@ -95,7 +95,7 @@
         <h2>Light · checked</h2>
         <div id="light-checked-rows"></div>
       </section>
-      <section class="panel dark rm-dark-theme" aria-label="Dark mode checked statuses">
+      <section class="panel dark" aria-label="Dark mode checked statuses">
         <h2>Dark · checked</h2>
         <div id="dark-checked-rows"></div>
       </section>
@@ -213,7 +213,7 @@
           </div>
           <div class="bp3-popover-content">
             <ul class="ts-status-choice-list bp3-menu" role="menu">
-              ${statuses.slice(0, 6).map(([status, , label]) => `<li><a class="ts-status-choice bp3-menu-item ${status === context.statusKey ? "bp3-active bp3-intent-primary" : ""}" role="menuitem" tabindex="0" ${status === context.statusKey ? 'aria-current="true"' : ""}><div class="ts-status-choice-label bp3-fill">${label.split(" · ")[0]}</div></a></li>`).join("")}
+              ${statuses.slice(0, 6).map(([status, , label]) => `<li><a class="ts-status-choice bp3-menu-item ${status === context.statusKey ? "bp3-active bp3-intent-primary" : ""}" role="menuitem" tabindex="0" ${status === context.statusKey ? 'aria-current="true"' : ""}><span class="ts-status-choice-glyph" aria-hidden="true" data-task-status-key="${status}"></span><div class="ts-status-choice-label bp3-fill">${label.split(" · ")[0]}</div></a></li>`).join("")}
               <li><a class="ts-status-choice ts-status-choice-remove bp3-menu-item" role="menuitem" tabindex="0"><div class="ts-status-choice-label bp3-fill">Remove status</div></a></li>
             </ul>
           </div>
@@ -254,10 +254,9 @@
 
       document.getElementById("theme-toggle").addEventListener("click", () => {
         const root = document.documentElement;
-        const dark = !root.classList.contains("bp3-dark");
-        root.classList.toggle("bp3-dark", dark);
-        root.classList.toggle("bp3-light", !dark);
-        log.textContent = dark ? "Global .bp3-dark enabled" : "Global .bp3-light enabled";
+        const dark = root.getAttribute("data-ts-theme") !== "dark";
+        root.setAttribute("data-ts-theme", dark ? "dark" : "light");
+        log.textContent = dark ? 'data-ts-theme="dark" enabled' : 'data-ts-theme="light" enabled';
       });
 
       window.addEventListener("beforeunload", () => {
