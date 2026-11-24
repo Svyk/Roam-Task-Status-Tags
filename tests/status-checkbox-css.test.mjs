@@ -342,16 +342,32 @@ function ruleBody(selectorFragment) {
 }
 
 test("each media and extra shape has a unique checkbox mask rule and pill marker rule", () => {
+  const iconDefs = new Map(
+    [...css.matchAll(/(--ts-(?:ico|svg)-[a-z0-9-]+):\s*(url\("data:image\/svg\+xml[^"]+"\))/g)].map(
+      ([, name, uri]) => [name, uri]
+    )
+  );
+  const resolveMask = (raw) => {
+    const varMatch = raw?.match(/^var\((--ts-[a-z0-9-]+)\)$/);
+    return varMatch ? iconDefs.get(varMatch[1]) || null : raw;
+  };
   const masks = new Set();
   for (const shape of [...MEDIA_SHAPES, ...EXTRA_SHAPES]) {
     const checkbox = ruleBody(`.rm-checkbox[data-ts-checkbox-shape="${shape}"] {`);
-    const mask = checkbox.match(/--ts-checkbox-glyph-mask: (url\("data:image\/svg\+xml[^"]+"\))/);
+    const mask = checkbox.match(
+      /--ts-checkbox-glyph-mask: (url\("data:image\/svg\+xml[^"]+"\)|var\(--ts-[a-z0-9-]+\))/
+    );
     assert.ok(mask, `${shape} checkbox mask`);
+    const resolvedCheckboxMask = resolveMask(mask[1]);
+    assert.ok(resolvedCheckboxMask?.startsWith('url("data:image/svg+xml'), `${shape} resolved checkbox mask`);
     assert.match(checkbox, /--ts-checkbox-glyph-width: 10px/);
     assert.match(checkbox, /--ts-checkbox-glyph-background: var\(--ts-checkbox-ink\)/);
-    masks.add(mask[1]);
+    masks.add(resolvedCheckboxMask);
     const pill = ruleBody(`[data-ts-status-glyph="${shape}"] {`);
-    assert.match(pill, /--ts-pill-marker-mask: url\("data:image\/svg\+xml/);
+    const pillMask = pill.match(
+      /--ts-pill-marker-mask: (url\("data:image\/svg\+xml[^"]+"\)|var\(--ts-[a-z0-9-]+\))/
+    );
+    assert.ok(pillMask && resolveMask(pillMask[1])?.startsWith('url("data:image/svg+xml'), `${shape} pill mask`);
     assert.match(pill, /--ts-pill-marker-background: currentColor/);
   }
   assert.equal(masks.size, MEDIA_SHAPES.length + EXTRA_SHAPES.length);
@@ -384,7 +400,7 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
 
   // Every glyph rule (data-ts-checkbox-shape) uses --ts-checkbox-ink, never --ts-checkbox-accent directly.
   const glyphRules = [
-    ...stripped.matchAll(/\.rm-checkbox\[data-ts-checkbox-shape="([^"]+)"\]\s*\{([^}]*)\}/g),
+    ...stripped.matchAll(/(?:^|\n)\.rm-checkbox\[data-ts-checkbox-shape="([^"]+)"\]\s*\{([^}]*)\}/g),
   ];
   assert.equal(glyphRules.length, 22, "expected all 21 built-in/media/extra shapes plus custom");
   for (const [, shape, body] of glyphRules) {
@@ -412,8 +428,13 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
     for (const selector of header.split(",").map((part) => part.trim()).filter(Boolean)) {
       assert.match(
         selector,
-        /\.rm-checkbox\[data-ts-checkbox-status\](?:\[[^\]]+\])*(?:\s*>\s*[^,]+)?$/,
+        /\.rm-checkbox(?:\.rm-todo)?(?:\[[^\]]+\])*\s*(?:>\s*[^,]+)?$/,
         `checkbox style selector must end on an owned checkbox or descendant: ${selector}`
+      );
+      assert.match(
+        selector,
+        /\[data-ts-checkbox-status(?:="[^"]+")?\]/,
+        `checkbox style selector must require data-ts-checkbox-status: ${selector}`
       );
     }
   }
@@ -424,6 +445,8 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-on-accent\)/);
   assert.match(css, /@media print[\s\S]*:root\[data-ts-checkbox-style\]/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*:root\[data-ts-checkbox-style\]/);
+  assert.doesNotMatch(css, /\b(?:listitem-task|line-check-div|state-done|state-started|body\.bt-on|bt-dark|bt-light|bt-preset-|bt-anim|bt-picker|--bt-)\b/);
+  assert.doesNotMatch(css, /:root\s*\{/);
 });
 
 test("hover lift, active press, forbidden selectors, and static Solid on-accent contrast are enforced", () => {
