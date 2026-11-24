@@ -240,3 +240,27 @@ Svy asked for the look to be "appealing, fun" over faithful, and for a Settings 
 Added: a live style preview row in settings (`task-status-style-preview`), a `Settings…` chooser item and a `Task Status: Open settings` command through `roamAlphaAPI.depot.openSettings({id})` (hidden when the API or the extension's own id is missing), README reference sections in `<details>`, and `docs/images/` screenshots rendered from `tests/fixtures/depot-gallery.html`.
 
 Added to the Depot checklist (section 8): after the Depot PR is opened and before it is merged, Svy installs the PR build in Roam with `roamAlphaAPI.depot.developer.install({url: "Svyk+Roam-Task-Status-Tags+<PR number>"})` and checks it. After a Pages push, `roamAlphaAPI.depot.developer.reload({id: "https://svyk.github.io/Roam-Task-Status-Tags/"})` is the first update step, then the About row for the running version.
+
+## 12. Third pass (RTS-8, 2026-11-24)
+
+The clean-room boundary in section 1 is superseded for BetterTask for Thymer (`github.com/imhalid/thymer-plugins/tree/main/plugins/better-task`, commit `cb1350d4d6b03d7939c77de2b1d99a685f093e66`). The author (imhalid) confirmed MIT license permission to Svyatoslav Kleshchev on 2026-11-24; attribution and the full MIT license text live in `THIRD_PARTY_NOTICES.md`.
+
+### Ported
+
+- Upstream 24x24 vector SVG icon artwork, per-status tile geometry, gradient inks, gloss, and glow for Active (Started), Waiting (Blocked), Alert, Cancelled (Canceled), Billable (Dollar), Important (Exclaim, replacing the flag), Discuss (Question), Starred, Bug, Draft, and Deadline, under `--ts-` custom properties.
+- Four additional opt-in extra statuses from BetterTask: **Kawaii**, **Flower**, **Sun**, and **Moon**, bringing the **Add more statuses** extra set to eleven (`DEFAULT_STATUS_LIST` stays at 14, `defaults-version` stays 3, never in click-to-cycle, glyph lookup by name).
+- Unmapped statuses (In Review, Holding, Incubating, the seven media statuses, and user custom statuses) keep their glyphs drawn inside the same Glass, Solid, and Minimal tile language so the full catalog reads as one family.
+- The three style presets (`Glass`, `Solid`, `Minimal`) ported from Neon Glass, Vivid Solid, and Minimal Crisp, with light and dark tokens keyed solely on `:root[data-ts-theme="dark"]`. Outline keeps v0.14.0 rendering for built-in task and media statuses and draws extra statuses as single-colour masks in `--ts-checkbox-ink`.
+- Ambient looping icon motion for the mapped statuses in Glass, Solid, and Minimal, gated by a new setting `task-status-ambient-motion` (`Animate status icons`, default on), reduced motion, forced colors, and print, animating transform, opacity, and filter only.
+- Canvas transition burst engine (`src/status-burst.js`) played on extension-initiated status writes for unchecked tasks in Glass, Solid, and Minimal (generic colour burst for unmapped statuses; Outline keeps the pass-2 CSS pop with no canvas created), controlled by `task-status-change-animation`, off under reduced motion and forced colors, with lazy canvas creation and full cleanup on unload.
+- Chooser styling adapted from BetterTask's picker (rounded panel, small-caps heading, roomy rows with full-size icon preview, bold name, muted digit hint, highlighted current row, and one-line footer key hint) while preserving existing chooser items, order, and keyboard behaviour.
+
+### Left out
+
+- Row mood tinting on host task rows (requires styling nodes this extension does not own).
+- Subtask count badges (requires per-task child graph reads on the render path).
+- Completed-task origin colour retention ("done keeps the status colour"; checked tasks stay host-owned in every style).
+- Open / unclaimed TODO checkbox restyling (unclaimed checkboxes are never styled).
+- Hashtag-on-top-of-base-status coupling (Roam Task Status Tags keeps one managed `#[[task-status/<Name>]]` tag per task).
+- Smart Markdown task paste, hashtag chip toning, Thymer autocomplete dropdown styling, upstream's settings page, and upstream commands.
+
