@@ -95,10 +95,7 @@
   display: none !important;
 }
 
-:root.bp3-dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
-body.bt-theme-dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
-.rm-dark-theme :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter),
-body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter) {
+:root[data-ts-theme="dark"] :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter) {
   --ts-preview-surface-bg: #1f2428;
   --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
   --ts-menu-surface: var(--svy-overlay, #30404d);
@@ -117,29 +114,6 @@ body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episod
   --ts-peek-shadow:
     0 8px 22px rgba(0, 0, 0, 0.42),
     0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.bp3-light) :where(.ts-status-portal, .ts-status-names-panel, .ts-episode-counter) {
-    --ts-preview-surface-bg: #1f2428;
-    --ts-preview-surface-border: rgba(255, 255, 255, 0.16);
-    --ts-menu-surface: var(--svy-overlay, #30404d);
-    --ts-menu-surface-alt: var(--svy-surface, #202b33);
-    --ts-menu-border: var(--svy-border, #738091);
-    --ts-menu-border-subtle: var(--svy-border-subtle, #5c7080);
-    --ts-menu-hover: var(--svy-hover, #26333d);
-    --ts-menu-selected: var(--svy-selected, #33485c);
-    --ts-menu-text: var(--svy-text, #e1e8ed);
-    --ts-menu-muted: var(--svy-text-muted, #b3c1cc);
-    --ts-menu-accent: var(--svy-accent, #48aff0);
-    --ts-menu-danger: var(--svy-danger, #ff9c9c);
-    --ts-menu-shadow:
-      0 14px 34px rgba(0, 0, 0, 0.46),
-      0 2px 7px rgba(0, 0, 0, 0.34);
-    --ts-peek-shadow:
-      0 8px 22px rgba(0, 0, 0, 0.42),
-      0 1px 2px rgba(0, 0, 0, 0.35);
-  }
 }
 
 /*
@@ -163,25 +137,12 @@ body.roam-body.dark :where(.ts-status-portal, .ts-status-names-panel, .ts-episod
   --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #ffffff));
 }
 
-:root.bp3-dark .rm-checkbox[data-ts-checkbox-status],
-body.bt-theme-dark .rm-checkbox[data-ts-checkbox-status],
-.rm-dark-theme .rm-checkbox[data-ts-checkbox-status],
-body.roam-body.dark .rm-checkbox[data-ts-checkbox-status] {
+:root[data-ts-theme="dark"] .rm-checkbox[data-ts-checkbox-status] {
   --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
   --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
   --ts-checkbox-beacon: var(--ts-checkbox-beacon-dark);
   --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #48aff0));
   --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #182026));
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.bp3-light) .rm-checkbox[data-ts-checkbox-status] {
-    --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
-    --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
-    --ts-checkbox-beacon: var(--ts-checkbox-beacon-dark);
-    --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #48aff0));
-    --ts-checkbox-surface: var(--svy-canvas, var(--bp3-surface, #182026));
-  }
 }
 
 .rm-checkbox[data-ts-checkbox-status="ACTIVE"] {
@@ -633,34 +594,7 @@ a.rm-page-ref[data-task-status-key],
   border-color: var(--ts-status-border) !important;
 }
 
-:root.bp3-dark
-  :where(
-    span.rm-page-ref[data-task-status-key],
-    a.rm-page-ref[data-task-status-key],
-    .bt-pill[data-task-status-title^="task-status/"],
-    .ts-status-pill-preview[data-task-status-key],
-    .ts-status-peek[data-task-status-key],
-    .ts-status-choice-dot[data-task-status-key]
-  ),
-body.bt-theme-dark
-  :where(
-    span.rm-page-ref[data-task-status-key],
-    a.rm-page-ref[data-task-status-key],
-    .bt-pill[data-task-status-title^="task-status/"],
-    .ts-status-pill-preview[data-task-status-key],
-    .ts-status-peek[data-task-status-key],
-    .ts-status-choice-dot[data-task-status-key]
-  ),
-.rm-dark-theme
-  :where(
-    span.rm-page-ref[data-task-status-key],
-    a.rm-page-ref[data-task-status-key],
-    .bt-pill[data-task-status-title^="task-status/"],
-    .ts-status-pill-preview[data-task-status-key],
-    .ts-status-peek[data-task-status-key],
-    .ts-status-choice-dot[data-task-status-key]
-  ),
-body.roam-body.dark
+:root[data-ts-theme="dark"]
   :where(
     span.rm-page-ref[data-task-status-key],
     a.rm-page-ref[data-task-status-key],
@@ -672,22 +606,6 @@ body.roam-body.dark
   --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
   --ts-status-fg: var(--ts-status-fg-dark, rgb(184, 194, 207));
   --ts-status-border: var(--ts-status-border-dark, rgba(105, 121, 143, 0.62));
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.bp3-light)
-    :where(
-      span.rm-page-ref[data-task-status-key],
-      a.rm-page-ref[data-task-status-key],
-      .bt-pill[data-task-status-title^="task-status/"],
-      .ts-status-pill-preview[data-task-status-key],
-      .ts-status-peek[data-task-status-key],
-      .ts-status-choice-dot[data-task-status-key]
-    ) {
-    --ts-status-bg: var(--ts-status-bg-dark, rgba(100, 116, 139, 0.2));
-    --ts-status-fg: var(--ts-status-fg-dark, rgb(184, 194, 207));
-    --ts-status-border: var(--ts-status-border-dark, rgba(105, 121, 143, 0.62));
-  }
 }
 
 /* Base pill styling (JS annotates matching refs with data-task-status-key/label) */
@@ -1003,10 +921,7 @@ a.rm-page-ref[data-task-status-key]:hover {
   }
 }
 
-:root.bp3-dark .ts-status-portal > .ts-status-peek,
-body.bt-theme-dark .ts-status-portal > .ts-status-peek,
-.rm-dark-theme .ts-status-portal > .ts-status-peek,
-body.roam-body.dark .ts-status-portal > .ts-status-peek {
+:root[data-ts-theme="dark"] .ts-status-portal > .ts-status-peek {
   box-shadow: var(--ts-peek-shadow);
 }
 
@@ -1560,7 +1475,7 @@ a.rm-page-ref[data-task-status-key="CANCELLED"],
   background: rgba(16, 22, 26, 0.03);
 }
 
-body.bp3-dark .ts-rename-prompt {
+:root[data-ts-theme="dark"] .ts-rename-prompt {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -1623,9 +1538,7 @@ body.bp3-dark .ts-rename-prompt {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
-body.bp3-dark .ts-status-color-swatch-dot,
-body.bp4-dark .ts-status-color-swatch-dot,
-body.bp5-dark .ts-status-color-swatch-dot {
+:root[data-ts-theme="dark"] .ts-status-color-swatch-dot {
   border-color: rgba(255, 255, 255, 0.22);
 }
 
@@ -1763,17 +1676,8 @@ body.bp5-dark .ts-status-color-swatch-dot {
   font-size: 12px;
 }
 
-:root.bp3-dark .ts-status-chooser .ts-follow-up-date,
-body.bt-theme-dark .ts-status-chooser .ts-follow-up-date,
-.rm-dark-theme .ts-status-chooser .ts-follow-up-date,
-body.roam-body.dark .ts-status-chooser .ts-follow-up-date {
+:root[data-ts-theme="dark"] .ts-status-chooser .ts-follow-up-date {
   color-scheme: dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.bp3-light) .ts-status-chooser .ts-follow-up-date {
-    color-scheme: dark;
-  }
 }
 
 .ts-status-chooser .ts-follow-up-date:focus-visible,

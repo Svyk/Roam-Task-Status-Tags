@@ -5,6 +5,7 @@
 // the Episode children of the kept tasks with one more.
 
 import { episodeStateFromChildren, formatEpisode } from "./episode-counter.js";
+import { resolveHostTheme } from "./theme.js";
 
 export const STATUS_VIEW_CLASS = "ts-status-view";
 export const STATUS_VIEW_FILTERS = Object.freeze(["media", "tasks", "all"]);
@@ -121,50 +122,8 @@ const SIDEBAR_ID = "#right-sidebar";
 const SIDEBAR_CONTENT_ID = "#roam-right-sidebar-content";
 const KEY_EVENTS = ["keydown", "keypress", "keyup"];
 
-function hasClass(el, name) {
-  return Boolean(el?.classList?.contains?.(name));
-}
-
-function parseColor(value) {
-  const numbers = String(value ?? "").match(/-?\d*\.?\d+/g);
-  if (!numbers || numbers.length < 3 || !/^\s*rgba?\(/i.test(String(value))) return null;
-  const [r, g, b] = numbers.slice(0, 3).map(Number);
-  const alpha = numbers.length > 3 ? Number(numbers[3]) : 1;
-  if (![r, g, b, alpha].every(Number.isFinite) || alpha === 0) return null;
-  return { r, g, b };
-}
-
-function luminance({ r, g, b }) {
-  const channel = (v) => {
-    const c = Math.min(255, Math.max(0, v)) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-// Explicit Roam theme classes first, then the painted body background (Roam
-// paints only body), and the OS hint only when nothing else is readable.
-export function resolveViewTheme({ document: documentLike, window: windowLike }) {
-  const html = documentLike?.documentElement;
-  const body = documentLike?.body;
-  if (
-    hasClass(html, "bp3-dark") ||
-    hasClass(body, "bt-theme-dark") ||
-    hasClass(html, "rm-dark-theme") ||
-    hasClass(body, "rm-dark-theme") ||
-    (hasClass(body, "roam-body") && hasClass(body, "dark"))
-  ) return "dark";
-  if (hasClass(html, "bp3-light") || hasClass(body, "bt-theme-light")) return "light";
-  try {
-    const compute = windowLike?.getComputedStyle ?? globalThis.getComputedStyle;
-    const color = body && typeof compute === "function" ? parseColor(compute.call(windowLike, body)?.backgroundColor) : null;
-    if (color) return luminance(color) < 0.4 ? "dark" : "light";
-  } catch (_) {}
-  try {
-    const query = windowLike?.matchMedia?.("(prefers-color-scheme: dark)");
-    if (query?.matches) return "dark";
-  } catch (_) {}
-  return "light";
+export function resolveViewTheme({ document: documentLike, window: windowLike, preference } = {}) {
+  return resolveHostTheme({ document: documentLike, window: windowLike, preference });
 }
 
 const INNER_LINK_SELECTOR = "a, .rm-page-ref, .rm-block-ref, [data-link-title]";
@@ -175,6 +134,7 @@ export function createStatusView({
   roamAlphaAPI,
   portalRoot,
   readGroups,
+  getTheme = null,
   waitMs = DOCK_WAIT_MS,
   MutationObserverCtor = windowLike?.MutationObserver ?? globalThis.MutationObserver,
   log = () => {},
@@ -282,7 +242,10 @@ export function createStatusView({
   }
 
   function applyTheme() {
-    const theme = resolveViewTheme({ document: documentLike, window: windowLike });
+    const theme =
+      typeof getTheme === "function"
+        ? getTheme()
+        : resolveViewTheme({ document: documentLike, window: windowLike });
     root?.setAttribute("data-ts-view-theme", theme);
     dockEl?.setAttribute("data-ts-view-theme", theme);
   }

@@ -712,13 +712,13 @@ test("the view root and dock wrapper carry the resolved theme", async () => {
   assert.equal(light.portalRoot.children[0].getAttribute("data-ts-view-theme"), "light");
 });
 
-test("theme override rules exist and follow the prefers-color-scheme portal rule", () => {
+test("theme override rules exist and follow the root data-ts-theme dark portal rule", () => {
   const css = readFileSync(new URL("../src/extension.css", import.meta.url), "utf8");
-  const osRule = css.indexOf(":root:not(.bp3-light) :where(.ts-status-portal");
+  const rootDarkRule = css.indexOf(':root[data-ts-theme="dark"] :where(.ts-status-portal');
   for (const theme of ["light", "dark"]) {
     const menu = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] {`);
     const pill = css.indexOf(`.ts-status-view[data-ts-view-theme="${theme}"] .ts-status-pill-preview[data-task-status-key] {`);
-    assert.ok(osRule > -1 && menu > osRule && pill > menu, `${theme} rules come after the OS rule`);
+    assert.ok(rootDarkRule > -1 && menu > rootDarkRule && pill > menu, `${theme} rules come after the root dark rule`);
     assert.match(css.slice(menu, pill), /--ts-menu-surface: var\(--svy-overlay/);
     assert.match(css.slice(pill, pill + 500), new RegExp(`--ts-status-bg: var\\(--ts-status-bg-${theme}`));
   }

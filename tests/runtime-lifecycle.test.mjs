@@ -137,6 +137,29 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
   };
   const context = commandApi(activeCommands);
   const multi = commandApi(activeCommands);
+  const observed = [];
+  const activeTimers = new Map();
+  let nextTimerId = 1;
+  const scheduledDelays = [];
+  const fakeSetTimeout = (fn, delay = 0) => {
+    const id = nextTimerId++;
+    scheduledDelays.push(delay);
+    if (delay >= 1000) {
+      activeTimers.set(id, { fn, delay });
+      return id;
+    }
+    const nativeId = setTimeout(() => {
+      activeTimers.delete(id);
+      fn();
+    }, delay);
+    activeTimers.set(id, { nativeId, delay });
+    return id;
+  };
+  const fakeClearTimeout = (id) => {
+    const entry = activeTimers.get(id);
+    if (entry?.nativeId) clearTimeout(entry.nativeId);
+    activeTimers.delete(id);
+  };
   const windowLike = new EventTarget();
   Object.assign(windowLike, {
     document,
@@ -148,10 +171,14 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       useRef: (value) => ({ current: value }),
       useState: (value) => [value, () => {}],
     },
-    getComputedStyle: () => ({ color: "rgb(20, 184, 166)" }),
-    setTimeout,
-    clearTimeout,
-    requestAnimationFrame: (callback) => setTimeout(callback, 0),
+    getComputedStyle: (el) => {
+      if (el === document.body) return { backgroundColor: "rgb(255, 255, 255)" };
+      return { color: "rgb(20, 184, 166)" };
+    },
+    setTimeout: fakeSetTimeout,
+    clearTimeout: fakeClearTimeout,
+    requestAnimationFrame: (callback) => fakeSetTimeout(callback, 0),
+    cancelAnimationFrame: fakeClearTimeout,
     innerWidth: 1280,
     innerHeight: 800,
     roamAlphaAPI: {
@@ -169,8 +196,18 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     },
   });
   class FakeMutationObserver {
-    observe() {}
-    disconnect() {}
+    constructor(callback) {
+      this.callback = callback;
+      this.targets = [];
+      this.disconnected = false;
+      observed.push(this);
+    }
+    observe(target, options) {
+      this.targets.push({ target, options });
+    }
+    disconnect() {
+      this.disconnected = true;
+    }
   }
   globalThis.window = windowLike;
   globalThis.document = document;
@@ -224,6 +261,28 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     ownedCheckbox.setAttribute("data-foreign-owner", "keep");
     document.body.appendChild(ownedCheckbox);
 
+    const themeSetting = latestPanelConfig.settings.find(
+      (entry) => entry.id === "task-status-theme"
+    );
+    assert.equal(themeSetting.action.type, "select");
+    assert.deepEqual(themeSetting.action.items, ["Follow Roam", "Light", "Dark"]);
+    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+    themeSetting.action.onChange("Dark");
+    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "dark");
+    themeSetting.action.onChange("Light");
+    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+    themeSetting.action.onChange("not-a-theme");
+    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+    assert.ok(
+      observed.some((observer) =>
+        observer.targets.some(
+          (entry) => entry.target === document.head && entry.options?.childList === true
+        )
+      ),
+      "head childList observer should be registered"
+    );
+    assert.ok(scheduledDelays.includes(1500), "1500ms theme boot timeout should be scheduled");
+
     const checkboxSetting = latestPanelConfig.settings.find(
       (entry) => entry.id === "task-status-style-native-checkboxes"
     );
@@ -275,6 +334,9 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
 
     await secondExtension.onunload();
     assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
+    assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
+    assert.equal(activeTimers.size, 0);
+    assert.ok(observed.every((observer) => observer.disconnected));
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
     assert.equal(activeCommands.size, 0);
     assert.equal(slashCalls.removed.length, 14);

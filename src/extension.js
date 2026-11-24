@@ -21,6 +21,13 @@ import {
 } from "./repeat-status-reset.js";
 import { createStatusView } from "./status-view.js";
 import {
+  THEME_ATTRIBUTE,
+  THEME_SETTING_VALUES,
+  normalizeThemeSetting,
+  resolveHostTheme,
+  themeSettingToPreference,
+} from "./theme.js";
+import {
   createPublicApi,
   emitStatusCatalog,
   emitStatusChange,
@@ -528,6 +535,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusList: "status-list",
     defaultsVersion: "defaults-version",
     statusColorOverrides: "status-color-overrides",
+    theme: "task-status-theme",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -599,6 +607,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   ];
 
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+  let themeSetting = loadThemeSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -913,6 +922,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return Object.values(STATUS_LABEL_DISPLAY).includes(normalized)
       ? normalized
       : fallback;
+  }
+
+  function loadThemeSetting() {
+    const fallback = THEME_SETTING_VALUES.FOLLOW_ROAM;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.theme);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.theme, fallback);
+      return fallback;
+    }
+    return normalizeThemeSetting(parseMaybeJson(raw), fallback);
   }
 
   function loadStatusLabelDisplaySetting() {
@@ -1334,9 +1354,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   let pillObserver = null;
   let themeObserver = null;
+  let headObserver = null;
   let themeMediaQuery = null;
   let themeMediaListener = null;
   let themeRefreshFrame = null;
+  let themeBootTimeout = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
   let statusChooserReturnFocusEl = null;
@@ -1640,11 +1662,35 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     clearStatusPillAnnotations(document);
   }
 
+  function resolveCurrentTheme() {
+    return resolveHostTheme({
+      document,
+      window,
+      preference: themeSettingToPreference(themeSetting),
+    });
+  }
+
+  function syncDocumentTheme() {
+    const next = resolveCurrentTheme();
+    const root = document?.documentElement;
+    if (root?.getAttribute?.(THEME_ATTRIBUTE) !== next) {
+      root?.setAttribute?.(THEME_ATTRIBUTE, next);
+    }
+    return next;
+  }
+
+  function setThemeSetting(nextValue) {
+    themeSetting = normalizeThemeSetting(nextValue, THEME_SETTING_VALUES.FOLLOW_ROAM);
+    syncDocumentTheme();
+    scheduleThemeColorRefresh();
+  }
+
   function scheduleThemeColorRefresh() {
     if (themeRefreshFrame != null) return;
     const requestFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
     themeRefreshFrame = requestFrame(() => {
       themeRefreshFrame = null;
+      syncDocumentTheme();
       applyStatusColorOverrides(statusColorOverrides);
       if (statusView?.isOpen()) void statusView.refresh();
     });
@@ -1660,6 +1706,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       });
     });
 
+    if (document?.head) {
+      headObserver = new MutationObserver(() => scheduleThemeColorRefresh());
+      headObserver.observe(document.head, { childList: true });
+    }
+
     try {
       themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
       themeMediaListener = () => scheduleThemeColorRefresh();
@@ -1672,6 +1723,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       themeMediaQuery = null;
       themeMediaListener = null;
     }
+
+    const setTimer = window.setTimeout?.bind(window) || setTimeout;
+    themeBootTimeout = setTimer(() => {
+      themeBootTimeout = null;
+      scheduleThemeColorRefresh();
+    }, 1500);
   }
 
   function stopThemeObserver() {
@@ -1681,6 +1738,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       } catch (_) {}
     }
     themeObserver = null;
+
+    if (headObserver) {
+      try {
+        headObserver.disconnect();
+      } catch (_) {}
+    }
+    headObserver = null;
 
     if (themeMediaQuery && themeMediaListener) {
       try {
@@ -1693,6 +1757,12 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     themeMediaQuery = null;
     themeMediaListener = null;
+
+    if (themeBootTimeout != null) {
+      const clearTimer = window.clearTimeout?.bind(window) || clearTimeout;
+      clearTimer(themeBootTimeout);
+    }
+    themeBootTimeout = null;
 
     if (themeRefreshFrame != null) {
       const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
@@ -3749,6 +3819,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       tabTitle: "Task Status Tags",
       settings: [
         {
+          id: SETTINGS_KEYS.theme,
+          name: "Theme",
+          description:
+            "Choose Light or Dark colors, or Follow Roam to match your graph theme automatically.",
+          action: {
+            type: "select",
+            items: Object.values(THEME_SETTING_VALUES),
+            onChange: (value) => setThemeSetting(value),
+          },
+        },
+        {
           id: SETTINGS_KEYS.styleNativeCheckboxes,
           name: "Style native checkboxes by task status",
           description:
@@ -3838,6 +3919,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   async function init(isActive = () => true) {
+    syncDocumentTheme();
+
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
     portalRoot.setAttribute("data-task-status-portal", "true");
@@ -3864,6 +3947,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       window,
       roamAlphaAPI: window.roamAlphaAPI,
       portalRoot,
+      getTheme: () => resolveCurrentTheme(),
       readGroups: () => ({
         statuses: CONFIG.cycleOrder
           .filter((key) => STATUSES[key]?.active)
@@ -3922,6 +4006,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     stopStatusPillObserver();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
+    document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
     repeatStatusReset.dispose();
 
     clearStatusColorOverrides();

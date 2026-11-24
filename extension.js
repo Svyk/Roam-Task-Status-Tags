@@ -1619,6 +1619,82 @@ function createRepeatStatusReset({
   });
 }
 
+// src/theme.js
+var THEME_ATTRIBUTE = "data-ts-theme";
+var THEME_SETTING_VALUES = Object.freeze({
+  FOLLOW_ROAM: "Follow Roam",
+  LIGHT: "Light",
+  DARK: "Dark"
+});
+function normalizeThemeSetting(value, fallback = THEME_SETTING_VALUES.FOLLOW_ROAM) {
+  const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(THEME_SETTING_VALUES).includes(normalized) ? normalized : fallback;
+}
+function themeSettingToPreference(value) {
+  const normalized = normalizeThemeSetting(value);
+  if (normalized === THEME_SETTING_VALUES.LIGHT) return "light";
+  if (normalized === THEME_SETTING_VALUES.DARK) return "dark";
+  return null;
+}
+function hasClass(el, name) {
+  return Boolean(el?.classList?.contains?.(name));
+}
+function parseColor(value) {
+  const raw = String(value ?? "");
+  if (!/^\s*rgba?\(/i.test(raw)) return null;
+  const numbers = raw.match(/-?\d*\.?\d+/g);
+  if (!numbers || numbers.length < 3) return null;
+  const [r, g, b] = numbers.slice(0, 3).map(Number);
+  const alpha = numbers.length > 3 ? Number(numbers[3]) : 1;
+  if (![r, g, b, alpha].every(Number.isFinite) || alpha <= 0) return null;
+  return { r, g, b };
+}
+function luminance({ r, g, b }) {
+  const channel2 = (v) => {
+    const c = Math.min(255, Math.max(0, v)) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel2(r) + 0.7152 * channel2(g) + 0.0722 * channel2(b);
+}
+function readMeasuredBackground(element, windowLike) {
+  if (!element) return null;
+  try {
+    const compute = windowLike?.getComputedStyle ?? globalThis.getComputedStyle;
+    if (typeof compute !== "function") return null;
+    const style = compute.call(windowLike, element);
+    return parseColor(style?.backgroundColor);
+  } catch (_) {
+    return null;
+  }
+}
+function resolveHostTheme({
+  document: documentLike,
+  window: windowLike,
+  preference
+} = {}) {
+  const pref = typeof preference === "string" ? preference.trim().toLowerCase() : "";
+  if (pref === "light" || pref === "dark") return pref;
+  const html = documentLike?.documentElement;
+  const body = documentLike?.body;
+  if (hasClass(html, "bp3-dark") || hasClass(body, "bt-theme-dark") || hasClass(html, "rm-dark-theme") || hasClass(body, "rm-dark-theme") || hasClass(body, "roam-body") && hasClass(body, "dark")) {
+    return "dark";
+  }
+  if (hasClass(html, "bp3-light") || hasClass(body, "bt-theme-light")) {
+    return "light";
+  }
+  const bodyColor = readMeasuredBackground(body, windowLike);
+  if (bodyColor) return luminance(bodyColor) < 0.4 ? "dark" : "light";
+  const htmlColor = readMeasuredBackground(html, windowLike);
+  if (htmlColor) return luminance(htmlColor) < 0.4 ? "dark" : "light";
+  try {
+    const query = windowLike?.matchMedia?.("(prefers-color-scheme: dark)");
+    if (query?.matches) return "dark";
+  } catch (_) {
+  }
+  return "light";
+}
+
 // src/status-view.js
 var STATUS_VIEW_CLASS = "ts-status-view";
 var STATUS_VIEW_FILTERS = Object.freeze(["media", "tasks", "all"]);
@@ -1719,41 +1795,8 @@ var DOCK_STEP_MS = 25;
 var SIDEBAR_ID = "#right-sidebar";
 var SIDEBAR_CONTENT_ID = "#roam-right-sidebar-content";
 var KEY_EVENTS = ["keydown", "keypress", "keyup"];
-function hasClass(el, name) {
-  return Boolean(el?.classList?.contains?.(name));
-}
-function parseColor(value) {
-  const numbers = String(value ?? "").match(/-?\d*\.?\d+/g);
-  if (!numbers || numbers.length < 3 || !/^\s*rgba?\(/i.test(String(value))) return null;
-  const [r, g, b] = numbers.slice(0, 3).map(Number);
-  const alpha = numbers.length > 3 ? Number(numbers[3]) : 1;
-  if (![r, g, b, alpha].every(Number.isFinite) || alpha === 0) return null;
-  return { r, g, b };
-}
-function luminance({ r, g, b }) {
-  const channel2 = (v) => {
-    const c = Math.min(255, Math.max(0, v)) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel2(r) + 0.7152 * channel2(g) + 0.0722 * channel2(b);
-}
-function resolveViewTheme({ document: documentLike, window: windowLike }) {
-  const html = documentLike?.documentElement;
-  const body = documentLike?.body;
-  if (hasClass(html, "bp3-dark") || hasClass(body, "bt-theme-dark") || hasClass(html, "rm-dark-theme") || hasClass(body, "rm-dark-theme") || hasClass(body, "roam-body") && hasClass(body, "dark")) return "dark";
-  if (hasClass(html, "bp3-light") || hasClass(body, "bt-theme-light")) return "light";
-  try {
-    const compute = windowLike?.getComputedStyle ?? globalThis.getComputedStyle;
-    const color = body && typeof compute === "function" ? parseColor(compute.call(windowLike, body)?.backgroundColor) : null;
-    if (color) return luminance(color) < 0.4 ? "dark" : "light";
-  } catch (_) {
-  }
-  try {
-    const query = windowLike?.matchMedia?.("(prefers-color-scheme: dark)");
-    if (query?.matches) return "dark";
-  } catch (_) {
-  }
-  return "light";
+function resolveViewTheme({ document: documentLike, window: windowLike, preference } = {}) {
+  return resolveHostTheme({ document: documentLike, window: windowLike, preference });
 }
 var INNER_LINK_SELECTOR = "a, .rm-page-ref, .rm-block-ref, [data-link-title]";
 function createStatusView({
@@ -1762,6 +1805,7 @@ function createStatusView({
   roamAlphaAPI,
   portalRoot,
   readGroups,
+  getTheme = null,
   waitMs = DOCK_WAIT_MS,
   MutationObserverCtor = windowLike?.MutationObserver ?? globalThis.MutationObserver,
   log = () => {
@@ -1862,7 +1906,7 @@ function createStatusView({
     return make("p", "ts-status-view-message", text);
   }
   function applyTheme() {
-    const theme = resolveViewTheme({ document: documentLike, window: windowLike });
+    const theme = typeof getTheme === "function" ? getTheme() : resolveViewTheme({ document: documentLike, window: windowLike });
     root?.setAttribute("data-ts-view-theme", theme);
     dockEl?.setAttribute("data-ts-view-theme", theme);
   }
@@ -3896,6 +3940,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     statusList: "status-list",
     defaultsVersion: "defaults-version",
     statusColorOverrides: "status-color-overrides",
+    theme: "task-status-theme",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -3960,6 +4005,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     { name: "Dark", value: "#1e293b" }
   ];
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
+  let themeSetting = loadThemeSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -4228,6 +4274,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
     const normalized = String(candidate || "").trim();
     return Object.values(STATUS_LABEL_DISPLAY).includes(normalized) ? normalized : fallback;
+  }
+  function loadThemeSetting() {
+    const fallback = THEME_SETTING_VALUES.FOLLOW_ROAM;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.theme);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.theme, fallback);
+      return fallback;
+    }
+    return normalizeThemeSetting(parseMaybeJson(raw), fallback);
   }
   function loadStatusLabelDisplaySetting() {
     const fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
@@ -4574,9 +4630,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   const pendingOperations = /* @__PURE__ */ new Set();
   let pillObserver = null;
   let themeObserver = null;
+  let headObserver = null;
   let themeMediaQuery = null;
   let themeMediaListener = null;
   let themeRefreshFrame = null;
+  let themeBootTimeout = null;
   let statusChooserEl = null;
   let statusChooserTeardown = null;
   let statusChooserReturnFocusEl = null;
@@ -4825,11 +4883,32 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     clearOwnedStatusCheckboxes(document);
     clearStatusPillAnnotations(document);
   }
+  function resolveCurrentTheme() {
+    return resolveHostTheme({
+      document,
+      window,
+      preference: themeSettingToPreference(themeSetting)
+    });
+  }
+  function syncDocumentTheme() {
+    const next = resolveCurrentTheme();
+    const root = document?.documentElement;
+    if (root?.getAttribute?.(THEME_ATTRIBUTE) !== next) {
+      root?.setAttribute?.(THEME_ATTRIBUTE, next);
+    }
+    return next;
+  }
+  function setThemeSetting(nextValue) {
+    themeSetting = normalizeThemeSetting(nextValue, THEME_SETTING_VALUES.FOLLOW_ROAM);
+    syncDocumentTheme();
+    scheduleThemeColorRefresh();
+  }
   function scheduleThemeColorRefresh() {
     if (themeRefreshFrame != null) return;
     const requestFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
     themeRefreshFrame = requestFrame(() => {
       themeRefreshFrame = null;
+      syncDocumentTheme();
       applyStatusColorOverrides(statusColorOverrides);
       if (statusView?.isOpen()) void statusView.refresh();
     });
@@ -4843,6 +4922,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         attributeFilter: ["class", "style"]
       });
     });
+    if (document?.head) {
+      headObserver = new MutationObserver(() => scheduleThemeColorRefresh());
+      headObserver.observe(document.head, { childList: true });
+    }
     try {
       themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
       themeMediaListener = () => scheduleThemeColorRefresh();
@@ -4855,6 +4938,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       themeMediaQuery = null;
       themeMediaListener = null;
     }
+    const setTimer = window.setTimeout?.bind(window) || setTimeout;
+    themeBootTimeout = setTimer(() => {
+      themeBootTimeout = null;
+      scheduleThemeColorRefresh();
+    }, 1500);
   }
   function stopThemeObserver() {
     if (themeObserver) {
@@ -4864,6 +4952,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     }
     themeObserver = null;
+    if (headObserver) {
+      try {
+        headObserver.disconnect();
+      } catch (_) {
+      }
+    }
+    headObserver = null;
     if (themeMediaQuery && themeMediaListener) {
       try {
         if (themeMediaQuery.removeEventListener) {
@@ -4876,6 +4971,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     themeMediaQuery = null;
     themeMediaListener = null;
+    if (themeBootTimeout != null) {
+      const clearTimer = window.clearTimeout?.bind(window) || clearTimeout;
+      clearTimer(themeBootTimeout);
+    }
+    themeBootTimeout = null;
     if (themeRefreshFrame != null) {
       const cancelFrame = window.cancelAnimationFrame || window.clearTimeout;
       cancelFrame?.(themeRefreshFrame);
@@ -6598,6 +6698,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       tabTitle: "Task Status Tags",
       settings: [
         {
+          id: SETTINGS_KEYS.theme,
+          name: "Theme",
+          description: "Choose Light or Dark colors, or Follow Roam to match your graph theme automatically.",
+          action: {
+            type: "select",
+            items: Object.values(THEME_SETTING_VALUES),
+            onChange: (value) => setThemeSetting(value)
+          }
+        },
+        {
           id: SETTINGS_KEYS.styleNativeCheckboxes,
           name: "Style native checkboxes by task status",
           description: "Adds an accessible color-and-shape treatment to the exact TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
@@ -6677,6 +6787,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     await extensionAPI.settings.panel.create(panelConfig);
   }
   async function init(isActive = () => true) {
+    syncDocumentTheme();
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
     portalRoot.setAttribute("data-task-status-portal", "true");
@@ -6700,6 +6811,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       window,
       roamAlphaAPI: window.roamAlphaAPI,
       portalRoot,
+      getTheme: () => resolveCurrentTheme(),
       readGroups: () => ({
         statuses: CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active).map((key) => ({
           key,
@@ -6746,6 +6858,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     stopStatusPillObserver();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
+    document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
     repeatStatusReset.dispose();
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();

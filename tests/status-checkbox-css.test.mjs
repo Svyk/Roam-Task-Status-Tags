@@ -115,20 +115,42 @@ test("checked fill remains host-owned and the workflow glyph is removed", () => 
   assert.match(css, /host theme continues to own checked fill/i);
 });
 
-test("Svy Theme tokens and every established dark signal are supported", () => {
+test("Svy Theme tokens and the single data-ts-theme dark signal are supported", () => {
   for (const token of ["--svy-canvas", "--svy-accent", "--cl-blue"]) {
     assert.match(css, new RegExp(token));
   }
-  for (const signal of [
-    ":root.bp3-dark",
-    "body.bt-theme-dark",
-    ".rm-dark-theme",
-    "body.roam-body.dark",
+  assert.ok(
+    css.includes(':root[data-ts-theme="dark"]'),
+    'missing single dark signal :root[data-ts-theme="dark"]'
+  );
+  for (const forbidden of [
+    "prefers-color-scheme",
+    "bp3-dark",
+    "bt-theme-dark",
+    "rm-dark-theme",
+    "roam-body.dark",
     ":root:not(.bp3-light)",
   ]) {
-    assert.ok(css.includes(signal), `missing dark signal ${signal}`);
+    assert.equal(
+      css.includes(forbidden),
+      false,
+      `unexpected legacy theme selector in CSS: ${forbidden}`
+    );
   }
-  assert.match(css, /@media \(prefers-color-scheme: dark\)/);
+  const strippedCss = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const darkThemeSelectors = [
+    ...strippedCss.matchAll(
+      /([^{}@]+)\{[^}]*(?:var\(--ts-checkbox-accent-dark\)|var\(--ts-status-bg-dark|--ts-preview-surface-bg:\s*#1f2428|color-scheme:\s*dark)[^}]*\}/g
+    ),
+  ].map((match) => match[1].trim());
+  assert.ok(darkThemeSelectors.length > 0, "expected dark theme rules");
+  for (const selector of darkThemeSelectors) {
+    if (selector.startsWith('.ts-status-view[data-ts-view-theme="dark"]')) continue;
+    assert.ok(
+      selector.startsWith(':root[data-ts-theme="dark"]'),
+      `dark rule must start with :root[data-ts-theme="dark"], got: ${selector}`
+    );
+  }
   assert.match(
     source,
     /\.rm-checkbox\.rm-todo:not\(\[data-ts-checkbox-status\]\) \.checkmark/
