@@ -205,7 +205,7 @@ test("checkbox style normalization falls back to Outline and maps attribute valu
   assert.equal(pickOnAccentColor({ r: 234, g: 179, b: 8 }), "#10161a");
 });
 
-test("all 21 built-in statuses meet Solid 3:1 glyph contrast in light and dark", () => {
+test("all 25 built-in statuses meet Solid 3:1 glyph contrast in light and dark", () => {
   const allBuiltins = {
     ...DEFAULT_COLORS,
     SERIES: "#c026d3",
@@ -222,6 +222,10 @@ test("all 21 built-in statuses meet Solid 3:1 glyph contrast in light and dark",
     BUG: "#65a30d",
     DRAFT: "#3b82f6",
     DEADLINE: "#ea580c",
+    KAWAII: "#f472b6",
+    FLOWER: "#e879f9",
+    SUN: "#f59e0b",
+    MOON: "#818cf8",
   };
   for (const [key, hex] of Object.entries(allBuiltins)) {
     const palette = buildStatusCheckboxColors({ baseRgb: hexRgb(hex) });
@@ -326,6 +330,10 @@ test("extra keys and names map to their own shapes, extra group, and accessible 
     BUG: { shape: "bug", color: "#65a30d" },
     DRAFT: { shape: "draft", color: "#3b82f6" },
     DEADLINE: { shape: "deadline", color: "#ea580c" },
+    KAWAII: { shape: "kawaii", color: "#f472b6" },
+    FLOWER: { shape: "flower", color: "#e879f9" },
+    SUN: { shape: "sun", color: "#f59e0b" },
+    MOON: { shape: "moon", color: "#818cf8" },
   };
   assert.equal(Object.isFrozen(EXTRA_STATUS_SHAPES), true);
   for (const [key, { shape, color }] of Object.entries(extras)) {

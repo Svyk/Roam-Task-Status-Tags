@@ -82,8 +82,8 @@ test("migration never mutates its input", () => {
 });
 
 test("cycling walks task statuses only and skips media and extra", () => {
-  const order = ["ACTIVE", "WAITING", "SERIES", "BUG", "CANCELLED", "CUSTOM_TV", "CUSTOM_DRAFT", "MOVIE"];
-  const names = { CUSTOM_TV: "Watchlist", CUSTOM_DRAFT: "Draft" };
+  const order = ["ACTIVE", "WAITING", "SERIES", "BUG", "KAWAII", "FLOWER", "SUN", "MOON", "CANCELLED", "CUSTOM_TV", "CUSTOM_DRAFT", "CUSTOM_MOON", "MOVIE"];
+  const names = { CUSTOM_TV: "Watchlist", CUSTOM_DRAFT: "Draft", CUSTOM_MOON: "Moon" };
   const nonTask = (key) => getStatusGroup(key, names[key]) !== "task";
   assert.equal(nextTaskCycleStatus(order, null, nonTask), "ACTIVE");
   assert.equal(nextTaskCycleStatus(order, "ACTIVE", nonTask), "WAITING");
@@ -91,16 +91,38 @@ test("cycling walks task statuses only and skips media and extra", () => {
   assert.equal(nextTaskCycleStatus(order, "CANCELLED", nonTask), null);
   assert.equal(nextTaskCycleStatus(order, "SERIES", nonTask), "ACTIVE");
   assert.equal(nextTaskCycleStatus(order, "BUG", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "KAWAII", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "FLOWER", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "SUN", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(order, "MOON", nonTask), "ACTIVE");
   assert.equal(nextTaskCycleStatus(order, "CUSTOM_TV", nonTask), "ACTIVE");
   assert.equal(nextTaskCycleStatus(order, "CUSTOM_DRAFT", nonTask), "ACTIVE");
-  assert.equal(nextTaskCycleStatus(["SERIES", "MOVIE", "BUG"], null, nonTask), null);
+  assert.equal(nextTaskCycleStatus(order, "CUSTOM_MOON", nonTask), "ACTIVE");
+  assert.equal(nextTaskCycleStatus(["SERIES", "MOVIE", "BUG", "KAWAII"], null, nonTask), null);
   assert.equal(nextTaskCycleStatus(["ACTIVE", "WAITING"], "ACTIVE"), "WAITING");
   assert.equal(isMediaStatus("BUG"), false);
+  assert.equal(isMediaStatus("KAWAII"), false);
+  assert.equal(isMediaStatus("FLOWER"), false);
+  assert.equal(isMediaStatus("SUN"), false);
+  assert.equal(isMediaStatus("MOON"), false);
   assert.equal(isMediaStatus("CUSTOM_DRAFT", "Draft"), false);
+  assert.equal(isMediaStatus("CUSTOM_MOON", "Moon"), false);
 });
 
 test("Add more statuses merge appends missing extras in table order and is idempotent", () => {
-  const extraKeys = ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "BUG", "DRAFT", "DEADLINE"];
+  const extraKeys = [
+    "IMPORTANT",
+    "STARRED",
+    "DISCUSS",
+    "BILLABLE",
+    "BUG",
+    "DRAFT",
+    "DEADLINE",
+    "KAWAII",
+    "FLOWER",
+    "SUN",
+    "MOON",
+  ];
   assert.deepEqual(EXTRA_STATUS_DEFAULTS.map((entry) => entry.key), extraKeys);
   assert.equal(Object.isFrozen(EXTRA_STATUS_DEFAULTS), true);
 
@@ -108,10 +130,10 @@ test("Add more statuses merge appends missing extras in table order and is idemp
   const snapshot = JSON.stringify(initial);
   const first = mergeExtraStatuses(initial);
   assert.equal(JSON.stringify(initial), snapshot);
-  assert.equal(first.added.length, 7);
-  assert.deepEqual(first.list.slice(-7).map((entry) => entry.key), extraKeys);
+  assert.equal(first.added.length, 11);
+  assert.deepEqual(first.list.slice(-11).map((entry) => entry.key), extraKeys);
 
-  // Idempotent when all seven are already present
+  // Idempotent when all eleven are already present
   const second = mergeExtraStatuses(first.list);
   assert.equal(second.added.length, 0);
   assert.equal(second.list, first.list);
@@ -121,16 +143,17 @@ test("Add more statuses merge appends missing extras in table order and is idemp
     ...v1List,
     { key: "BUG", name: "Defect" },
     { key: "CUSTOM_DRAFT", name: "  draft " },
+    { key: "CUSTOM_SUN", name: "SUN" },
   ];
   const merged = mergeExtraStatuses(partial);
   assert.deepEqual(
     merged.added.map((entry) => entry.key),
-    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE"]
+    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE", "KAWAII", "FLOWER", "MOON"]
   );
   assert.deepEqual(merged.list.slice(0, partial.length), partial);
   assert.deepEqual(
     merged.list.slice(partial.length).map((entry) => entry.key),
-    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE"]
+    ["IMPORTANT", "STARRED", "DISCUSS", "BILLABLE", "DEADLINE", "KAWAII", "FLOWER", "MOON"]
   );
 
   // Deleting one and merging again appends it back
@@ -150,7 +173,7 @@ test("the runtime wrapper and chooser use the group-aware helpers", async () => 
   assert.match(source, /const extraKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "extra"\)/);
   assert.match(source, /for \(const groupKeys of \[taskKeys, mediaKeys, extraKeys\]\)/);
   assert.match(source, /Add more statuses/);
-  assert.match(source, /All seven are already in your list/);
+  assert.match(source, /All eleven are already in your list/);
   assert.match(source, /statusNames: getStatusNameMap\(\)/);
 });
 

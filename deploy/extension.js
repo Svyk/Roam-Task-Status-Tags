@@ -2692,7 +2692,11 @@ var BUILTIN_SHAPES = Object.freeze({
   BILLABLE: "billable",
   BUG: "bug",
   DRAFT: "draft",
-  DEADLINE: "deadline"
+  DEADLINE: "deadline",
+  KAWAII: "kawaii",
+  FLOWER: "flower",
+  SUN: "sun",
+  MOON: "moon"
 });
 var MEDIA_STATUS_SHAPES = Object.freeze({
   series: "series",
@@ -2710,7 +2714,11 @@ var EXTRA_STATUS_SHAPES = Object.freeze({
   billable: "billable",
   bug: "bug",
   draft: "draft",
-  deadline: "deadline"
+  deadline: "deadline",
+  kawaii: "kawaii",
+  flower: "flower",
+  sun: "sun",
+  moon: "moon"
 });
 function getMediaStatusShape(name) {
   const key = String(name ?? "").trim().toLowerCase();
@@ -3838,7 +3846,11 @@ var EXTRA_STATUS_DEFAULTS = Object.freeze([
   Object.freeze({ key: "BILLABLE", name: "Billable" }),
   Object.freeze({ key: "BUG", name: "Bug" }),
   Object.freeze({ key: "DRAFT", name: "Draft" }),
-  Object.freeze({ key: "DEADLINE", name: "Deadline" })
+  Object.freeze({ key: "DEADLINE", name: "Deadline" }),
+  Object.freeze({ key: "KAWAII", name: "Kawaii" }),
+  Object.freeze({ key: "FLOWER", name: "Flower" }),
+  Object.freeze({ key: "SUN", name: "Sun" }),
+  Object.freeze({ key: "MOON", name: "Moon" })
 ]);
 function mergeExtraStatuses(list) {
   const source = Array.isArray(list) ? list : [];
@@ -4292,7 +4304,11 @@ function createTaskStatusExtension({
     BILLABLE: "Billable",
     BUG: "Bug",
     DRAFT: "Draft",
-    DEADLINE: "Deadline"
+    DEADLINE: "Deadline",
+    KAWAII: "Kawaii",
+    FLOWER: "Flower",
+    SUN: "Sun",
+    MOON: "Moon"
   };
   const DEFAULT_STATUS_LIST = [
     { key: "ACTIVE", name: "Active" },
@@ -4325,7 +4341,11 @@ function createTaskStatusExtension({
     BILLABLE: "#10b981",
     BUG: "#65a30d",
     DRAFT: "#3b82f6",
-    DEADLINE: "#ea580c"
+    DEADLINE: "#ea580c",
+    KAWAII: "#f472b6",
+    FLOWER: "#e879f9",
+    SUN: "#f59e0b",
+    MOON: "#818cf8"
   };
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
   const STATUS_COLOR_PRESETS = [
@@ -6545,7 +6565,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               result4.added.length === 1 ? "Added 1 status" : `Added ${result4.added.length} statuses`
             );
           } else {
-            setExtraStatusInfo("All seven are already in your list");
+            setExtraStatusInfo("All eleven are already in your list");
           }
         } catch (e) {
           setExtraStatusError(e?.message || String(e));

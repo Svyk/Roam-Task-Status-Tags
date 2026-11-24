@@ -109,6 +109,10 @@ export const EXTRA_STATUS_DEFAULTS = Object.freeze([
   Object.freeze({ key: "BUG", name: "Bug" }),
   Object.freeze({ key: "DRAFT", name: "Draft" }),
   Object.freeze({ key: "DEADLINE", name: "Deadline" }),
+  Object.freeze({ key: "KAWAII", name: "Kawaii" }),
+  Object.freeze({ key: "FLOWER", name: "Flower" }),
+  Object.freeze({ key: "SUN", name: "Sun" }),
+  Object.freeze({ key: "MOON", name: "Moon" }),
 ]);
 
 export function mergeExtraStatuses(list) {
@@ -642,6 +646,10 @@ function createTaskStatusExtension({
     BUG: "Bug",
     DRAFT: "Draft",
     DEADLINE: "Deadline",
+    KAWAII: "Kawaii",
+    FLOWER: "Flower",
+    SUN: "Sun",
+    MOON: "Moon",
   };
 
   const DEFAULT_STATUS_LIST = [
@@ -677,6 +685,10 @@ function createTaskStatusExtension({
     BUG: "#65a30d",
     DRAFT: "#3b82f6",
     DEADLINE: "#ea580c",
+    KAWAII: "#f472b6",
+    FLOWER: "#e879f9",
+    SUN: "#f59e0b",
+    MOON: "#818cf8",
   };
 
   const DEFAULT_CUSTOM_STATUS_BASE_COLOR = "#64748b";
@@ -3346,7 +3358,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                 : `Added ${result.added.length} statuses`
             );
           } else {
-            setExtraStatusInfo("All seven are already in your list");
+            setExtraStatusInfo("All eleven are already in your list");
           }
         } catch (e) {
           setExtraStatusError(e?.message || String(e));

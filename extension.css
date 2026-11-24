@@ -24,6 +24,13 @@
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
   --ts-ico-draft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath fill='black' fill-rule='evenodd' d='M4.3 19.7 L5.4 15.1 L15.3 5.2 C16.1 4.4 17.4 4.4 18.2 5.2 L18.8 5.8 C19.6 6.6 19.6 7.9 18.8 8.7 L8.9 18.6 Z M14.1 7.6 L16.4 9.9 L17.3 9 L15 6.7 Z'/%3E %3Cpath d='M12.6 20.2 C14.2 19.2 15.6 21 17.2 20 C18.1 19.4 18.9 19.6 19.8 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E %3C/svg%3E");
   --ts-ico-deadline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cg fill='none' stroke='black' stroke-linecap='round'%3E %3Cpath d='M6 3.4 H18 M6 20.6 H18' stroke-width='2.2'/%3E %3Cpath d='M7.6 3.8 C7.6 8.6 10.9 10.2 10.9 12 C10.9 13.8 7.6 15.4 7.6 20.2 M16.4 3.8 C16.4 8.6 13.1 10.2 13.1 12 C13.1 13.8 16.4 15.4 16.4 20.2' stroke-width='1.7'/%3E %3Cpath d='M12 10.8 V16' stroke-width='0.9'/%3E %3C/g%3E %3Cpath d='M9.3 7.2 H14.7 C14.3 8.8 12.8 9.9 12 10.6 C11.2 9.9 9.7 8.8 9.3 7.2 Z' fill='black'/%3E %3Cpath d='M8.7 19.3 C9.3 17.1 10.9 16.2 12 15.8 C13.1 16.2 14.7 17.1 15.3 19.3 Z' fill='black'/%3E %3C/svg%3E");
+  --ts-svg-kawaii: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cdefs%3E%3CradialGradient id='f' cx='0.38' cy='0.32' r='0.8'%3E%3Cstop offset='0' stop-color='%23fff1f8'/%3E%3Cstop offset='1' stop-color='%23f9a8d4'/%3E%3C/radialGradient%3E%3C/defs%3E %3Cpath d='M5.2 7.4 L4.6 3.2 L8.6 5.2 Z M18.8 7.4 L19.4 3.2 L15.4 5.2 Z' fill='%23f472b6'/%3E %3Ccircle cx='12' cy='13' r='9' fill='url(%23f)' stroke='%23ec4899' stroke-width='1.1'/%3E %3Cpath d='M7.4 12.1 q1.35 -1.9 2.7 0 M13.9 12.1 q1.35 -1.9 2.7 0' fill='none' stroke='%234a1d3d' stroke-width='1.45' stroke-linecap='round'/%3E %3Cellipse cx='6.9' cy='15' rx='1.7' ry='1.05' fill='%23fb7185' opacity='0.75'/%3E %3Cellipse cx='17.1' cy='15' rx='1.7' ry='1.05' fill='%23fb7185' opacity='0.75'/%3E %3Cpath d='M10.5 15.2 q0.75 0.9 1.5 0 q0.75 0.9 1.5 0' fill='none' stroke='%234a1d3d' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E %3C/svg%3E");
+  --ts-ico-kawaii: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.2 7.4 L4.6 3.2 L8.6 5.2 Z M18.8 7.4 L19.4 3.2 L15.4 5.2 Z' fill='black'/%3E%3Ccircle cx='12' cy='13' r='8.4' fill='none' stroke='black' stroke-width='2.1'/%3E%3Cpath d='M7.4 12.1 q1.35 -1.9 2.7 0 M13.9 12.1 q1.35 -1.9 2.7 0' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round'/%3E%3Cpath d='M10.3 15.4 q0.85 1 1.7 0 q0.85 1 1.7 0' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --ts-svg-flower: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cdefs%3E%3ClinearGradient id='p' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fdf4ff'/%3E%3Cstop offset='1' stop-color='%23f0abfc'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(0 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(72 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(144 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(216 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(288 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E %3Ccircle cx='12' cy='12' r='3.1' fill='%23fde047' stroke='%23f59e0b' stroke-width='0.9'/%3E %3Ccircle cx='11.1' cy='11.1' r='0.8' fill='%23fffbeb'/%3E %3C/svg%3E");
+  --ts-ico-flower: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(0 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(72 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(144 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(216 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(288 12 12)' fill='black'/%3E%3C/svg%3E");
+  --ts-ico-sun: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Ccircle cx='12' cy='12' r='4.6' fill='black'/%3E %3Cpath d='M18.9 12 L21.7 12 M16.88 16.88 L18.86 18.86 M12 18.9 L12 21.7 M7.12 16.88 L5.14 18.86 M5.1 12 L2.3 12 M7.12 7.12 L5.14 5.14 M12 5.1 L12 2.3 M16.88 7.12 L18.86 5.14' fill='none' stroke='black' stroke-width='2.1' stroke-linecap='round'/%3E %3C/svg%3E");
+  --ts-ico-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath d='M10.54 4.61 A8.2 8.2 0 1 0 18.95 14.8 A6.7 6.7 0 0 1 10.54 4.61 Z' fill='black'/%3E %3Cpath d='M18.6 2.6 L19.25 4.35 L21 5 L19.25 5.65 L18.6 7.4 L17.95 5.65 L16.2 5 L17.95 4.35 Z' fill='black'/%3E %3C/svg%3E");
+  --ts-ico-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath d='M12 21 C5 15.6 2.5 12.3 2.5 8.6 C2.5 5.6 4.9 3.4 7.6 3.4 C9.5 3.4 11 4.4 12 6 C13 4.4 14.5 3.4 16.4 3.4 C19.1 3.4 21.5 5.6 21.5 8.6 C21.5 12.3 19 15.6 12 21 Z' fill='black'/%3E %3C/svg%3E");
 
   --ts-active-bg-light: rgba(20, 184, 166, 0.1);
   --ts-active-fg-light: rgb(13, 116, 104);
@@ -152,6 +159,13 @@
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
   --ts-ico-draft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath fill='black' fill-rule='evenodd' d='M4.3 19.7 L5.4 15.1 L15.3 5.2 C16.1 4.4 17.4 4.4 18.2 5.2 L18.8 5.8 C19.6 6.6 19.6 7.9 18.8 8.7 L8.9 18.6 Z M14.1 7.6 L16.4 9.9 L17.3 9 L15 6.7 Z'/%3E %3Cpath d='M12.6 20.2 C14.2 19.2 15.6 21 17.2 20 C18.1 19.4 18.9 19.6 19.8 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E %3C/svg%3E");
   --ts-ico-deadline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cg fill='none' stroke='black' stroke-linecap='round'%3E %3Cpath d='M6 3.4 H18 M6 20.6 H18' stroke-width='2.2'/%3E %3Cpath d='M7.6 3.8 C7.6 8.6 10.9 10.2 10.9 12 C10.9 13.8 7.6 15.4 7.6 20.2 M16.4 3.8 C16.4 8.6 13.1 10.2 13.1 12 C13.1 13.8 16.4 15.4 16.4 20.2' stroke-width='1.7'/%3E %3Cpath d='M12 10.8 V16' stroke-width='0.9'/%3E %3C/g%3E %3Cpath d='M9.3 7.2 H14.7 C14.3 8.8 12.8 9.9 12 10.6 C11.2 9.9 9.7 8.8 9.3 7.2 Z' fill='black'/%3E %3Cpath d='M8.7 19.3 C9.3 17.1 10.9 16.2 12 15.8 C13.1 16.2 14.7 17.1 15.3 19.3 Z' fill='black'/%3E %3C/svg%3E");
+  --ts-svg-kawaii: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cdefs%3E%3CradialGradient id='f' cx='0.38' cy='0.32' r='0.8'%3E%3Cstop offset='0' stop-color='%23fff1f8'/%3E%3Cstop offset='1' stop-color='%23f9a8d4'/%3E%3C/radialGradient%3E%3C/defs%3E %3Cpath d='M5.2 7.4 L4.6 3.2 L8.6 5.2 Z M18.8 7.4 L19.4 3.2 L15.4 5.2 Z' fill='%23f472b6'/%3E %3Ccircle cx='12' cy='13' r='9' fill='url(%23f)' stroke='%23ec4899' stroke-width='1.1'/%3E %3Cpath d='M7.4 12.1 q1.35 -1.9 2.7 0 M13.9 12.1 q1.35 -1.9 2.7 0' fill='none' stroke='%234a1d3d' stroke-width='1.45' stroke-linecap='round'/%3E %3Cellipse cx='6.9' cy='15' rx='1.7' ry='1.05' fill='%23fb7185' opacity='0.75'/%3E %3Cellipse cx='17.1' cy='15' rx='1.7' ry='1.05' fill='%23fb7185' opacity='0.75'/%3E %3Cpath d='M10.5 15.2 q0.75 0.9 1.5 0 q0.75 0.9 1.5 0' fill='none' stroke='%234a1d3d' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E %3C/svg%3E");
+  --ts-ico-kawaii: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.2 7.4 L4.6 3.2 L8.6 5.2 Z M18.8 7.4 L19.4 3.2 L15.4 5.2 Z' fill='black'/%3E%3Ccircle cx='12' cy='13' r='8.4' fill='none' stroke='black' stroke-width='2.1'/%3E%3Cpath d='M7.4 12.1 q1.35 -1.9 2.7 0 M13.9 12.1 q1.35 -1.9 2.7 0' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round'/%3E%3Cpath d='M10.3 15.4 q0.85 1 1.7 0 q0.85 1 1.7 0' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --ts-svg-flower: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cdefs%3E%3ClinearGradient id='p' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fdf4ff'/%3E%3Cstop offset='1' stop-color='%23f0abfc'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(0 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(72 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(144 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(216 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E%3Cellipse cx='12' cy='6.7' rx='3.2' ry='4.3' transform='rotate(288 12 12)' fill='url(%23p)' stroke='%23d946ef' stroke-width='0.8'/%3E %3Ccircle cx='12' cy='12' r='3.1' fill='%23fde047' stroke='%23f59e0b' stroke-width='0.9'/%3E %3Ccircle cx='11.1' cy='11.1' r='0.8' fill='%23fffbeb'/%3E %3C/svg%3E");
+  --ts-ico-flower: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(0 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(72 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(144 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(216 12 12)' fill='black'/%3E%3Cellipse cx='12' cy='6.1' rx='3' ry='4.1' transform='rotate(288 12 12)' fill='black'/%3E%3C/svg%3E");
+  --ts-ico-sun: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Ccircle cx='12' cy='12' r='4.6' fill='black'/%3E %3Cpath d='M18.9 12 L21.7 12 M16.88 16.88 L18.86 18.86 M12 18.9 L12 21.7 M7.12 16.88 L5.14 18.86 M5.1 12 L2.3 12 M7.12 7.12 L5.14 5.14 M12 5.1 L12 2.3 M16.88 7.12 L18.86 5.14' fill='none' stroke='black' stroke-width='2.1' stroke-linecap='round'/%3E %3C/svg%3E");
+  --ts-ico-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath d='M10.54 4.61 A8.2 8.2 0 1 0 18.95 14.8 A6.7 6.7 0 0 1 10.54 4.61 Z' fill='black'/%3E %3Cpath d='M18.6 2.6 L19.25 4.35 L21 5 L19.25 5.65 L18.6 7.4 L17.95 5.65 L16.2 5 L17.95 4.35 Z' fill='black'/%3E %3C/svg%3E");
+  --ts-ico-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath d='M12 21 C5 15.6 2.5 12.3 2.5 8.6 C2.5 5.6 4.9 3.4 7.6 3.4 C9.5 3.4 11 4.4 12 6 C13 4.4 14.5 3.4 16.4 3.4 C19.1 3.4 21.5 5.6 21.5 8.6 C21.5 12.3 19 15.6 12 21 Z' fill='black'/%3E %3C/svg%3E");
 
   --ts-checkbox-accent-light: rgb(100, 116, 139);
   --ts-checkbox-accent-dark: rgb(105, 121, 143);
@@ -613,6 +627,34 @@
   --ts-checkbox-glyph-mask: var(--ts-ico-deadline);
 }
 
+.rm-checkbox[data-ts-checkbox-shape="kawaii"] {
+  --ts-checkbox-glyph-width: 10px;
+  --ts-checkbox-glyph-height: 10px;
+  --ts-checkbox-glyph-background: var(--ts-checkbox-ink);
+  --ts-checkbox-glyph-mask: var(--ts-ico-kawaii);
+}
+
+.rm-checkbox[data-ts-checkbox-shape="flower"] {
+  --ts-checkbox-glyph-width: 10px;
+  --ts-checkbox-glyph-height: 10px;
+  --ts-checkbox-glyph-background: var(--ts-checkbox-ink);
+  --ts-checkbox-glyph-mask: var(--ts-ico-flower);
+}
+
+.rm-checkbox[data-ts-checkbox-shape="sun"] {
+  --ts-checkbox-glyph-width: 10px;
+  --ts-checkbox-glyph-height: 10px;
+  --ts-checkbox-glyph-background: var(--ts-checkbox-ink);
+  --ts-checkbox-glyph-mask: var(--ts-ico-sun);
+}
+
+.rm-checkbox[data-ts-checkbox-shape="moon"] {
+  --ts-checkbox-glyph-width: 10px;
+  --ts-checkbox-glyph-height: 10px;
+  --ts-checkbox-glyph-background: var(--ts-checkbox-ink);
+  --ts-checkbox-glyph-mask: var(--ts-ico-moon);
+}
+
 .rm-checkbox[data-ts-checkbox-shape="custom"] {
   --ts-checkbox-glyph-width: 7px;
   --ts-checkbox-glyph-height: 7px;
@@ -639,6 +681,8 @@
   --ts-bug-ink: linear-gradient(160deg, #65a30d, #3f6212);
   --ts-draft-ink: linear-gradient(150deg, #3b82f6, #1d4ed8);
   --ts-deadline-ink: linear-gradient(180deg, #f97316, #c2410c);
+  --ts-sun-ink: linear-gradient(150deg, #f59e0b, #ea580c);
+  --ts-moon-ink: linear-gradient(150deg, #818cf8, #4338ca);
   --ts-unmapped-ink: linear-gradient(
     150deg,
     var(--ts-checkbox-accent),
@@ -659,6 +703,8 @@
   --ts-bug-ink: linear-gradient(180deg, #ecfccb, #bef264);
   --ts-draft-ink: linear-gradient(150deg, #dbeafe, #60a5fa);
   --ts-deadline-ink: linear-gradient(180deg, #fed7aa, #f97316);
+  --ts-sun-ink: linear-gradient(150deg, #fef08a, #fb923c);
+  --ts-moon-ink: linear-gradient(150deg, #eef2ff, #a5b4fc);
   --ts-unmapped-ink: linear-gradient(
     150deg,
     color-mix(in srgb, var(--ts-checkbox-accent) 44%, #ffffff),
@@ -1432,6 +1478,219 @@
   box-shadow: 0 0 14px rgba(249, 115, 22, 0.55) !important;
 }
 
+/* ---- Ported Custom Status: Kawaii (Blushing Cat Face) ---- */
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: transparent !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: -10%;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  clip-path: none;
+  transform: none;
+  background: var(--ts-svg-kawaii) center / contain no-repeat;
+  -webkit-mask: none;
+  mask: none;
+  filter: drop-shadow(0 0 3px rgba(244, 114, 182, 0.45));
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark::before {
+  filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.75));
+}
+
+/* ---- Ported Custom Status: Flower (Five-Petal Blossom) ---- */
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: transparent !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: -12%;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  clip-path: none;
+  transform: none;
+  background: var(--ts-svg-flower) center / contain no-repeat;
+  -webkit-mask: none;
+  mask: none;
+  filter: drop-shadow(0 0 3px rgba(232, 121, 249, 0.45));
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark::before {
+  filter: drop-shadow(0 0 6px rgba(232, 121, 249, 0.8));
+}
+
+/* ---- Ported Custom Status: Sun (Warm Radiant Orb) ---- */
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 50% !important;
+  border-color: #f59e0b !important;
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(253, 224, 71, 0.32),
+    rgba(251, 146, 60, 0.12)
+  ) !important;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.42) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #fbbf24 !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 5%;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: inherit;
+  clip-path: none;
+  transform: none;
+  background: var(--ts-sun-ink);
+  -webkit-mask: var(--ts-ico-sun) center / contain no-repeat;
+  mask: var(--ts-ico-sun) center / contain no-repeat;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #fde047 !important;
+  box-shadow: 0 0 15px rgba(253, 224, 71, 0.6) !important;
+}
+
+/* ---- Ported Custom Status: Moon (Crescent Orb) ---- */
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 50% !important;
+  border-color: #6366f1 !important;
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(199, 210, 254, 0.5),
+    rgba(99, 102, 241, 0.14)
+  ) !important;
+  box-shadow:
+    inset 0 1px 0 var(--ts-gloss),
+    0 0 9px rgba(129, 140, 248, 0.34) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #a5b4fc !important;
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(165, 180, 252, 0.26),
+    rgba(49, 46, 129, 0.24)
+  ) !important;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 8%;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: inherit;
+  clip-path: none;
+  transform: none;
+  background: var(--ts-moon-ink);
+  -webkit-mask: var(--ts-ico-moon) center / contain no-repeat;
+  mask: var(--ts-ico-moon) center / contain no-repeat;
+}
+
+:root[data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #c7d2fe !important;
+  box-shadow: 0 0 14px rgba(165, 180, 252, 0.58) !important;
+}
+
 /* ---- Visual Preset: Solid (Vivid Solid) ---- */
 :root[data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status],
 :root[data-ts-theme="dark"][data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status] {
@@ -1610,6 +1869,61 @@
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #f59e0b !important;
+  background: linear-gradient(145deg, #fde047, #ea580c) !important;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.45) !important;
+}
+
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #818cf8 !important;
+  background: linear-gradient(145deg, #818cf8, #312e81) !important;
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.42) !important;
+}
+
+:root[data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
   > .check-container
   > input:not(:checked)
@@ -1656,6 +1970,16 @@
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before {
@@ -1796,6 +2120,16 @@
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="minimal"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before {
@@ -2919,6 +3253,74 @@ a.rm-page-ref[data-task-status-key]:hover {
   --ts-pill-marker-transform: none;
   --ts-pill-marker-opacity: 0.9;
   --ts-pill-marker-mask: var(--ts-ico-deadline);
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview,
+  .ts-status-peek,
+  .ts-status-choice-glyph
+)[data-ts-status-glyph="kawaii"] {
+  --ts-pill-marker-width: 8px;
+  --ts-pill-marker-height: 8px;
+  --ts-pill-marker-radius: 0;
+  --ts-pill-marker-border: 0 solid transparent;
+  --ts-pill-marker-background: currentColor;
+  --ts-pill-marker-transform: none;
+  --ts-pill-marker-opacity: 0.9;
+  --ts-pill-marker-mask: var(--ts-ico-kawaii);
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview,
+  .ts-status-peek,
+  .ts-status-choice-glyph
+)[data-ts-status-glyph="flower"] {
+  --ts-pill-marker-width: 8px;
+  --ts-pill-marker-height: 8px;
+  --ts-pill-marker-radius: 0;
+  --ts-pill-marker-border: 0 solid transparent;
+  --ts-pill-marker-background: currentColor;
+  --ts-pill-marker-transform: none;
+  --ts-pill-marker-opacity: 0.9;
+  --ts-pill-marker-mask: var(--ts-ico-flower);
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview,
+  .ts-status-peek,
+  .ts-status-choice-glyph
+)[data-ts-status-glyph="sun"] {
+  --ts-pill-marker-width: 8px;
+  --ts-pill-marker-height: 8px;
+  --ts-pill-marker-radius: 0;
+  --ts-pill-marker-border: 0 solid transparent;
+  --ts-pill-marker-background: currentColor;
+  --ts-pill-marker-transform: none;
+  --ts-pill-marker-opacity: 0.9;
+  --ts-pill-marker-mask: var(--ts-ico-sun);
+}
+
+:where(
+  span.rm-page-ref,
+  a.rm-page-ref,
+  .ts-status-pill-preview,
+  .ts-status-peek,
+  .ts-status-choice-glyph
+)[data-ts-status-glyph="moon"] {
+  --ts-pill-marker-width: 8px;
+  --ts-pill-marker-height: 8px;
+  --ts-pill-marker-radius: 0;
+  --ts-pill-marker-border: 0 solid transparent;
+  --ts-pill-marker-background: currentColor;
+  --ts-pill-marker-transform: none;
+  --ts-pill-marker-opacity: 0.9;
+  --ts-pill-marker-mask: var(--ts-ico-moon);
 }
 
 :where(

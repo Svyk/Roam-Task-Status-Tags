@@ -333,7 +333,19 @@ test("the reveal control carries status shapes and light, dark, focus, motion, a
 });
 
 const MEDIA_SHAPES = ["series", "movie", "watching", "watchlist", "upcoming", "rewatch", "dropped"];
-const EXTRA_SHAPES = ["important", "starred", "discuss", "billable", "bug", "draft", "deadline"];
+const EXTRA_SHAPES = [
+  "important",
+  "starred",
+  "discuss",
+  "billable",
+  "bug",
+  "draft",
+  "deadline",
+  "kawaii",
+  "flower",
+  "sun",
+  "moon",
+];
 
 function ruleBody(selectorFragment) {
   const at = css.indexOf(selectorFragment);
@@ -402,7 +414,7 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   const glyphRules = [
     ...stripped.matchAll(/(?:^|\n)\.rm-checkbox\[data-ts-checkbox-shape="([^"]+)"\]\s*\{([^}]*)\}/g),
   ];
-  assert.equal(glyphRules.length, 22, "expected all 21 built-in/media/extra shapes plus custom");
+  assert.equal(glyphRules.length, 26, "expected all 25 built-in/media/extra shapes plus custom");
   for (const [, shape, body] of glyphRules) {
     assert.doesNotMatch(
       body,

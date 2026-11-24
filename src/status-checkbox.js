@@ -67,6 +67,10 @@ const BUILTIN_SHAPES = Object.freeze({
   BUG: "bug",
   DRAFT: "draft",
   DEADLINE: "deadline",
+  KAWAII: "kawaii",
+  FLOWER: "flower",
+  SUN: "sun",
+  MOON: "moon",
 });
 
 export const MEDIA_STATUS_SHAPES = Object.freeze({
@@ -87,6 +91,10 @@ export const EXTRA_STATUS_SHAPES = Object.freeze({
   bug: "bug",
   draft: "draft",
   deadline: "deadline",
+  kawaii: "kawaii",
+  flower: "flower",
+  sun: "sun",
+  moon: "moon",
 });
 
 export function getMediaStatusShape(name) {
