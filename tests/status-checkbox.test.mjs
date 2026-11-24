@@ -199,6 +199,39 @@ test("checkbox style normalization falls back to Outline and maps attribute valu
   assert.equal(checkboxStyleToAttributeValue("invalid"), null);
   assert.equal(pickOnAccentColor({ r: 255, g: 255, b: 0 }), "#10161a");
   assert.equal(pickOnAccentColor({ r: 30, g: 41, b: 59 }), "#ffffff");
+  assert.equal(pickOnAccentColor({ r: 244, g: 63, b: 94 }), "#ffffff");
+  assert.equal(pickOnAccentColor({ r: 234, g: 179, b: 8 }), "#10161a");
+});
+
+test("all 21 built-in statuses meet Solid 3:1 glyph contrast in light and dark", () => {
+  const allBuiltins = {
+    ...DEFAULT_COLORS,
+    SERIES: "#c026d3",
+    MOVIE: "#f97316",
+    WATCHING: "#22c55e",
+    WATCHLIST: "#ec4899",
+    UPCOMING: "#0d87f2",
+    REWATCH: "#84cc16",
+    DROPPED: "#7c2d12",
+    IMPORTANT: "#dc2626",
+    STARRED: "#d97706",
+    DISCUSS: "#8b5cf6",
+    BILLABLE: "#10b981",
+    BUG: "#65a30d",
+    DRAFT: "#3b82f6",
+    DEADLINE: "#ea580c",
+  };
+  for (const [key, hex] of Object.entries(allBuiltins)) {
+    const palette = buildStatusCheckboxColors({ baseRgb: hexRgb(hex) });
+    assert.ok(
+      contrastRatio(hexRgb(palette.lightOnAccentCss), palette.lightAccent) >= 3.0,
+      `${key} light Solid on-accent contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(hexRgb(palette.darkOnAccentCss), palette.darkAccent) >= 3.0,
+      `${key} dark Solid on-accent contrast below 3:1`
+    );
+  }
 });
 
 test("every default status derives small-text-safe light and dark pill colors", () => {

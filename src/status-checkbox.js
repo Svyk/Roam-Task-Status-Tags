@@ -221,6 +221,7 @@ export function pickOnAccentColor(accentRgb) {
   const accent = normalizeRgb(accentRgb);
   const whiteContrast = contrastRatio(WHITE, accent);
   const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  if (whiteContrast >= 3.4) return WHITE_CSS;
   return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
 }
 

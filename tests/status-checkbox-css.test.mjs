@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { contrastRatio } from "../src/status-checkbox.js";
+
 const css = await readFile(new URL("../src/extension.css", import.meta.url), "utf8");
 const source = await readFile(new URL("../src/extension.js", import.meta.url), "utf8");
 const checkboxSource = await readFile(
@@ -422,4 +424,62 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-on-accent\)/);
   assert.match(css, /@media print[\s\S]*:root\[data-ts-checkbox-style\]/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*:root\[data-ts-checkbox-style\]/);
+});
+
+test("hover lift, active press, forbidden selectors, and static Solid on-accent contrast are enforced", () => {
+  assert.doesNotMatch(css, /backdrop-filter\s*:/i);
+  assert.doesNotMatch(css, /:has\(/i);
+  assert.doesNotMatch(css, /::selection/i);
+
+  assert.match(
+    css,
+    /\.rm-checkbox\[data-ts-checkbox-status\]\s*>\s*\.check-container:hover\s*>\s*input:not\(:checked\)\s*~\s*\.checkmark[\s\S]*?transform:\s*scale\(/
+  );
+  assert.match(
+    css,
+    /\.rm-checkbox\[data-ts-checkbox-status\]\s*>\s*\.check-container:active\s*>\s*input:not\(:checked\)\s*~\s*\.checkmark[\s\S]*?transform:\s*scale\(/
+  );
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.check-container:active[\s\S]*?transform:\s*none !important;/
+  );
+
+  const parseCssColor = (value) => {
+    const rgbMatch = value.match(/^rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/);
+    if (rgbMatch) {
+      return { r: Number(rgbMatch[1]), g: Number(rgbMatch[2]), b: Number(rgbMatch[3]) };
+    }
+    const hexMatch = value.match(/^#([0-9a-f]{6})$/i);
+    if (hexMatch) {
+      const hex = hexMatch[1];
+      return {
+        r: Number.parseInt(hex.slice(0, 2), 16),
+        g: Number.parseInt(hex.slice(2, 4), 16),
+        b: Number.parseInt(hex.slice(4, 6), 16),
+      };
+    }
+    throw new Error(`Unsupported color format in static CSS check: ${value}`);
+  };
+
+  for (const status of [
+    "ACTIVE",
+    "WAITING",
+    "IN_REVIEW",
+    "HOLDING",
+    "INCUBATING",
+    "ALERT",
+    "CANCELLED",
+  ]) {
+    const body = ruleBody(`.rm-checkbox[data-ts-checkbox-status="${status}"] {`);
+    for (const mode of ["light", "dark"]) {
+      const accent = body.match(new RegExp(`--ts-checkbox-accent-${mode}:\\s*([^;]+);`))?.[1]?.trim();
+      const onAccent = body.match(new RegExp(`--ts-checkbox-on-accent-${mode}:\\s*([^;]+);`))?.[1]?.trim();
+      assert.ok(accent && onAccent, `missing static ${mode} accent/on-accent for ${status}`);
+      const ratio = contrastRatio(parseCssColor(onAccent), parseCssColor(accent));
+      assert.ok(
+        ratio >= 3.0,
+        `${status} ${mode} Solid glyph contrast ${ratio.toFixed(2)} is below 3:1`
+      );
+    }
+  }
 });
