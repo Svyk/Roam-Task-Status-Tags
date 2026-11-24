@@ -1,5 +1,1448 @@
 /* Roam Task Status Tags v0.16.0 | generated; edit src/ */
 
+// src/status-checkbox.js
+var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
+var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
+var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
+var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
+var AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
+var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
+var STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
+var STATUS_POP_RECENT_WINDOW_MS = 2e3;
+var STATUS_POP_DURATION_MS = 520;
+var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
+var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
+var HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
+var OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
+var CHECKBOX_STYLE_VALUES = Object.freeze({
+  OUTLINE: "Outline",
+  GLASS: "Glass",
+  SOLID: "Solid",
+  MINIMAL: "Minimal"
+});
+function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
+  const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(CHECKBOX_STYLE_VALUES).includes(normalized) ? normalized : fallback;
+}
+function checkboxStyleToAttributeValue(value) {
+  const normalized = normalizeCheckboxStyle(value);
+  if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
+  if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
+  if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
+  return null;
+}
+var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
+var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
+var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
+var NEAR_BLACK = Object.freeze({ r: 16, g: 22, b: 26 });
+var WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
+var NEAR_BLACK_CSS = "#10161a";
+var WHITE_CSS = "#ffffff";
+var BUILTIN_SHAPES = Object.freeze({
+  ACTIVE: "active",
+  WAITING: "waiting",
+  IN_REVIEW: "in-review",
+  HOLDING: "holding",
+  INCUBATING: "incubating",
+  ALERT: "alert",
+  CANCELLED: "cancelled",
+  SERIES: "series",
+  MOVIE: "movie",
+  WATCHING: "watching",
+  WATCHLIST: "watchlist",
+  UPCOMING: "upcoming",
+  REWATCH: "rewatch",
+  DROPPED: "dropped",
+  IMPORTANT: "important",
+  STARRED: "starred",
+  DISCUSS: "discuss",
+  BILLABLE: "billable",
+  BUG: "bug",
+  DRAFT: "draft",
+  DEADLINE: "deadline",
+  KAWAII: "kawaii",
+  FLOWER: "flower",
+  SUN: "sun",
+  MOON: "moon"
+});
+var MEDIA_STATUS_SHAPES = Object.freeze({
+  series: "series",
+  movie: "movie",
+  watching: "watching",
+  watchlist: "watchlist",
+  upcoming: "upcoming",
+  rewatch: "rewatch",
+  dropped: "dropped"
+});
+var EXTRA_STATUS_SHAPES = Object.freeze({
+  important: "important",
+  starred: "starred",
+  discuss: "discuss",
+  billable: "billable",
+  bug: "bug",
+  draft: "draft",
+  deadline: "deadline",
+  kawaii: "kawaii",
+  flower: "flower",
+  sun: "sun",
+  moon: "moon"
+});
+function getMediaStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key) ? MEDIA_STATUS_SHAPES[key] : null;
+}
+function getExtraStatusShape(name) {
+  const key = String(name ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(EXTRA_STATUS_SHAPES, key) ? EXTRA_STATUS_SHAPES[key] : null;
+}
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+function channel(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? clamp(parsed, 0, 255) : 0;
+}
+function normalizeRgb(value, fallback = BLACK) {
+  if (!value || typeof value !== "object") return { ...fallback };
+  return {
+    r: channel(value.r),
+    g: channel(value.g),
+    b: channel(value.b)
+  };
+}
+function linearizedChannel(value) {
+  const normalized = channel(value) / 255;
+  return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+function relativeLuminance(rgb) {
+  const value = normalizeRgb(rgb);
+  return 0.2126 * linearizedChannel(value.r) + 0.7152 * linearizedChannel(value.g) + 0.0722 * linearizedChannel(value.b);
+}
+function contrastRatio(first, second) {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+function mixRgb(from, to, amount) {
+  const start = normalizeRgb(from);
+  const end = normalizeRgb(to);
+  const ratio = clamp(Number(amount) || 0, 0, 1);
+  return {
+    r: start.r + (end.r - start.r) * ratio,
+    g: start.g + (end.g - start.g) * ratio,
+    b: start.b + (end.b - start.b) * ratio
+  };
+}
+function compositeRgb(foreground, background, alpha) {
+  const front = normalizeRgb(foreground);
+  const back = normalizeRgb(background);
+  const opacity = clamp(Number(alpha) || 0, 0, 1);
+  return {
+    r: front.r * opacity + back.r * (1 - opacity),
+    g: front.g * opacity + back.g * (1 - opacity),
+    b: front.b * opacity + back.b * (1 - opacity)
+  };
+}
+function nearestPassingMix(base, surface, target, minimumContrast) {
+  if (contrastRatio(target, surface) < minimumContrast) return null;
+  let low = 0;
+  let high = 1;
+  for (let index = 0; index < 28; index += 1) {
+    const middle = (low + high) / 2;
+    const candidate = mixRgb(base, target, middle);
+    if (contrastRatio(candidate, surface) >= minimumContrast) high = middle;
+    else low = middle;
+  }
+  return {
+    amount: high,
+    color: mixRgb(base, target, high)
+  };
+}
+function deriveAccessibleAccent(baseRgb, surfaceRgb, minimumContrast = 3.2) {
+  const base = normalizeRgb(baseRgb);
+  const surface = normalizeRgb(surfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const required = Math.max(1, Number(minimumContrast) || 3.2);
+  if (contrastRatio(base, surface) >= required) return base;
+  const candidates = [
+    nearestPassingMix(base, surface, BLACK, required),
+    nearestPassingMix(base, surface, WHITE, required)
+  ].filter(Boolean);
+  candidates.sort((a, b) => a.amount - b.amount);
+  return candidates[0]?.color || (relativeLuminance(surface) > 0.5 ? { ...BLACK } : { ...WHITE });
+}
+function roundedRgb(rgb) {
+  const value = normalizeRgb(rgb);
+  return {
+    r: Math.round(value.r),
+    g: Math.round(value.g),
+    b: Math.round(value.b)
+  };
+}
+function rgbCss(rgb) {
+  const value = roundedRgb(rgb);
+  return `rgb(${value.r}, ${value.g}, ${value.b})`;
+}
+function rgbaCss(rgb, alpha) {
+  const value = roundedRgb(rgb);
+  const opacity = clamp(Number(alpha) || 0, 0, 1);
+  return `rgba(${value.r}, ${value.g}, ${value.b}, ${opacity})`;
+}
+function pickOnAccentColor(accentRgb) {
+  const accent = normalizeRgb(accentRgb);
+  const whiteContrast = contrastRatio(WHITE, accent);
+  const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  if (whiteContrast >= 3.4) return WHITE_CSS;
+  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
+function buildStatusCheckboxColors({
+  baseRgb,
+  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
+  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
+  minimumContrast = 3.2
+} = {}) {
+  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
+  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
+  const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
+  const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
+  const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
+  const roundedLightAccent = roundedRgb(lightAccent);
+  const roundedDarkAccent = roundedRgb(darkAccent);
+  return Object.freeze({
+    base: roundedRgb(base),
+    lightSurface: roundedRgb(lightSurface),
+    darkSurface: roundedRgb(darkSurface),
+    lightAccent: roundedLightAccent,
+    darkAccent: roundedDarkAccent,
+    lightAccentCss: rgbCss(roundedLightAccent),
+    darkAccentCss: rgbCss(roundedDarkAccent),
+    lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
+    darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
+    lightWashCss: rgbaCss(base, 0.09),
+    darkWashCss: rgbaCss(base, 0.16),
+    lightBeaconCss: rgbaCss(roundedLightAccent, 0.52),
+    darkBeaconCss: rgbaCss(roundedDarkAccent, 0.68)
+  });
+}
+function buildStatusPillColors({
+  baseRgb,
+  preferredTextRgb,
+  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
+  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
+  minimumTextContrast = 4.8,
+  lightBackgroundAlpha = 0.1,
+  darkBackgroundAlpha = 0.2
+} = {}) {
+  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
+  const preferredText = normalizeRgb(preferredTextRgb, base);
+  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
+  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
+  const lightBackground = compositeRgb(base, lightSurface, lightBackgroundAlpha);
+  const darkBackground = compositeRgb(base, darkSurface, darkBackgroundAlpha);
+  const certificationContrast = Math.max(1, Number(minimumTextContrast) || 4.8) + 0.08;
+  const lightText = deriveAccessibleAccent(
+    preferredText,
+    lightBackground,
+    certificationContrast
+  );
+  const darkText = deriveAccessibleAccent(
+    preferredText,
+    darkBackground,
+    certificationContrast
+  );
+  const lightBorder = deriveAccessibleAccent(base, lightSurface, 3.25);
+  const darkBorder = deriveAccessibleAccent(base, darkSurface, 3.25);
+  return Object.freeze({
+    base: roundedRgb(base),
+    lightSurface: roundedRgb(lightSurface),
+    darkSurface: roundedRgb(darkSurface),
+    lightBackground: roundedRgb(lightBackground),
+    darkBackground: roundedRgb(darkBackground),
+    lightText: roundedRgb(lightText),
+    darkText: roundedRgb(darkText),
+    lightBackgroundCss: rgbaCss(base, lightBackgroundAlpha),
+    darkBackgroundCss: rgbaCss(base, darkBackgroundAlpha),
+    lightTextCss: rgbCss(lightText),
+    darkTextCss: rgbCss(darkText),
+    lightBorderCss: rgbaCss(lightBorder, 0.48),
+    darkBorderCss: rgbaCss(darkBorder, 0.62)
+  });
+}
+function getStatusCheckboxShape(statusKey, statusName) {
+  const key = String(statusKey || "").trim().toUpperCase();
+  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || getExtraStatusShape(statusName) || "custom";
+}
+function getStatusGroup(statusKey, statusName) {
+  const shape = getStatusCheckboxShape(statusKey, statusName);
+  if (Object.values(MEDIA_STATUS_SHAPES).includes(shape)) return "media";
+  if (Object.values(EXTRA_STATUS_SHAPES).includes(shape)) return "extra";
+  return "task";
+}
+function isMediaStatus(statusKey, statusName) {
+  return getStatusGroup(statusKey, statusName) === "media";
+}
+function lookupStatusName(statusNames, statusKey) {
+  if (!statusKey) return null;
+  if (statusNames instanceof Map) return statusNames.get(statusKey) || null;
+  return statusNames?.[statusKey] || null;
+}
+function lookupStatusKey(statusTagToKey, tagTitle) {
+  if (!tagTitle) return null;
+  if (statusTagToKey instanceof Map) return statusTagToKey.get(tagTitle) || null;
+  return statusTagToKey?.[tagTitle] || null;
+}
+function decideStatusCheckboxAnnotation({
+  enabled = true,
+  tagTitle,
+  statusTagToKey,
+  statusNames,
+  blockString,
+  textHelpers
+} = {}) {
+  if (!enabled || typeof blockString !== "string" || !textHelpers?.parseManagedPrefix) {
+    return null;
+  }
+  const statusKey = lookupStatusKey(statusTagToKey, tagTitle);
+  if (!statusKey) return null;
+  const parsed = textHelpers.parseManagedPrefix(blockString);
+  if (!parsed?.managed || !parsed?.hadStatus || parsed.currentStatus !== statusKey || parsed.taskKind !== "todo" && parsed.taskKind !== "done") {
+    return null;
+  }
+  return Object.freeze({
+    statusKey,
+    shape: getStatusCheckboxShape(statusKey, lookupStatusName(statusNames, statusKey))
+  });
+}
+function hasClass(element, className) {
+  return Boolean(element?.classList?.contains?.(className));
+}
+function findSiblingTaskCheckbox(statusPill) {
+  const parent = statusPill?.parentElement;
+  if (!parent) return null;
+  const children = Array.from(parent.children || []);
+  const candidates = children.filter((child) => hasClass(child, "rm-checkbox"));
+  if (candidates.length !== 1) return null;
+  const checkbox = candidates[0];
+  const input = checkbox.querySelector?.('input[type="checkbox"]');
+  const checkmark = checkbox.querySelector?.(".checkmark");
+  return input && checkmark ? checkbox : null;
+}
+function clearStatusCheckboxAnnotation(checkbox) {
+  if (!checkbox?.removeAttribute) return;
+  checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+  checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
+}
+function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
+  if (!checkbox?.setAttribute || !decision?.statusKey) {
+    clearStatusCheckboxAnnotation(checkbox);
+    return false;
+  }
+  checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, decision.statusKey);
+  checkbox.setAttribute(
+    CHECKBOX_SHAPE_ATTRIBUTE,
+    decision.shape || getStatusCheckboxShape(decision.statusKey)
+  );
+  const certifiedUid = String(blockUid || "").trim();
+  if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
+  else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  return true;
+}
+function syncStatusCheckboxForPill({
+  statusPill,
+  enabled = true,
+  tagTitle,
+  statusTagToKey,
+  statusNames,
+  blockString,
+  blockUid,
+  textHelpers
+} = {}) {
+  const checkbox = findSiblingTaskCheckbox(statusPill);
+  if (!checkbox) return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
+  clearStatusCheckboxAnnotation(checkbox);
+  const decision = decideStatusCheckboxAnnotation({
+    enabled,
+    tagTitle,
+    statusTagToKey,
+    statusNames,
+    blockString,
+    textHelpers
+  });
+  if (!decision) return Object.freeze({ annotated: false, reason: "not-managed" });
+  applyStatusCheckboxAnnotation(checkbox, decision, blockUid);
+  return Object.freeze({
+    annotated: true,
+    checkbox,
+    statusKey: decision.statusKey,
+    shape: decision.shape
+  });
+}
+function clearStatusPillPresentation(statusPill) {
+  if (!statusPill?.removeAttribute) return;
+  statusPill.removeAttribute(MANAGED_STATUS_PILL_ATTRIBUTE);
+  statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+  statusPill.removeAttribute(ALERT_BEACON_ATTRIBUTE);
+}
+function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {}) {
+  if (!statusPill?.setAttribute) {
+    clearStatusPillPresentation(statusPill);
+    return false;
+  }
+  statusPill.setAttribute(MANAGED_STATUS_PILL_ATTRIBUTE, "true");
+  if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
+  else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
+  return true;
+}
+function escapeRegex(text) {
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function countExactStatusTagOccurrences(blockString, tagTitle) {
+  if (typeof blockString !== "string" || !tagTitle) return 0;
+  const title = escapeRegex(tagTitle);
+  const matcher = new RegExp(
+    `#\\[\\[${title}\\]\\]|#${title}(?=$|\\s|[\\.,;:!\\?\\)\\]\\}])`,
+    "g"
+  );
+  return Array.from(blockString.matchAll(matcher)).length;
+}
+function isExactManagedStatusPill({
+  statusPill,
+  tagTitle,
+  blockString
+} = {}) {
+  const parent = statusPill?.parentElement;
+  if (!parent || statusPill.getAttribute?.("data-tag") !== tagTitle) return false;
+  const checkbox = findSiblingTaskCheckbox(statusPill);
+  if (!checkbox) return false;
+  const children = Array.from(parent.children || []);
+  if (children.indexOf(checkbox) >= children.indexOf(statusPill)) return false;
+  const renderedMatches = children.filter(
+    (child) => child?.classList?.contains?.("rm-page-ref") && child.getAttribute?.("data-tag") === tagTitle
+  );
+  const textOccurrences = countExactStatusTagOccurrences(blockString, tagTitle);
+  return renderedMatches.length > 0 && renderedMatches.length === textOccurrences && renderedMatches[0] === statusPill;
+}
+function syncStatusPresentationForPill({
+  statusPill,
+  hideManagedPill = false,
+  alertBeaconEnabled = false,
+  ...checkboxOptions
+} = {}) {
+  clearStatusPillPresentation(statusPill);
+  if (!findSiblingTaskCheckbox(statusPill)) {
+    return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
+  }
+  if (!isExactManagedStatusPill({
+    statusPill,
+    tagTitle: checkboxOptions.tagTitle,
+    blockString: checkboxOptions.blockString
+  })) {
+    return Object.freeze({
+      annotated: false,
+      managed: false,
+      hidden: false,
+      reason: "not-exact-managed-pill"
+    });
+  }
+  const checkboxResult = syncStatusCheckboxForPill({
+    statusPill,
+    ...checkboxOptions
+  });
+  if (!checkboxResult.annotated) return checkboxResult;
+  applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  const input = checkboxResult.checkbox?.querySelector?.('input[type="checkbox"]');
+  const shouldBeacon = Boolean(alertBeaconEnabled) && checkboxResult.statusKey === "ALERT" && input?.checked === false;
+  if (shouldBeacon) {
+    checkboxResult.checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+    statusPill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
+  }
+  return Object.freeze({
+    ...checkboxResult,
+    managed: true,
+    hidden: Boolean(hideManagedPill),
+    alertBeacon: shouldBeacon
+  });
+}
+function includingRoot(root, selector) {
+  const nodes = [];
+  if (root?.matches?.(selector)) nodes.push(root);
+  if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
+  return nodes;
+}
+function clearOwnedStatusCheckboxes(root) {
+  const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
+    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser, .ts-rendered-icon")
+  );
+  checkboxes.forEach(clearStatusCheckboxAnnotation);
+  return checkboxes.length;
+}
+function clearOwnedStatusPillPresentations(root) {
+  const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
+  statusPills.forEach(clearStatusPillPresentation);
+  return statusPills.length;
+}
+function createStatusPopTracker({
+  windowLike = typeof window !== "undefined" ? window : globalThis,
+  lifecycle = null,
+  recentWindowMs = STATUS_POP_RECENT_WINDOW_MS,
+  popDurationMs = STATUS_POP_DURATION_MS
+} = {}) {
+  const recentWrites = /* @__PURE__ */ new Map();
+  const activePops = /* @__PURE__ */ new Map();
+  let enabled = true;
+  let disposed = false;
+  const setTimer = (fn, delay) => (windowLike?.setTimeout || globalThis.setTimeout)(fn, delay);
+  const clearTimer = (id) => {
+    if (id == null) return;
+    (windowLike?.clearTimeout || globalThis.clearTimeout)(id);
+  };
+  function clearRecent(blockUid) {
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return;
+    clearTimer(entry.timerId);
+    recentWrites.delete(blockUid);
+  }
+  function clearPopForCheckbox(checkbox) {
+    const active = activePops.get(checkbox);
+    if (active) {
+      clearTimer(active.timerId);
+      if (active.onAnimationEnd) {
+        try {
+          checkbox?.removeEventListener?.("animationend", active.onAnimationEnd);
+        } catch (_) {
+        }
+      }
+      activePops.delete(checkbox);
+    }
+    checkbox?.removeAttribute?.(STATUS_POP_ATTRIBUTE);
+  }
+  function markWritten(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid || !statusKey) return false;
+    clearRecent(blockUid);
+    const timerId = setTimer(() => {
+      recentWrites.delete(blockUid);
+    }, recentWindowMs);
+    recentWrites.set(blockUid, { statusKey, timerId });
+    return true;
+  }
+  function hasPendingWrite(blockUid, statusKey) {
+    if (disposed || !enabled || !blockUid) return false;
+    const entry = recentWrites.get(blockUid);
+    if (!entry) return false;
+    return !statusKey || entry.statusKey === statusKey;
+  }
+  function consumeWrite(blockUid) {
+    clearRecent(blockUid);
+  }
+  function isPopping(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox) return false;
+    const active = activePops.get(checkbox);
+    if (!active) return false;
+    return !statusKey || active.statusKey === statusKey;
+  }
+  function triggerPop(checkbox, statusKey) {
+    if (disposed || !enabled || !checkbox?.setAttribute || !statusKey) return false;
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    clearPopForCheckbox(checkbox);
+    checkbox.setAttribute(STATUS_POP_ATTRIBUTE, "true");
+    const finish = () => clearPopForCheckbox(checkbox);
+    const onAnimationEnd = (event) => {
+      if (event?.animationName && !String(event.animationName).startsWith("ts-status-pop-")) {
+        return;
+      }
+      finish();
+    };
+    const timerId = setTimer(finish, popDurationMs);
+    activePops.set(checkbox, { timerId, statusKey, onAnimationEnd });
+    try {
+      checkbox.addEventListener?.("animationend", onAnimationEnd);
+    } catch (_) {
+    }
+    return true;
+  }
+  function restorePopAttributeIfActive(checkbox, statusKey) {
+    if (!isPopping(checkbox, statusKey)) {
+      if (activePops.has(checkbox)) clearPopForCheckbox(checkbox);
+      return false;
+    }
+    const input = checkbox.querySelector?.('input[type="checkbox"]');
+    if (input?.checked === true) {
+      clearPopForCheckbox(checkbox);
+      return false;
+    }
+    checkbox.setAttribute?.(STATUS_POP_ATTRIBUTE, "true");
+    return true;
+  }
+  function clearAll() {
+    for (const uid of [...recentWrites.keys()]) clearRecent(uid);
+    for (const checkbox of [...activePops.keys()]) clearPopForCheckbox(checkbox);
+  }
+  function setEnabled(nextValue) {
+    enabled = Boolean(nextValue);
+    if (!enabled) clearAll();
+  }
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearAll();
+  }
+  lifecycle?.add?.(dispose);
+  return {
+    get enabled() {
+      return enabled;
+    },
+    get pendingCount() {
+      return recentWrites.size;
+    },
+    get activeCount() {
+      return activePops.size;
+    },
+    setEnabled,
+    markWritten,
+    hasPendingWrite,
+    consumeWrite,
+    isPopping,
+    triggerPop,
+    restorePopAttributeIfActive,
+    clearPopForCheckbox,
+    clearAll,
+    dispose
+  };
+}
+
+// src/public-api.js
+var API_VERSION = 1;
+var GLOBAL_NAME = "RoamTaskStatusTags";
+var READY_EVENT = "roam-task-status-tags:ready";
+var UNLOAD_EVENT = "roam-task-status-tags:unload";
+var API_EVENTS = Object.freeze(["change", "statuses"]);
+var API_FEATURES = Object.freeze([
+  "statusOfBlock",
+  "tasks",
+  "counts",
+  "renderIcon",
+  "aiTools"
+]);
+var DEFAULT_TASK_LIMIT = 50;
+var MIN_TASK_LIMIT = 1;
+var MAX_TASK_LIMIT = 200;
+var EVENT_TYPES = new Set(API_EVENTS);
+var PUBLIC_STATUSES = /* @__PURE__ */ new Set([
+  "updated",
+  "rejected",
+  "unknown",
+  "conflict",
+  "not-updated",
+  "unchanged"
+]);
+var emitters = /* @__PURE__ */ new WeakMap();
+var renderedIconCleanups = /* @__PURE__ */ new WeakMap();
+function requiredFunction(name, value) {
+  if (typeof value !== "function") throw new TypeError(`${name} is required`);
+  return value;
+}
+function helperOptionsFromCatalog(catalog) {
+  const statuses = {};
+  const cycleOrder = [];
+  for (const row of catalog || []) {
+    if (!row?.key || !row?.name) continue;
+    cycleOrder.push(row.key);
+    const tagTitle = row.tag || `task-status/${row.name}`;
+    statuses[row.key] = {
+      name: row.name,
+      label: row.name,
+      tagTitle,
+      tagTitles: [tagTitle]
+    };
+  }
+  return { statuses, cycleOrder };
+}
+function validStatusNames(catalog) {
+  return (Array.isArray(catalog) ? catalog : []).map((row) => row?.name).filter((name) => typeof name === "string" && name.length > 0);
+}
+function unknownStatusError(name, catalog) {
+  const valid = validStatusNames(catalog);
+  const label = name === null ? "null" : String(name);
+  const list = valid.length ? valid.join(", ") : "(none)";
+  return new Error(`Unknown status "${label}". Valid statuses: ${list}`);
+}
+function resolveStatusKey(name, catalog) {
+  if (name === null) return { ok: true, key: null };
+  if (typeof name !== "string") return { ok: false, reason: "unknown-status" };
+  const text = name.trim();
+  if (!text) return { ok: false, reason: "unknown-status" };
+  const rows = Array.isArray(catalog) ? catalog : [];
+  const upper = text.toUpperCase();
+  for (const row of rows) {
+    if (row?.key === text || row?.key === upper) return { ok: true, key: row.key };
+  }
+  const folded = text.toLowerCase();
+  for (const row of rows) {
+    if (row?.name === text || String(row?.name ?? "").toLowerCase() === folded) {
+      return { ok: true, key: row.key };
+    }
+  }
+  return { ok: false, reason: "unknown-status" };
+}
+function clampTaskLimit(value, fallback = DEFAULT_TASK_LIMIT) {
+  if (value === void 0 || value === null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(MAX_TASK_LIMIT, Math.max(MIN_TASK_LIMIT, Math.trunc(parsed)));
+}
+function isElementLike(node) {
+  if (!node || typeof node !== "object") return false;
+  if (node.nodeType !== void 0 && node.nodeType !== 1) return false;
+  return typeof node.appendChild === "function" && typeof node.tagName === "string";
+}
+function noop() {
+}
+function mapPublicResult(outcome) {
+  if (outcome == null || typeof outcome !== "object") {
+    return { status: "unknown", didWrite: false, reason: "unmapped-result" };
+  }
+  const known = PUBLIC_STATUSES.has(outcome.status);
+  const status = known ? outcome.status : "unknown";
+  const mapped = {
+    status,
+    didWrite: status === "updated" && outcome.didWrite === true
+  };
+  if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
+  else if (!known) mapped.reason = "unmapped-result";
+  const activity = outcome.activity;
+  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
+    mapped.activity = { recorded: activity.recorded };
+    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
+  }
+  return mapped;
+}
+function publicStatusRow({ key, name, tag, glyph, group, inCycle, colors }) {
+  const resolvedGroup = group === "media" || group === "extra" ? group : "task";
+  const resolvedInCycle = typeof inCycle === "boolean" ? inCycle : resolvedGroup === "task";
+  return Object.freeze({
+    key: String(key),
+    name: String(name),
+    tag: String(tag),
+    glyph: String(glyph),
+    group: resolvedGroup,
+    inCycle: resolvedInCycle,
+    light: Object.freeze({
+      base: String(colors?.lightBackgroundCss ?? ""),
+      text: String(colors?.lightTextCss ?? "")
+    }),
+    dark: Object.freeze({
+      base: String(colors?.darkBackgroundCss ?? ""),
+      text: String(colors?.darkTextCss ?? "")
+    })
+  });
+}
+function dispatch(target, type, detail) {
+  try {
+    const Ctor = globalThis.CustomEvent;
+    if (!Ctor) return;
+    target.dispatchEvent(new Ctor(type, { detail }));
+  } catch (error) {
+    console.error("[TaskStatus] listener dispatch failed", error);
+  }
+}
+function emitStatusChange(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "change", detail);
+}
+function emitStatusCatalog(api, detail) {
+  const emitter = emitters.get(api);
+  if (!emitter) return;
+  dispatch(emitter, "statuses", detail ?? { apiVersion: API_VERSION });
+}
+function clearRenderedIcons(api) {
+  const active = renderedIconCleanups.get(api);
+  if (!active) return;
+  for (const cleanup of [...active]) {
+    try {
+      cleanup();
+    } catch (_) {
+    }
+  }
+  active.clear();
+}
+function emitChange(emitter, detail) {
+  dispatch(emitter, "change", detail);
+}
+function createPublicApi({
+  readCatalog,
+  readStatuses,
+  createTextHelpers,
+  setBlockStatus,
+  cycleBlockStatus,
+  readBlockString = null,
+  queryTasks = null,
+  documentLike = null
+} = {}) {
+  requiredFunction("readCatalog", readCatalog);
+  requiredFunction("readStatuses", readStatuses);
+  requiredFunction("createTextHelpers", createTextHelpers);
+  requiredFunction("setBlockStatus", setBlockStatus);
+  requiredFunction("cycleBlockStatus", cycleBlockStatus);
+  const emitter = new EventTarget();
+  const buckets = /* @__PURE__ */ new Map();
+  const liveIcons = /* @__PURE__ */ new Set();
+  function statusEntriesForQuery(entries) {
+    return (Array.isArray(entries) ? entries : []).filter((entry) => entry?.key && entry?.name).map((entry) => ({
+      key: entry.key,
+      name: entry.name,
+      tagTitle: entry.tag || `task-status/${entry.name}`
+    }));
+  }
+  const api = {
+    apiVersion: API_VERSION,
+    features: API_FEATURES,
+    statuses() {
+      const rows = readStatuses();
+      return Object.freeze(Array.isArray(rows) ? rows.slice() : []);
+    },
+    statusOf(text) {
+      if (typeof text !== "string" || text.length === 0) return null;
+      try {
+        const catalog = readCatalog();
+        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+        const key = helpers?.getCurrentStatus?.(text);
+        if (!key) return null;
+        const row = (catalog || []).find((entry) => entry?.key === key);
+        return typeof row?.name === "string" && row.name ? row.name : null;
+      } catch (error) {
+        console.warn("[TaskStatus] statusOf failed", error);
+        return null;
+      }
+    },
+    async statusOfBlock(uid) {
+      const empty = { found: false, isTask: false, done: false, status: null };
+      if (typeof uid !== "string" || !uid.trim() || typeof readBlockString !== "function") {
+        return empty;
+      }
+      try {
+        const text = await readBlockString(uid.trim());
+        if (typeof text !== "string") return empty;
+        const catalog = readCatalog();
+        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+        const parsed = helpers?.parseManagedPrefix?.(text);
+        if (!parsed?.managed) {
+          return { found: true, isTask: false, done: false, status: null };
+        }
+        const row = parsed.currentStatus ? (catalog || []).find((entry) => entry?.key === parsed.currentStatus) : null;
+        return {
+          found: true,
+          isTask: true,
+          done: parsed.taskKind === "done",
+          status: typeof row?.name === "string" && row.name ? row.name : null
+        };
+      } catch {
+        return empty;
+      }
+    },
+    async tasks({ status, includeDone = false, limit = DEFAULT_TASK_LIMIT } = {}) {
+      if (typeof queryTasks !== "function") {
+        throw new Error("Task query reader is unavailable");
+      }
+      const catalog = readCatalog() || [];
+      let targetEntries = catalog;
+      if (status !== void 0) {
+        if (status === null) throw unknownStatusError(status, catalog);
+        const resolved = resolveStatusKey(status, catalog);
+        if (!resolved.ok || !resolved.key) throw unknownStatusError(status, catalog);
+        const matchedEntry = catalog.find((entry) => entry?.key === resolved.key);
+        if (!matchedEntry) throw unknownStatusError(status, catalog);
+        targetEntries = [matchedEntry];
+      }
+      const clampedLimit = clampTaskLimit(limit, DEFAULT_TASK_LIMIT);
+      const queryStatuses = statusEntriesForQuery(targetEntries);
+      if (!queryStatuses.length) {
+        return { tasks: [], truncated: false };
+      }
+      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+      const rows = await queryTasks({
+        statuses: queryStatuses,
+        helpers,
+        includeDone: Boolean(includeDone)
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      const nameByKey = new Map(
+        catalog.filter((entry) => entry?.key && entry?.name).map((entry) => [entry.key, entry.name])
+      );
+      const truncated = list.length > clampedLimit;
+      const sliced = list.slice(0, clampedLimit).map((row) => ({
+        uid: row.uid,
+        text: String(row.body ?? ""),
+        status: nameByKey.get(row.statusKey) ?? row.statusKey,
+        done: Boolean(row.done),
+        page: typeof row.page === "string" ? row.page : null
+      }));
+      return { tasks: sliced, truncated };
+    },
+    async counts({ includeDone = false } = {}) {
+      if (typeof queryTasks !== "function") {
+        throw new Error("Task query reader is unavailable");
+      }
+      const catalog = readCatalog() || [];
+      const counts = {};
+      const nameByKey = /* @__PURE__ */ new Map();
+      for (const entry of catalog) {
+        if (!entry?.key || !entry?.name) continue;
+        counts[entry.name] = 0;
+        nameByKey.set(entry.key, entry.name);
+      }
+      const queryStatuses = statusEntriesForQuery(catalog);
+      if (!queryStatuses.length) {
+        return { counts, total: 0 };
+      }
+      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
+      const rows = await queryTasks({
+        statuses: queryStatuses,
+        helpers,
+        includeDone: Boolean(includeDone)
+      });
+      let total = 0;
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const name = nameByKey.get(row?.statusKey);
+        if (name && Object.prototype.hasOwnProperty.call(counts, name)) {
+          counts[name] += 1;
+          total += 1;
+        }
+      }
+      return { counts, total };
+    },
+    renderIcon(element, name) {
+      if (!isElementLike(element) || typeof name !== "string") return noop;
+      let catalog;
+      try {
+        catalog = readCatalog();
+      } catch {
+        return noop;
+      }
+      const resolved = resolveStatusKey(name, catalog);
+      if (!resolved.ok || !resolved.key) return noop;
+      const entry = (catalog || []).find((row) => row?.key === resolved.key);
+      if (!entry) return noop;
+      const doc = element.ownerDocument || documentLike || globalThis.document;
+      if (!doc || typeof doc.createElement !== "function") return noop;
+      const wrap = doc.createElement("span");
+      wrap.className = "ts-rendered-icon";
+      wrap.setAttribute("data-ts-rendered-icon", "true");
+      wrap.setAttribute("aria-hidden", "true");
+      wrap.setAttribute("data-task-status-key", entry.key);
+      const box = doc.createElement("span");
+      box.className = "rm-checkbox rm-todo";
+      box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, entry.key);
+      box.setAttribute(CHECKBOX_SHAPE_ATTRIBUTE, String(entry.glyph || "custom"));
+      const container = doc.createElement("span");
+      container.className = "check-container";
+      const fakeInput = doc.createElement("input");
+      fakeInput.setAttribute("type", "checkbox");
+      fakeInput.setAttribute("tabindex", "-1");
+      fakeInput.setAttribute("aria-hidden", "true");
+      const checkmark = doc.createElement("span");
+      checkmark.className = "checkmark";
+      container.appendChild(fakeInput);
+      container.appendChild(checkmark);
+      box.appendChild(container);
+      wrap.appendChild(box);
+      element.appendChild(wrap);
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        liveIcons.delete(cleanup);
+        if (typeof wrap.remove === "function") {
+          wrap.remove();
+        } else if (wrap.parentNode && typeof wrap.parentNode.removeChild === "function") {
+          wrap.parentNode.removeChild(wrap);
+        }
+      };
+      liveIcons.add(cleanup);
+      return cleanup;
+    },
+    async setStatus(uid, name) {
+      let catalog;
+      try {
+        catalog = readCatalog();
+      } catch (error) {
+        console.warn("[TaskStatus] status list read failed", error);
+        return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
+      }
+      const resolved = resolveStatusKey(name, catalog);
+      if (!resolved.ok) {
+        return { status: "rejected", didWrite: false, reason: resolved.reason };
+      }
+      let outcome;
+      try {
+        outcome = await setBlockStatus(uid, resolved.key);
+      } catch (error) {
+        console.warn("[TaskStatus] setStatus failed", error);
+        return { status: "unknown", didWrite: false, reason: "set-status-failed" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const row = (catalog || []).find((entry) => entry?.key === resolved.key);
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: row?.name ?? null,
+        status: "updated"
+      });
+      return mapped;
+    },
+    async cycle(uid) {
+      let outcome;
+      try {
+        outcome = await cycleBlockStatus(uid);
+      } catch (error) {
+        console.warn("[TaskStatus] cycle failed", error);
+        return { status: "unknown", didWrite: false, reason: "cycle-failed" };
+      }
+      if (outcome == null || typeof outcome !== "object") {
+        return { status: "unchanged", didWrite: false, reason: "done-task" };
+      }
+      const mapped = mapPublicResult(outcome);
+      if (mapped.status !== "updated") return mapped;
+      const written = typeof outcome.string === "string" ? api.statusOf(outcome.string) : null;
+      emitChange(emitter, {
+        apiVersion: API_VERSION,
+        uid,
+        name: written,
+        status: "updated"
+      });
+      return mapped;
+    },
+    addEventListener(type, cb) {
+      if (!EVENT_TYPES.has(type) || typeof cb !== "function") return;
+      let bag = buckets.get(type);
+      if (!bag) {
+        bag = /* @__PURE__ */ new Map();
+        buckets.set(type, bag);
+      }
+      if (bag.has(cb)) return;
+      const wrapped = (event) => {
+        try {
+          cb(event?.detail);
+        } catch (error) {
+          console.error("[TaskStatus] listener failed", error);
+        }
+      };
+      bag.set(cb, wrapped);
+      emitter.addEventListener(type, wrapped);
+    },
+    removeEventListener(type, cb) {
+      const bag = buckets.get(type);
+      const wrapped = bag?.get(cb);
+      if (!wrapped) return;
+      bag.delete(cb);
+      emitter.removeEventListener(type, wrapped);
+    }
+  };
+  const frozen = Object.freeze(api);
+  emitters.set(frozen, emitter);
+  renderedIconCleanups.set(frozen, liveIcons);
+  return frozen;
+}
+var fire = (win, type, detail, Ctor) => {
+  try {
+    const C = Ctor ?? win.CustomEvent ?? globalThis.CustomEvent;
+    if (C) win.dispatchEvent(new C(type, { detail }));
+  } catch (error) {
+    console.warn("[TaskStatus] event dispatch failed", error);
+  }
+};
+function installPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  win[GLOBAL_NAME] = api;
+  fire(win, READY_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+}
+function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
+  const ours = win[GLOBAL_NAME] === api;
+  if (ours) delete win[GLOBAL_NAME];
+  fire(win, UNLOAD_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
+  return ours;
+}
+
+// src/ai-tools.js
+var AI_TOOL_NAMES = Object.freeze([
+  "list_statuses",
+  "get_task_status",
+  "list_tasks",
+  "status_counts",
+  "set_task_status"
+]);
+var TAG_FORMAT = "{{[[TODO]]}} #[[task-status/<Name>]] text";
+var MAX_TOOLS = 25;
+var MAX_GET_UIDS = 50;
+var MAX_SET_CHANGES = 10;
+var MAX_SCHEMA_CHARS = 3800;
+function normalizeBlockUid(raw) {
+  if (typeof raw !== "string") return "";
+  let value = raw.trim();
+  if (value.startsWith("((") && value.endsWith("))")) {
+    value = value.slice(2, -2).trim();
+  }
+  return value;
+}
+function readLiveStatuses(api) {
+  const rows = api?.statuses?.();
+  return Array.isArray(rows) ? rows : [];
+}
+function liveStatusNames(api) {
+  return readLiveStatuses(api).map((row) => row?.name).filter((name) => typeof name === "string" && name.length > 0);
+}
+function buildListTasksSchema(names) {
+  const make = (statusProp) => ({
+    type: "object",
+    properties: {
+      status: statusProp,
+      include_done: {
+        type: "boolean",
+        description: "Include DONE tasks when true. Default false."
+      },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: 200,
+        description: "Maximum tasks to return, from 1 to 200 (default 50)."
+      }
+    },
+    additionalProperties: false
+  });
+  if (Array.isArray(names) && names.length > 0) {
+    const withEnum = make({
+      type: "string",
+      enum: [...names],
+      description: "Optional status name to filter by."
+    });
+    if (JSON.stringify(withEnum).length <= MAX_SCHEMA_CHARS) {
+      return withEnum;
+    }
+  }
+  return make({
+    type: "string",
+    description: "Optional status name to filter by."
+  });
+}
+function buildSetTaskStatusSchema(names) {
+  const make = (statusProp) => ({
+    type: "object",
+    properties: {
+      changes: {
+        type: "array",
+        minItems: 1,
+        maxItems: MAX_SET_CHANGES,
+        description: "1 to 10 status changes to apply sequentially.",
+        items: {
+          type: "object",
+          properties: {
+            uid: {
+              type: "string",
+              description: "Block uid of an existing task, bare or wrapped in (( ))."
+            },
+            status: statusProp
+          },
+          required: ["uid", "status"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["changes"],
+    additionalProperties: false
+  });
+  if (Array.isArray(names) && names.length > 0) {
+    const withEnum = make({
+      type: ["string", "null"],
+      enum: [...names, null],
+      description: "Target status name, or null to clear the status tag."
+    });
+    if (JSON.stringify(withEnum).length <= MAX_SCHEMA_CHARS) {
+      return withEnum;
+    }
+  }
+  return make({
+    type: ["string", "null"],
+    description: "Target status name, or null to clear the status tag."
+  });
+}
+function createAiTools({ api, setStatusForAgent } = {}) {
+  if (!api || typeof api.statuses !== "function") {
+    throw new TypeError("api is required");
+  }
+  if (typeof setStatusForAgent !== "function") {
+    throw new TypeError("setStatusForAgent is required");
+  }
+  const names = liveStatusNames(api);
+  const list_statuses = {
+    name: "list_statuses",
+    scope: "read",
+    description: "Lists every task status configured in this graph with its tag, group (task, media, or extra), whether click-to-cycle visits it, and the tag format used on task blocks.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    },
+    handler() {
+      const statuses = readLiveStatuses(api).map((row) => ({
+        name: row.name,
+        tag: row.tag,
+        group: row.group,
+        cycles: Boolean(row.inCycle)
+      }));
+      return { statuses, tagFormat: TAG_FORMAT };
+    }
+  };
+  const get_task_status = {
+    name: "get_task_status",
+    scope: "read",
+    description: "Reads the current workflow status and TODO/DONE state for 1 to 50 blocks by uid (bare or wrapped in double parentheses). Reports whether each block exists and starts with a TODO or DONE macro.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        uids: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_GET_UIDS,
+          items: { type: "string" },
+          description: "1 to 50 block uids, bare or wrapped in (( ))."
+        }
+      },
+      required: ["uids"],
+      additionalProperties: false
+    },
+    async handler(args) {
+      const rawUids = args?.uids;
+      if (!Array.isArray(rawUids) || rawUids.length < 1 || rawUids.length > MAX_GET_UIDS) {
+        throw new Error(`uids must be an array of 1 to ${MAX_GET_UIDS} block uids.`);
+      }
+      const tasks = [];
+      for (const raw of rawUids) {
+        if (typeof raw !== "string") {
+          throw new Error("Each entry in uids must be a string.");
+        }
+        const uid = normalizeBlockUid(raw);
+        const info = await api.statusOfBlock(uid);
+        tasks.push({
+          uid,
+          found: Boolean(info?.found),
+          isTask: Boolean(info?.isTask),
+          done: Boolean(info?.done),
+          status: info?.status ?? null
+        });
+      }
+      return { tasks };
+    }
+  };
+  const list_tasks = {
+    name: "list_tasks",
+    scope: "read",
+    description: "Lists tasks that carry a configured task status tag, optionally filtered to one status. Excludes DONE tasks unless include_done is true. Returns uid, text without prefix, status, done state, and page title.",
+    inputSchema: buildListTasksSchema(names),
+    async handler(args) {
+      const status = args?.status;
+      if (status !== void 0) {
+        const live = readLiveStatuses(api);
+        if (status === null) throw unknownStatusError(status, live);
+        const resolved = resolveStatusKey(status, live);
+        if (!resolved.ok || !resolved.key) throw unknownStatusError(status, live);
+      }
+      const includeDone = Boolean(args?.include_done);
+      const limit = args?.limit;
+      return api.tasks({ status, includeDone, limit });
+    }
+  };
+  const status_counts = {
+    name: "status_counts",
+    scope: "read",
+    description: "Counts tasks per configured status across the graph, including statuses with zero tasks. Excludes DONE tasks unless include_done is true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        include_done: {
+          type: "boolean",
+          description: "Include DONE tasks when true. Default false."
+        }
+      },
+      additionalProperties: false
+    },
+    async handler(args) {
+      return api.counts({ includeDone: Boolean(args?.include_done) });
+    }
+  };
+  const set_task_status = {
+    name: "set_task_status",
+    scope: "edit",
+    description: "Sets or clears the workflow status on 1 to 10 existing TODO or DONE tasks. Use this tool instead of editing block text directly: it is the safe way to change a status because it routes Better Tasks tasks through Better Tasks and updates the activity log. Pass status null to clear the tag. Never creates statuses, never converts plain blocks into tasks, and never changes TODO/DONE.",
+    inputSchema: buildSetTaskStatusSchema(names),
+    async handler(args, context) {
+      const changes = args?.changes;
+      if (!Array.isArray(changes) || changes.length < 1 || changes.length > MAX_SET_CHANGES) {
+        throw new Error(`changes must be an array of 1 to ${MAX_SET_CHANGES} items.`);
+      }
+      const live = readLiveStatuses(api);
+      const plan = [];
+      for (const entry of changes) {
+        if (!entry || typeof entry !== "object") {
+          throw new Error("Each change must be an object with uid and status.");
+        }
+        if (typeof entry.uid !== "string") {
+          throw new Error("Each change uid must be a string.");
+        }
+        const uid = normalizeBlockUid(entry.uid);
+        if (!uid) {
+          throw new Error("Each change uid must be non-empty.");
+        }
+        if (!Object.prototype.hasOwnProperty.call(entry, "status") || entry.status === void 0) {
+          throw new Error("Each change must specify a status name or null.");
+        }
+        if (entry.status === null) {
+          plan.push({ uid, name: null });
+          continue;
+        }
+        const resolved = resolveStatusKey(entry.status, live);
+        if (!resolved.ok || !resolved.key) {
+          throw unknownStatusError(entry.status, live);
+        }
+        const matched = live.find((row) => row?.key === resolved.key);
+        if (!matched) {
+          throw unknownStatusError(entry.status, live);
+        }
+        plan.push({ uid, name: matched.name });
+      }
+      const userUid = typeof context?.tokenUserUid === "string" && context.tokenUserUid.trim() ? context.tokenUserUid.trim() : void 0;
+      const results = [];
+      let updated = 0;
+      let failed = 0;
+      for (const item of plan) {
+        let outcome;
+        try {
+          outcome = await setStatusForAgent(item.uid, item.name, { userUid });
+        } catch {
+          outcome = { status: "unknown", didWrite: false, reason: "set-status-failed" };
+        }
+        const mapped = mapPublicResult(outcome);
+        const row = {
+          uid: item.uid,
+          status: mapped.status,
+          didWrite: mapped.didWrite,
+          name: item.name
+        };
+        if (mapped.reason) row.reason = mapped.reason;
+        results.push(row);
+        if (mapped.status === "updated") {
+          updated += 1;
+        } else if (mapped.status !== "unchanged") {
+          failed += 1;
+        }
+      }
+      return { results, updated, failed };
+    }
+  };
+  return [list_statuses, get_task_status, list_tasks, status_counts, set_task_status];
+}
+function registerAiTools(extensionAPI, tools) {
+  const ai = extensionAPI?.ai;
+  if (typeof ai?.addTool !== "function") return () => {
+  };
+  const added = [];
+  let warned = false;
+  for (const tool of (tools ?? []).slice(0, MAX_TOOLS)) {
+    try {
+      ai.addTool({
+        name: tool.name,
+        description: tool.description,
+        scope: tool.scope,
+        inputSchema: tool.inputSchema,
+        handler: tool.handler
+      });
+      added.push(tool.name);
+    } catch (error) {
+      if (!warned) {
+        warned = true;
+        console.warn("[TaskStatus] AI tool not registered", tool.name, error);
+      }
+    }
+  }
+  return () => {
+    for (const name of added.splice(0)) {
+      try {
+        ai.removeTool?.({ name });
+      } catch {
+      }
+    }
+  };
+}
+function createAiToolsManager({ extensionAPI, api, setStatusForAgent } = {}) {
+  let unregister = null;
+  let statusesListener = null;
+  function updateDynamicTools() {
+    const ai = extensionAPI?.ai;
+    if (!unregister || typeof ai?.addTool !== "function") return;
+    const tools = createAiTools({ api, setStatusForAgent }).filter(
+      (tool) => tool.name === "list_tasks" || tool.name === "set_task_status"
+    );
+    let warned = false;
+    for (const tool of tools) {
+      try {
+        ai.addTool({
+          name: tool.name,
+          description: tool.description,
+          scope: tool.scope,
+          inputSchema: tool.inputSchema,
+          handler: tool.handler
+        });
+      } catch (error) {
+        if (!warned) {
+          warned = true;
+          console.warn("[TaskStatus] AI tool update failed", tool.name, error);
+        }
+      }
+    }
+  }
+  function enable() {
+    if (unregister) return;
+    if (typeof extensionAPI?.ai?.addTool !== "function") return;
+    const tools = createAiTools({ api, setStatusForAgent });
+    unregister = registerAiTools(extensionAPI, tools);
+    if (typeof api?.addEventListener === "function") {
+      statusesListener = () => updateDynamicTools();
+      api.addEventListener("statuses", statusesListener);
+    }
+  }
+  function disable() {
+    if (statusesListener && typeof api?.removeEventListener === "function") {
+      api.removeEventListener("statuses", statusesListener);
+    }
+    statusesListener = null;
+    if (unregister) {
+      const stop = unregister;
+      unregister = null;
+      stop();
+    }
+  }
+  function sync(enabled) {
+    if (enabled) enable();
+    else disable();
+  }
+  return Object.freeze({
+    sync,
+    dispose: disable,
+    get active() {
+      return unregister !== null;
+    }
+  });
+}
+
 // src/better-tasks-activity.js
 var ACTIVITY_LOG_CONTAINER_TITLES = Object.freeze([
   "**Activity log**",
@@ -1194,7 +2637,7 @@ function valueAt3(value, key, fallback = null) {
   const plain = key.replace(/^:/, "");
   return value[key] ?? value[plain] ?? value[plain.replace(/^block\//, "")] ?? fallback;
 }
-function escapeRegex(text) {
+function escapeRegex2(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function attributeNames(schema, id, fallback) {
@@ -1218,7 +2661,7 @@ function findChild(children, names) {
     const uid = valueAt3(child, ":block/uid", null);
     if (typeof string !== "string" || typeof uid !== "string") continue;
     for (const name of names) {
-      const pattern = new RegExp(`^\\s*${escapeRegex(name)}::\\s*`, "i");
+      const pattern = new RegExp(`^\\s*${escapeRegex2(name)}::\\s*`, "i");
       if (pattern.test(string)) return { uid, name, value: string.replace(pattern, "").trim() };
     }
   }
@@ -2486,7 +3929,7 @@ function themeSettingToPreference(value) {
   if (normalized === THEME_SETTING_VALUES.DARK) return "dark";
   return null;
 }
-function hasClass(el, name) {
+function hasClass2(el, name) {
   return Boolean(el?.classList?.contains?.(name));
 }
 function parseColor(value) {
@@ -2526,10 +3969,10 @@ function resolveHostTheme({
   if (pref === "light" || pref === "dark") return pref;
   const html = documentLike?.documentElement;
   const body = documentLike?.body;
-  if (hasClass(html, "bp3-dark") || hasClass(body, "bt-theme-dark") || hasClass(html, "rm-dark-theme") || hasClass(body, "rm-dark-theme") || hasClass(body, "roam-body") && hasClass(body, "dark")) {
+  if (hasClass2(html, "bp3-dark") || hasClass2(body, "bt-theme-dark") || hasClass2(html, "rm-dark-theme") || hasClass2(body, "rm-dark-theme") || hasClass2(body, "roam-body") && hasClass2(body, "dark")) {
     return "dark";
   }
-  if (hasClass(html, "bp3-light") || hasClass(body, "bt-theme-light")) {
+  if (hasClass2(html, "bp3-light") || hasClass2(body, "bt-theme-light")) {
     return "light";
   }
   const bodyColor = readMeasuredBackground(body, windowLike);
@@ -3062,1079 +4505,6 @@ function createStatusView({
     if (had) closeSidebarIfOurs();
   }
   return { open, close, toggle, refresh, isOpen, dispose };
-}
-
-// src/status-checkbox.js
-var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
-var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
-var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
-var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
-var AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
-var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
-var STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
-var STATUS_POP_RECENT_WINDOW_MS = 2e3;
-var STATUS_POP_DURATION_MS = 520;
-var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
-var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
-var HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
-var OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
-var CHECKBOX_STYLE_VALUES = Object.freeze({
-  OUTLINE: "Outline",
-  GLASS: "Glass",
-  SOLID: "Solid",
-  MINIMAL: "Minimal"
-});
-function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
-  const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
-  const normalized = String(candidate || "").trim();
-  return Object.values(CHECKBOX_STYLE_VALUES).includes(normalized) ? normalized : fallback;
-}
-function checkboxStyleToAttributeValue(value) {
-  const normalized = normalizeCheckboxStyle(value);
-  if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
-  if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
-  if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
-  return null;
-}
-var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
-var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
-var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
-var NEAR_BLACK = Object.freeze({ r: 16, g: 22, b: 26 });
-var WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
-var NEAR_BLACK_CSS = "#10161a";
-var WHITE_CSS = "#ffffff";
-var BUILTIN_SHAPES = Object.freeze({
-  ACTIVE: "active",
-  WAITING: "waiting",
-  IN_REVIEW: "in-review",
-  HOLDING: "holding",
-  INCUBATING: "incubating",
-  ALERT: "alert",
-  CANCELLED: "cancelled",
-  SERIES: "series",
-  MOVIE: "movie",
-  WATCHING: "watching",
-  WATCHLIST: "watchlist",
-  UPCOMING: "upcoming",
-  REWATCH: "rewatch",
-  DROPPED: "dropped",
-  IMPORTANT: "important",
-  STARRED: "starred",
-  DISCUSS: "discuss",
-  BILLABLE: "billable",
-  BUG: "bug",
-  DRAFT: "draft",
-  DEADLINE: "deadline",
-  KAWAII: "kawaii",
-  FLOWER: "flower",
-  SUN: "sun",
-  MOON: "moon"
-});
-var MEDIA_STATUS_SHAPES = Object.freeze({
-  series: "series",
-  movie: "movie",
-  watching: "watching",
-  watchlist: "watchlist",
-  upcoming: "upcoming",
-  rewatch: "rewatch",
-  dropped: "dropped"
-});
-var EXTRA_STATUS_SHAPES = Object.freeze({
-  important: "important",
-  starred: "starred",
-  discuss: "discuss",
-  billable: "billable",
-  bug: "bug",
-  draft: "draft",
-  deadline: "deadline",
-  kawaii: "kawaii",
-  flower: "flower",
-  sun: "sun",
-  moon: "moon"
-});
-function getMediaStatusShape(name) {
-  const key = String(name ?? "").trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(MEDIA_STATUS_SHAPES, key) ? MEDIA_STATUS_SHAPES[key] : null;
-}
-function getExtraStatusShape(name) {
-  const key = String(name ?? "").trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(EXTRA_STATUS_SHAPES, key) ? EXTRA_STATUS_SHAPES[key] : null;
-}
-function clamp(value, minimum, maximum) {
-  return Math.min(maximum, Math.max(minimum, value));
-}
-function channel(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? clamp(parsed, 0, 255) : 0;
-}
-function normalizeRgb(value, fallback = BLACK) {
-  if (!value || typeof value !== "object") return { ...fallback };
-  return {
-    r: channel(value.r),
-    g: channel(value.g),
-    b: channel(value.b)
-  };
-}
-function linearizedChannel(value) {
-  const normalized = channel(value) / 255;
-  return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-}
-function relativeLuminance(rgb) {
-  const value = normalizeRgb(rgb);
-  return 0.2126 * linearizedChannel(value.r) + 0.7152 * linearizedChannel(value.g) + 0.0722 * linearizedChannel(value.b);
-}
-function contrastRatio(first, second) {
-  const firstLuminance = relativeLuminance(first);
-  const secondLuminance = relativeLuminance(second);
-  const lighter = Math.max(firstLuminance, secondLuminance);
-  const darker = Math.min(firstLuminance, secondLuminance);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-function mixRgb(from, to, amount) {
-  const start = normalizeRgb(from);
-  const end = normalizeRgb(to);
-  const ratio = clamp(Number(amount) || 0, 0, 1);
-  return {
-    r: start.r + (end.r - start.r) * ratio,
-    g: start.g + (end.g - start.g) * ratio,
-    b: start.b + (end.b - start.b) * ratio
-  };
-}
-function compositeRgb(foreground, background, alpha) {
-  const front = normalizeRgb(foreground);
-  const back = normalizeRgb(background);
-  const opacity = clamp(Number(alpha) || 0, 0, 1);
-  return {
-    r: front.r * opacity + back.r * (1 - opacity),
-    g: front.g * opacity + back.g * (1 - opacity),
-    b: front.b * opacity + back.b * (1 - opacity)
-  };
-}
-function nearestPassingMix(base, surface, target, minimumContrast) {
-  if (contrastRatio(target, surface) < minimumContrast) return null;
-  let low = 0;
-  let high = 1;
-  for (let index = 0; index < 28; index += 1) {
-    const middle = (low + high) / 2;
-    const candidate = mixRgb(base, target, middle);
-    if (contrastRatio(candidate, surface) >= minimumContrast) high = middle;
-    else low = middle;
-  }
-  return {
-    amount: high,
-    color: mixRgb(base, target, high)
-  };
-}
-function deriveAccessibleAccent(baseRgb, surfaceRgb, minimumContrast = 3.2) {
-  const base = normalizeRgb(baseRgb);
-  const surface = normalizeRgb(surfaceRgb, DEFAULT_LIGHT_SURFACE);
-  const required = Math.max(1, Number(minimumContrast) || 3.2);
-  if (contrastRatio(base, surface) >= required) return base;
-  const candidates = [
-    nearestPassingMix(base, surface, BLACK, required),
-    nearestPassingMix(base, surface, WHITE, required)
-  ].filter(Boolean);
-  candidates.sort((a, b) => a.amount - b.amount);
-  return candidates[0]?.color || (relativeLuminance(surface) > 0.5 ? { ...BLACK } : { ...WHITE });
-}
-function roundedRgb(rgb) {
-  const value = normalizeRgb(rgb);
-  return {
-    r: Math.round(value.r),
-    g: Math.round(value.g),
-    b: Math.round(value.b)
-  };
-}
-function rgbCss(rgb) {
-  const value = roundedRgb(rgb);
-  return `rgb(${value.r}, ${value.g}, ${value.b})`;
-}
-function rgbaCss(rgb, alpha) {
-  const value = roundedRgb(rgb);
-  const opacity = clamp(Number(alpha) || 0, 0, 1);
-  return `rgba(${value.r}, ${value.g}, ${value.b}, ${opacity})`;
-}
-function pickOnAccentColor(accentRgb) {
-  const accent = normalizeRgb(accentRgb);
-  const whiteContrast = contrastRatio(WHITE, accent);
-  const darkContrast = contrastRatio(NEAR_BLACK, accent);
-  if (whiteContrast >= 3.4) return WHITE_CSS;
-  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
-}
-function buildStatusCheckboxColors({
-  baseRgb,
-  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
-  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
-  minimumContrast = 3.2
-} = {}) {
-  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
-  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
-  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
-  const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
-  const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
-  const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
-  const roundedLightAccent = roundedRgb(lightAccent);
-  const roundedDarkAccent = roundedRgb(darkAccent);
-  return Object.freeze({
-    base: roundedRgb(base),
-    lightSurface: roundedRgb(lightSurface),
-    darkSurface: roundedRgb(darkSurface),
-    lightAccent: roundedLightAccent,
-    darkAccent: roundedDarkAccent,
-    lightAccentCss: rgbCss(roundedLightAccent),
-    darkAccentCss: rgbCss(roundedDarkAccent),
-    lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
-    darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
-    lightWashCss: rgbaCss(base, 0.09),
-    darkWashCss: rgbaCss(base, 0.16),
-    lightBeaconCss: rgbaCss(roundedLightAccent, 0.52),
-    darkBeaconCss: rgbaCss(roundedDarkAccent, 0.68)
-  });
-}
-function buildStatusPillColors({
-  baseRgb,
-  preferredTextRgb,
-  lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
-  darkSurfaceRgb = DEFAULT_DARK_SURFACE,
-  minimumTextContrast = 4.8,
-  lightBackgroundAlpha = 0.1,
-  darkBackgroundAlpha = 0.2
-} = {}) {
-  const base = normalizeRgb(baseRgb, { r: 100, g: 116, b: 139 });
-  const preferredText = normalizeRgb(preferredTextRgb, base);
-  const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
-  const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
-  const lightBackground = compositeRgb(base, lightSurface, lightBackgroundAlpha);
-  const darkBackground = compositeRgb(base, darkSurface, darkBackgroundAlpha);
-  const certificationContrast = Math.max(1, Number(minimumTextContrast) || 4.8) + 0.08;
-  const lightText = deriveAccessibleAccent(
-    preferredText,
-    lightBackground,
-    certificationContrast
-  );
-  const darkText = deriveAccessibleAccent(
-    preferredText,
-    darkBackground,
-    certificationContrast
-  );
-  const lightBorder = deriveAccessibleAccent(base, lightSurface, 3.25);
-  const darkBorder = deriveAccessibleAccent(base, darkSurface, 3.25);
-  return Object.freeze({
-    base: roundedRgb(base),
-    lightSurface: roundedRgb(lightSurface),
-    darkSurface: roundedRgb(darkSurface),
-    lightBackground: roundedRgb(lightBackground),
-    darkBackground: roundedRgb(darkBackground),
-    lightText: roundedRgb(lightText),
-    darkText: roundedRgb(darkText),
-    lightBackgroundCss: rgbaCss(base, lightBackgroundAlpha),
-    darkBackgroundCss: rgbaCss(base, darkBackgroundAlpha),
-    lightTextCss: rgbCss(lightText),
-    darkTextCss: rgbCss(darkText),
-    lightBorderCss: rgbaCss(lightBorder, 0.48),
-    darkBorderCss: rgbaCss(darkBorder, 0.62)
-  });
-}
-function getStatusCheckboxShape(statusKey, statusName) {
-  const key = String(statusKey || "").trim().toUpperCase();
-  return BUILTIN_SHAPES[key] || getMediaStatusShape(statusName) || getExtraStatusShape(statusName) || "custom";
-}
-function getStatusGroup(statusKey, statusName) {
-  const shape = getStatusCheckboxShape(statusKey, statusName);
-  if (Object.values(MEDIA_STATUS_SHAPES).includes(shape)) return "media";
-  if (Object.values(EXTRA_STATUS_SHAPES).includes(shape)) return "extra";
-  return "task";
-}
-function isMediaStatus(statusKey, statusName) {
-  return getStatusGroup(statusKey, statusName) === "media";
-}
-function lookupStatusName(statusNames, statusKey) {
-  if (!statusKey) return null;
-  if (statusNames instanceof Map) return statusNames.get(statusKey) || null;
-  return statusNames?.[statusKey] || null;
-}
-function lookupStatusKey(statusTagToKey, tagTitle) {
-  if (!tagTitle) return null;
-  if (statusTagToKey instanceof Map) return statusTagToKey.get(tagTitle) || null;
-  return statusTagToKey?.[tagTitle] || null;
-}
-function decideStatusCheckboxAnnotation({
-  enabled = true,
-  tagTitle,
-  statusTagToKey,
-  statusNames,
-  blockString,
-  textHelpers
-} = {}) {
-  if (!enabled || typeof blockString !== "string" || !textHelpers?.parseManagedPrefix) {
-    return null;
-  }
-  const statusKey = lookupStatusKey(statusTagToKey, tagTitle);
-  if (!statusKey) return null;
-  const parsed = textHelpers.parseManagedPrefix(blockString);
-  if (!parsed?.managed || !parsed?.hadStatus || parsed.currentStatus !== statusKey || parsed.taskKind !== "todo" && parsed.taskKind !== "done") {
-    return null;
-  }
-  return Object.freeze({
-    statusKey,
-    shape: getStatusCheckboxShape(statusKey, lookupStatusName(statusNames, statusKey))
-  });
-}
-function hasClass2(element, className) {
-  return Boolean(element?.classList?.contains?.(className));
-}
-function findSiblingTaskCheckbox(statusPill) {
-  const parent = statusPill?.parentElement;
-  if (!parent) return null;
-  const children = Array.from(parent.children || []);
-  const candidates = children.filter((child) => hasClass2(child, "rm-checkbox"));
-  if (candidates.length !== 1) return null;
-  const checkbox = candidates[0];
-  const input = checkbox.querySelector?.('input[type="checkbox"]');
-  const checkmark = checkbox.querySelector?.(".checkmark");
-  return input && checkmark ? checkbox : null;
-}
-function clearStatusCheckboxAnnotation(checkbox) {
-  if (!checkbox?.removeAttribute) return;
-  checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
-  checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
-  checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
-  checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
-  checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
-}
-function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
-  if (!checkbox?.setAttribute || !decision?.statusKey) {
-    clearStatusCheckboxAnnotation(checkbox);
-    return false;
-  }
-  checkbox.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, decision.statusKey);
-  checkbox.setAttribute(
-    CHECKBOX_SHAPE_ATTRIBUTE,
-    decision.shape || getStatusCheckboxShape(decision.statusKey)
-  );
-  const certifiedUid = String(blockUid || "").trim();
-  if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
-  else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
-  return true;
-}
-function syncStatusCheckboxForPill({
-  statusPill,
-  enabled = true,
-  tagTitle,
-  statusTagToKey,
-  statusNames,
-  blockString,
-  blockUid,
-  textHelpers
-} = {}) {
-  const checkbox = findSiblingTaskCheckbox(statusPill);
-  if (!checkbox) return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
-  clearStatusCheckboxAnnotation(checkbox);
-  const decision = decideStatusCheckboxAnnotation({
-    enabled,
-    tagTitle,
-    statusTagToKey,
-    statusNames,
-    blockString,
-    textHelpers
-  });
-  if (!decision) return Object.freeze({ annotated: false, reason: "not-managed" });
-  applyStatusCheckboxAnnotation(checkbox, decision, blockUid);
-  return Object.freeze({
-    annotated: true,
-    checkbox,
-    statusKey: decision.statusKey,
-    shape: decision.shape
-  });
-}
-function clearStatusPillPresentation(statusPill) {
-  if (!statusPill?.removeAttribute) return;
-  statusPill.removeAttribute(MANAGED_STATUS_PILL_ATTRIBUTE);
-  statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
-  statusPill.removeAttribute(ALERT_BEACON_ATTRIBUTE);
-}
-function applyManagedStatusPillPresentation(statusPill, { hidden = false } = {}) {
-  if (!statusPill?.setAttribute) {
-    clearStatusPillPresentation(statusPill);
-    return false;
-  }
-  statusPill.setAttribute(MANAGED_STATUS_PILL_ATTRIBUTE, "true");
-  if (hidden) statusPill.setAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE, "true");
-  else statusPill.removeAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE);
-  return true;
-}
-function escapeRegex2(text) {
-  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function countExactStatusTagOccurrences(blockString, tagTitle) {
-  if (typeof blockString !== "string" || !tagTitle) return 0;
-  const title = escapeRegex2(tagTitle);
-  const matcher = new RegExp(
-    `#\\[\\[${title}\\]\\]|#${title}(?=$|\\s|[\\.,;:!\\?\\)\\]\\}])`,
-    "g"
-  );
-  return Array.from(blockString.matchAll(matcher)).length;
-}
-function isExactManagedStatusPill({
-  statusPill,
-  tagTitle,
-  blockString
-} = {}) {
-  const parent = statusPill?.parentElement;
-  if (!parent || statusPill.getAttribute?.("data-tag") !== tagTitle) return false;
-  const checkbox = findSiblingTaskCheckbox(statusPill);
-  if (!checkbox) return false;
-  const children = Array.from(parent.children || []);
-  if (children.indexOf(checkbox) >= children.indexOf(statusPill)) return false;
-  const renderedMatches = children.filter(
-    (child) => child?.classList?.contains?.("rm-page-ref") && child.getAttribute?.("data-tag") === tagTitle
-  );
-  const textOccurrences = countExactStatusTagOccurrences(blockString, tagTitle);
-  return renderedMatches.length > 0 && renderedMatches.length === textOccurrences && renderedMatches[0] === statusPill;
-}
-function syncStatusPresentationForPill({
-  statusPill,
-  hideManagedPill = false,
-  alertBeaconEnabled = false,
-  ...checkboxOptions
-} = {}) {
-  clearStatusPillPresentation(statusPill);
-  if (!findSiblingTaskCheckbox(statusPill)) {
-    return Object.freeze({ annotated: false, reason: "missing-exact-checkbox" });
-  }
-  if (!isExactManagedStatusPill({
-    statusPill,
-    tagTitle: checkboxOptions.tagTitle,
-    blockString: checkboxOptions.blockString
-  })) {
-    return Object.freeze({
-      annotated: false,
-      managed: false,
-      hidden: false,
-      reason: "not-exact-managed-pill"
-    });
-  }
-  const checkboxResult = syncStatusCheckboxForPill({
-    statusPill,
-    ...checkboxOptions
-  });
-  if (!checkboxResult.annotated) return checkboxResult;
-  applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
-  const input = checkboxResult.checkbox?.querySelector?.('input[type="checkbox"]');
-  const shouldBeacon = Boolean(alertBeaconEnabled) && checkboxResult.statusKey === "ALERT" && input?.checked === false;
-  if (shouldBeacon) {
-    checkboxResult.checkbox.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-    statusPill.setAttribute(ALERT_BEACON_ATTRIBUTE, "true");
-  }
-  return Object.freeze({
-    ...checkboxResult,
-    managed: true,
-    hidden: Boolean(hideManagedPill),
-    alertBeacon: shouldBeacon
-  });
-}
-function includingRoot(root, selector) {
-  const nodes = [];
-  if (root?.matches?.(selector)) nodes.push(root);
-  if (root?.querySelectorAll) nodes.push(...root.querySelectorAll(selector));
-  return nodes;
-}
-function clearOwnedStatusCheckboxes(root) {
-  const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
-    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser, .ts-rendered-icon")
-  );
-  checkboxes.forEach(clearStatusCheckboxAnnotation);
-  return checkboxes.length;
-}
-function clearOwnedStatusPillPresentations(root) {
-  const statusPills = includingRoot(root, OWNED_STATUS_PILL_SELECTOR);
-  statusPills.forEach(clearStatusPillPresentation);
-  return statusPills.length;
-}
-function createStatusPopTracker({
-  windowLike = typeof window !== "undefined" ? window : globalThis,
-  lifecycle = null,
-  recentWindowMs = STATUS_POP_RECENT_WINDOW_MS,
-  popDurationMs = STATUS_POP_DURATION_MS
-} = {}) {
-  const recentWrites = /* @__PURE__ */ new Map();
-  const activePops = /* @__PURE__ */ new Map();
-  let enabled = true;
-  let disposed = false;
-  const setTimer = (fn, delay) => (windowLike?.setTimeout || globalThis.setTimeout)(fn, delay);
-  const clearTimer = (id) => {
-    if (id == null) return;
-    (windowLike?.clearTimeout || globalThis.clearTimeout)(id);
-  };
-  function clearRecent(blockUid) {
-    const entry = recentWrites.get(blockUid);
-    if (!entry) return;
-    clearTimer(entry.timerId);
-    recentWrites.delete(blockUid);
-  }
-  function clearPopForCheckbox(checkbox) {
-    const active = activePops.get(checkbox);
-    if (active) {
-      clearTimer(active.timerId);
-      if (active.onAnimationEnd) {
-        try {
-          checkbox?.removeEventListener?.("animationend", active.onAnimationEnd);
-        } catch (_) {
-        }
-      }
-      activePops.delete(checkbox);
-    }
-    checkbox?.removeAttribute?.(STATUS_POP_ATTRIBUTE);
-  }
-  function markWritten(blockUid, statusKey) {
-    if (disposed || !enabled || !blockUid || !statusKey) return false;
-    clearRecent(blockUid);
-    const timerId = setTimer(() => {
-      recentWrites.delete(blockUid);
-    }, recentWindowMs);
-    recentWrites.set(blockUid, { statusKey, timerId });
-    return true;
-  }
-  function hasPendingWrite(blockUid, statusKey) {
-    if (disposed || !enabled || !blockUid) return false;
-    const entry = recentWrites.get(blockUid);
-    if (!entry) return false;
-    return !statusKey || entry.statusKey === statusKey;
-  }
-  function consumeWrite(blockUid) {
-    clearRecent(blockUid);
-  }
-  function isPopping(checkbox, statusKey) {
-    if (disposed || !enabled || !checkbox) return false;
-    const active = activePops.get(checkbox);
-    if (!active) return false;
-    return !statusKey || active.statusKey === statusKey;
-  }
-  function triggerPop(checkbox, statusKey) {
-    if (disposed || !enabled || !checkbox?.setAttribute || !statusKey) return false;
-    const input = checkbox.querySelector?.('input[type="checkbox"]');
-    if (input?.checked === true) {
-      clearPopForCheckbox(checkbox);
-      return false;
-    }
-    clearPopForCheckbox(checkbox);
-    checkbox.setAttribute(STATUS_POP_ATTRIBUTE, "true");
-    const finish = () => clearPopForCheckbox(checkbox);
-    const onAnimationEnd = (event) => {
-      if (event?.animationName && !String(event.animationName).startsWith("ts-status-pop-")) {
-        return;
-      }
-      finish();
-    };
-    const timerId = setTimer(finish, popDurationMs);
-    activePops.set(checkbox, { timerId, statusKey, onAnimationEnd });
-    try {
-      checkbox.addEventListener?.("animationend", onAnimationEnd);
-    } catch (_) {
-    }
-    return true;
-  }
-  function restorePopAttributeIfActive(checkbox, statusKey) {
-    if (!isPopping(checkbox, statusKey)) {
-      if (activePops.has(checkbox)) clearPopForCheckbox(checkbox);
-      return false;
-    }
-    const input = checkbox.querySelector?.('input[type="checkbox"]');
-    if (input?.checked === true) {
-      clearPopForCheckbox(checkbox);
-      return false;
-    }
-    checkbox.setAttribute?.(STATUS_POP_ATTRIBUTE, "true");
-    return true;
-  }
-  function clearAll() {
-    for (const uid of [...recentWrites.keys()]) clearRecent(uid);
-    for (const checkbox of [...activePops.keys()]) clearPopForCheckbox(checkbox);
-  }
-  function setEnabled(nextValue) {
-    enabled = Boolean(nextValue);
-    if (!enabled) clearAll();
-  }
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
-    clearAll();
-  }
-  lifecycle?.add?.(dispose);
-  return {
-    get enabled() {
-      return enabled;
-    },
-    get pendingCount() {
-      return recentWrites.size;
-    },
-    get activeCount() {
-      return activePops.size;
-    },
-    setEnabled,
-    markWritten,
-    hasPendingWrite,
-    consumeWrite,
-    isPopping,
-    triggerPop,
-    restorePopAttributeIfActive,
-    clearPopForCheckbox,
-    clearAll,
-    dispose
-  };
-}
-
-// src/public-api.js
-var API_VERSION = 1;
-var GLOBAL_NAME = "RoamTaskStatusTags";
-var READY_EVENT = "roam-task-status-tags:ready";
-var UNLOAD_EVENT = "roam-task-status-tags:unload";
-var API_EVENTS = Object.freeze(["change", "statuses"]);
-var API_FEATURES = Object.freeze([
-  "statusOfBlock",
-  "tasks",
-  "counts",
-  "renderIcon",
-  "aiTools"
-]);
-var DEFAULT_TASK_LIMIT = 50;
-var MIN_TASK_LIMIT = 1;
-var MAX_TASK_LIMIT = 200;
-var EVENT_TYPES = new Set(API_EVENTS);
-var PUBLIC_STATUSES = /* @__PURE__ */ new Set([
-  "updated",
-  "rejected",
-  "unknown",
-  "conflict",
-  "not-updated",
-  "unchanged"
-]);
-var emitters = /* @__PURE__ */ new WeakMap();
-var renderedIconCleanups = /* @__PURE__ */ new WeakMap();
-function requiredFunction(name, value) {
-  if (typeof value !== "function") throw new TypeError(`${name} is required`);
-  return value;
-}
-function helperOptionsFromCatalog(catalog) {
-  const statuses = {};
-  const cycleOrder = [];
-  for (const row of catalog || []) {
-    if (!row?.key || !row?.name) continue;
-    cycleOrder.push(row.key);
-    const tagTitle = row.tag || `task-status/${row.name}`;
-    statuses[row.key] = {
-      name: row.name,
-      label: row.name,
-      tagTitle,
-      tagTitles: [tagTitle]
-    };
-  }
-  return { statuses, cycleOrder };
-}
-function validStatusNames(catalog) {
-  return (Array.isArray(catalog) ? catalog : []).map((row) => row?.name).filter((name) => typeof name === "string" && name.length > 0);
-}
-function unknownStatusError(name, catalog) {
-  const valid = validStatusNames(catalog);
-  const label = name === null ? "null" : String(name);
-  const list = valid.length ? valid.join(", ") : "(none)";
-  return new Error(`Unknown status "${label}". Valid statuses: ${list}`);
-}
-function resolveStatusKey(name, catalog) {
-  if (name === null) return { ok: true, key: null };
-  if (typeof name !== "string") return { ok: false, reason: "unknown-status" };
-  const text = name.trim();
-  if (!text) return { ok: false, reason: "unknown-status" };
-  const rows = Array.isArray(catalog) ? catalog : [];
-  const upper = text.toUpperCase();
-  for (const row of rows) {
-    if (row?.key === text || row?.key === upper) return { ok: true, key: row.key };
-  }
-  const folded = text.toLowerCase();
-  for (const row of rows) {
-    if (row?.name === text || String(row?.name ?? "").toLowerCase() === folded) {
-      return { ok: true, key: row.key };
-    }
-  }
-  return { ok: false, reason: "unknown-status" };
-}
-function clampTaskLimit(value, fallback = DEFAULT_TASK_LIMIT) {
-  if (value === void 0 || value === null) return fallback;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(MAX_TASK_LIMIT, Math.max(MIN_TASK_LIMIT, Math.trunc(parsed)));
-}
-function isElementLike(node) {
-  if (!node || typeof node !== "object") return false;
-  if (node.nodeType !== void 0 && node.nodeType !== 1) return false;
-  return typeof node.appendChild === "function" && typeof node.tagName === "string";
-}
-function noop() {
-}
-function mapPublicResult(outcome) {
-  if (outcome == null || typeof outcome !== "object") {
-    return { status: "unknown", didWrite: false, reason: "unmapped-result" };
-  }
-  const known = PUBLIC_STATUSES.has(outcome.status);
-  const status = known ? outcome.status : "unknown";
-  const mapped = {
-    status,
-    didWrite: status === "updated" && outcome.didWrite === true
-  };
-  if (typeof outcome.reason === "string" && outcome.reason) mapped.reason = outcome.reason;
-  else if (!known) mapped.reason = "unmapped-result";
-  const activity = outcome.activity;
-  if (status === "updated" && activity && typeof activity.recorded === "boolean") {
-    mapped.activity = { recorded: activity.recorded };
-    if (typeof activity.reason === "string" && activity.reason) mapped.activity.reason = activity.reason;
-  }
-  return mapped;
-}
-function publicStatusRow({ key, name, tag, glyph, group, inCycle, colors }) {
-  const resolvedGroup = group === "media" || group === "extra" ? group : "task";
-  const resolvedInCycle = typeof inCycle === "boolean" ? inCycle : resolvedGroup === "task";
-  return Object.freeze({
-    key: String(key),
-    name: String(name),
-    tag: String(tag),
-    glyph: String(glyph),
-    group: resolvedGroup,
-    inCycle: resolvedInCycle,
-    light: Object.freeze({
-      base: String(colors?.lightBackgroundCss ?? ""),
-      text: String(colors?.lightTextCss ?? "")
-    }),
-    dark: Object.freeze({
-      base: String(colors?.darkBackgroundCss ?? ""),
-      text: String(colors?.darkTextCss ?? "")
-    })
-  });
-}
-function dispatch(target, type, detail) {
-  try {
-    const Ctor = globalThis.CustomEvent;
-    if (!Ctor) return;
-    target.dispatchEvent(new Ctor(type, { detail }));
-  } catch (error) {
-    console.error("[TaskStatus] listener dispatch failed", error);
-  }
-}
-function emitStatusChange(api, detail) {
-  const emitter = emitters.get(api);
-  if (!emitter) return;
-  dispatch(emitter, "change", detail);
-}
-function emitStatusCatalog(api, detail) {
-  const emitter = emitters.get(api);
-  if (!emitter) return;
-  dispatch(emitter, "statuses", detail ?? { apiVersion: API_VERSION });
-}
-function clearRenderedIcons(api) {
-  const active = renderedIconCleanups.get(api);
-  if (!active) return;
-  for (const cleanup of [...active]) {
-    try {
-      cleanup();
-    } catch (_) {
-    }
-  }
-  active.clear();
-}
-function emitChange(emitter, detail) {
-  dispatch(emitter, "change", detail);
-}
-function createPublicApi({
-  readCatalog,
-  readStatuses,
-  createTextHelpers,
-  setBlockStatus,
-  cycleBlockStatus,
-  readBlockString = null,
-  queryTasks = null,
-  documentLike = null
-} = {}) {
-  requiredFunction("readCatalog", readCatalog);
-  requiredFunction("readStatuses", readStatuses);
-  requiredFunction("createTextHelpers", createTextHelpers);
-  requiredFunction("setBlockStatus", setBlockStatus);
-  requiredFunction("cycleBlockStatus", cycleBlockStatus);
-  const emitter = new EventTarget();
-  const buckets = /* @__PURE__ */ new Map();
-  const liveIcons = /* @__PURE__ */ new Set();
-  function statusEntriesForQuery(entries) {
-    return (Array.isArray(entries) ? entries : []).filter((entry) => entry?.key && entry?.name).map((entry) => ({
-      key: entry.key,
-      name: entry.name,
-      tagTitle: entry.tag || `task-status/${entry.name}`
-    }));
-  }
-  const api = {
-    apiVersion: API_VERSION,
-    features: API_FEATURES,
-    statuses() {
-      const rows = readStatuses();
-      return Object.freeze(Array.isArray(rows) ? rows.slice() : []);
-    },
-    statusOf(text) {
-      if (typeof text !== "string" || text.length === 0) return null;
-      try {
-        const catalog = readCatalog();
-        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
-        const key = helpers?.getCurrentStatus?.(text);
-        if (!key) return null;
-        const row = (catalog || []).find((entry) => entry?.key === key);
-        return typeof row?.name === "string" && row.name ? row.name : null;
-      } catch (error) {
-        console.warn("[TaskStatus] statusOf failed", error);
-        return null;
-      }
-    },
-    async statusOfBlock(uid) {
-      const empty = { found: false, isTask: false, done: false, status: null };
-      if (typeof uid !== "string" || !uid.trim() || typeof readBlockString !== "function") {
-        return empty;
-      }
-      try {
-        const text = await readBlockString(uid.trim());
-        if (typeof text !== "string") return empty;
-        const catalog = readCatalog();
-        const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
-        const parsed = helpers?.parseManagedPrefix?.(text);
-        if (!parsed?.managed) {
-          return { found: true, isTask: false, done: false, status: null };
-        }
-        const row = parsed.currentStatus ? (catalog || []).find((entry) => entry?.key === parsed.currentStatus) : null;
-        return {
-          found: true,
-          isTask: true,
-          done: parsed.taskKind === "done",
-          status: typeof row?.name === "string" && row.name ? row.name : null
-        };
-      } catch {
-        return empty;
-      }
-    },
-    async tasks({ status, includeDone = false, limit = DEFAULT_TASK_LIMIT } = {}) {
-      if (typeof queryTasks !== "function") {
-        throw new Error("Task query reader is unavailable");
-      }
-      const catalog = readCatalog() || [];
-      let targetEntries = catalog;
-      if (status !== void 0) {
-        if (status === null) throw unknownStatusError(status, catalog);
-        const resolved = resolveStatusKey(status, catalog);
-        if (!resolved.ok || !resolved.key) throw unknownStatusError(status, catalog);
-        const matchedEntry = catalog.find((entry) => entry?.key === resolved.key);
-        if (!matchedEntry) throw unknownStatusError(status, catalog);
-        targetEntries = [matchedEntry];
-      }
-      const clampedLimit = clampTaskLimit(limit, DEFAULT_TASK_LIMIT);
-      const queryStatuses = statusEntriesForQuery(targetEntries);
-      if (!queryStatuses.length) {
-        return { tasks: [], truncated: false };
-      }
-      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
-      const rows = await queryTasks({
-        statuses: queryStatuses,
-        helpers,
-        includeDone: Boolean(includeDone)
-      });
-      const list = Array.isArray(rows) ? rows : [];
-      const nameByKey = new Map(
-        catalog.filter((entry) => entry?.key && entry?.name).map((entry) => [entry.key, entry.name])
-      );
-      const truncated = list.length > clampedLimit;
-      const sliced = list.slice(0, clampedLimit).map((row) => ({
-        uid: row.uid,
-        text: String(row.body ?? ""),
-        status: nameByKey.get(row.statusKey) ?? row.statusKey,
-        done: Boolean(row.done),
-        page: typeof row.page === "string" ? row.page : null
-      }));
-      return { tasks: sliced, truncated };
-    },
-    async counts({ includeDone = false } = {}) {
-      if (typeof queryTasks !== "function") {
-        throw new Error("Task query reader is unavailable");
-      }
-      const catalog = readCatalog() || [];
-      const counts = {};
-      const nameByKey = /* @__PURE__ */ new Map();
-      for (const entry of catalog) {
-        if (!entry?.key || !entry?.name) continue;
-        counts[entry.name] = 0;
-        nameByKey.set(entry.key, entry.name);
-      }
-      const queryStatuses = statusEntriesForQuery(catalog);
-      if (!queryStatuses.length) {
-        return { counts, total: 0 };
-      }
-      const helpers = createTextHelpers(helperOptionsFromCatalog(catalog));
-      const rows = await queryTasks({
-        statuses: queryStatuses,
-        helpers,
-        includeDone: Boolean(includeDone)
-      });
-      let total = 0;
-      for (const row of Array.isArray(rows) ? rows : []) {
-        const name = nameByKey.get(row?.statusKey);
-        if (name && Object.prototype.hasOwnProperty.call(counts, name)) {
-          counts[name] += 1;
-          total += 1;
-        }
-      }
-      return { counts, total };
-    },
-    renderIcon(element, name) {
-      if (!isElementLike(element) || typeof name !== "string") return noop;
-      let catalog;
-      try {
-        catalog = readCatalog();
-      } catch {
-        return noop;
-      }
-      const resolved = resolveStatusKey(name, catalog);
-      if (!resolved.ok || !resolved.key) return noop;
-      const entry = (catalog || []).find((row) => row?.key === resolved.key);
-      if (!entry) return noop;
-      const doc = element.ownerDocument || documentLike || globalThis.document;
-      if (!doc || typeof doc.createElement !== "function") return noop;
-      const wrap = doc.createElement("span");
-      wrap.className = "ts-rendered-icon";
-      wrap.setAttribute("data-ts-rendered-icon", "true");
-      wrap.setAttribute("aria-hidden", "true");
-      wrap.setAttribute("data-task-status-key", entry.key);
-      const box = doc.createElement("span");
-      box.className = "rm-checkbox rm-todo";
-      box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, entry.key);
-      box.setAttribute(CHECKBOX_SHAPE_ATTRIBUTE, String(entry.glyph || "custom"));
-      const container = doc.createElement("span");
-      container.className = "check-container";
-      const fakeInput = doc.createElement("input");
-      fakeInput.setAttribute("type", "checkbox");
-      fakeInput.setAttribute("tabindex", "-1");
-      fakeInput.setAttribute("aria-hidden", "true");
-      const checkmark = doc.createElement("span");
-      checkmark.className = "checkmark";
-      container.appendChild(fakeInput);
-      container.appendChild(checkmark);
-      box.appendChild(container);
-      wrap.appendChild(box);
-      element.appendChild(wrap);
-      let cleaned = false;
-      const cleanup = () => {
-        if (cleaned) return;
-        cleaned = true;
-        liveIcons.delete(cleanup);
-        if (typeof wrap.remove === "function") {
-          wrap.remove();
-        } else if (wrap.parentNode && typeof wrap.parentNode.removeChild === "function") {
-          wrap.parentNode.removeChild(wrap);
-        }
-      };
-      liveIcons.add(cleanup);
-      return cleanup;
-    },
-    async setStatus(uid, name) {
-      let catalog;
-      try {
-        catalog = readCatalog();
-      } catch (error) {
-        console.warn("[TaskStatus] status list read failed", error);
-        return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
-      }
-      const resolved = resolveStatusKey(name, catalog);
-      if (!resolved.ok) {
-        return { status: "rejected", didWrite: false, reason: resolved.reason };
-      }
-      let outcome;
-      try {
-        outcome = await setBlockStatus(uid, resolved.key);
-      } catch (error) {
-        console.warn("[TaskStatus] setStatus failed", error);
-        return { status: "unknown", didWrite: false, reason: "set-status-failed" };
-      }
-      const mapped = mapPublicResult(outcome);
-      if (mapped.status !== "updated") return mapped;
-      const row = (catalog || []).find((entry) => entry?.key === resolved.key);
-      emitChange(emitter, {
-        apiVersion: API_VERSION,
-        uid,
-        name: row?.name ?? null,
-        status: "updated"
-      });
-      return mapped;
-    },
-    async cycle(uid) {
-      let outcome;
-      try {
-        outcome = await cycleBlockStatus(uid);
-      } catch (error) {
-        console.warn("[TaskStatus] cycle failed", error);
-        return { status: "unknown", didWrite: false, reason: "cycle-failed" };
-      }
-      if (outcome == null || typeof outcome !== "object") {
-        return { status: "unchanged", didWrite: false, reason: "done-task" };
-      }
-      const mapped = mapPublicResult(outcome);
-      if (mapped.status !== "updated") return mapped;
-      const written = typeof outcome.string === "string" ? api.statusOf(outcome.string) : null;
-      emitChange(emitter, {
-        apiVersion: API_VERSION,
-        uid,
-        name: written,
-        status: "updated"
-      });
-      return mapped;
-    },
-    addEventListener(type, cb) {
-      if (!EVENT_TYPES.has(type) || typeof cb !== "function") return;
-      let bag = buckets.get(type);
-      if (!bag) {
-        bag = /* @__PURE__ */ new Map();
-        buckets.set(type, bag);
-      }
-      if (bag.has(cb)) return;
-      const wrapped = (event) => {
-        try {
-          cb(event?.detail);
-        } catch (error) {
-          console.error("[TaskStatus] listener failed", error);
-        }
-      };
-      bag.set(cb, wrapped);
-      emitter.addEventListener(type, wrapped);
-    },
-    removeEventListener(type, cb) {
-      const bag = buckets.get(type);
-      const wrapped = bag?.get(cb);
-      if (!wrapped) return;
-      bag.delete(cb);
-      emitter.removeEventListener(type, wrapped);
-    }
-  };
-  const frozen = Object.freeze(api);
-  emitters.set(frozen, emitter);
-  renderedIconCleanups.set(frozen, liveIcons);
-  return frozen;
-}
-var fire = (win, type, detail, Ctor) => {
-  try {
-    const C = Ctor ?? win.CustomEvent ?? globalThis.CustomEvent;
-    if (C) win.dispatchEvent(new C(type, { detail }));
-  } catch (error) {
-    console.warn("[TaskStatus] event dispatch failed", error);
-  }
-};
-function installPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
-  win[GLOBAL_NAME] = api;
-  fire(win, READY_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
-}
-function uninstallPublicApi(api, { win = globalThis.window ?? globalThis, CustomEventCtor } = {}) {
-  const ours = win[GLOBAL_NAME] === api;
-  if (ours) delete win[GLOBAL_NAME];
-  fire(win, UNLOAD_EVENT, { apiVersion: API_VERSION }, CustomEventCtor);
-  return ours;
 }
 
 // src/status-write.js
@@ -5312,7 +5682,8 @@ function createTaskStatusExtension({
     statusChangeAnimation: "task-status-change-animation",
     ambientMotion: "task-status-ambient-motion",
     repeatCarryOver: "task-status-repeat-carry-over",
-    followUpPrompt: "task-status-follow-up-prompt"
+    followUpPrompt: "task-status-follow-up-prompt",
+    agentTools: "task-status-agent-tools"
   };
   const STATUS_LABEL_DISPLAY = Object.freeze({
     CHECKBOX_ONLY: "Checkbox only — reveal on intent",
@@ -5424,6 +5795,8 @@ function createTaskStatusExtension({
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
   let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
+  let agentToolsEnabled = loadBooleanSetting(SETTINGS_KEYS.agentTools, true);
+  let aiToolsManager = null;
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -6308,6 +6681,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   function setFollowUpPromptEnabled(nextValue) {
     followUpPromptEnabled = normalizeBooleanSetting(nextValue, followUpPromptEnabled);
+  }
+  function setAgentToolsEnabled(nextValue) {
+    agentToolsEnabled = normalizeBooleanSetting(nextValue, agentToolsEnabled);
+    aiToolsManager?.sync(agentToolsEnabled);
   }
   function setRepeatCarryOver(value) {
     const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
@@ -8654,6 +9031,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.agentTools,
+          name: "Let AI agents read and set statuses",
+          description: "Offers read and status-change tools to AI agents connected to this graph; writes go through the same checks as the chooser.",
+          action: {
+            type: "switch",
+            onChange: (value) => setAgentToolsEnabled(value)
+          }
+        },
+        {
           id: SETTINGS_KEYS.repeatCarryOver,
           name: "Statuses kept on the next repeat",
           description: "Comma-separated status names kept on the next occurrence of a repeating task; every other status is cleared. Needs Better Tasks.",
@@ -8733,6 +9119,34 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       await cleanup();
       return false;
     }
+    aiToolsManager = createAiToolsManager({
+      extensionAPI,
+      api: publicApi,
+      setStatusForAgent: async (uid, name, { userUid } = {}) => {
+        let catalog;
+        try {
+          catalog = readStatusEntries();
+        } catch {
+          return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
+        }
+        const resolved = resolveStatusKey(name, catalog);
+        if (!resolved.ok) {
+          return { status: "rejected", didWrite: false, reason: resolved.reason };
+        }
+        let outcome;
+        try {
+          outcome = await setBlockStatus(uid, resolved.key, {
+            userUid,
+            requireExistingTask: true,
+            requireBetterTasksReady: true
+          });
+        } catch {
+          return { status: "unknown", didWrite: false, reason: "set-status-failed" };
+        }
+        return mapPublicResult(outcome);
+      }
+    });
+    aiToolsManager.sync(agentToolsEnabled);
     repeatStatusReset.sync();
     startStatusPillObserver();
     window.addEventListener("mousedown", handleStatusMouseDown, true);
@@ -8760,6 +9174,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     repeatStatusReset.dispose();
     clearStatusColorOverrides();
     clearRenderedIcons(publicApi);
+    aiToolsManager?.dispose();
+    aiToolsManager = null;
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;
     window.removeEventListener("mousedown", handleStatusMouseDown, true);

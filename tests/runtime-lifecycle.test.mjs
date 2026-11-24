@@ -271,6 +271,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
           "task-status-change-animation",
           "task-status-ambient-motion",
           "task-status-follow-up-prompt",
+          "task-status-agent-tools",
           "task-status-repeat-carry-over",
           "task-status-status-names",
           "task-status-about",
@@ -744,6 +745,176 @@ test("status-change pop triggers only on extension writes, respects setting off,
       "onunload must remove the burst canvas"
     );
     assert.equal(timers.size, 0);
+  } finally {
+    await mod?.onunload?.();
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+    globalThis.MutationObserver = originalMutationObserver;
+  }
+});
+
+test("AI agent tools register with setting, enforce agent guards, attribute user-uid, and release on unload", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const originalMutationObserver = globalThis.MutationObserver;
+
+  const document = new FakeDocument();
+  const noopApi = { addCommand: async () => {}, removeCommand: async () => {} };
+  const blocks = new Map([
+    ["task00001", "{{[[TODO]]}} Write tests"],
+    ["plain0001", "Just a plain block"],
+    ["bttask001", "{{[[TODO]]}} Better Tasks task"],
+    ["btchild01", "BT_attrDue:: [[November 25th, 2026]]"],
+  ]);
+  const children = new Map([
+    ["task00001", []],
+    ["plain0001", []],
+    ["bttask001", ["btchild01"]],
+  ]);
+  const updateCalls = [];
+  const registeredTools = new Map();
+  const removedTools = [];
+
+  class QuietObserver {
+    observe() {}
+    disconnect() {}
+  }
+
+  const windowLike = new EventTarget();
+  Object.assign(windowLike, {
+    document,
+    CSS: { supports: () => true },
+    React: { createElement: () => null },
+    getComputedStyle: () => ({ backgroundColor: "rgb(255, 255, 255)", color: "rgb(20, 184, 166)" }),
+    setTimeout,
+    clearTimeout,
+    requestAnimationFrame: (cb) => setTimeout(cb, 0),
+    cancelAnimationFrame: clearTimeout,
+    innerWidth: 1280,
+    innerHeight: 800,
+    roamAlphaAPI: {
+      data: {
+        async: {
+          pull: async (_pattern, [, uid]) => {
+            const string = blocks.get(uid);
+            if (typeof string !== "string") return null;
+            return {
+              ":block/uid": uid,
+              ":block/string": string,
+              ":block/children": (children.get(uid) || []).map((childUid) => ({
+                ":block/uid": childUid,
+                ":block/string": blocks.get(childUid),
+              })),
+            };
+          },
+          q: async () => [],
+        },
+        block: {
+          update: async ({ block }) => {
+            updateCalls.push(block);
+            blocks.set(block.uid, block.string);
+          },
+        },
+      },
+      ui: {
+        commandPalette: noopApi,
+        blockContextMenu: noopApi,
+        msContextMenu: noopApi,
+      },
+    },
+  });
+
+  globalThis.window = windowLike;
+  globalThis.document = document;
+  globalThis.MutationObserver = QuietObserver;
+
+  let panelConfig = null;
+  const extensionAPI = {
+    settings: {
+      get: () => null,
+      set: async () => {},
+      panel: { create: async (cfg) => { panelConfig = cfg; } },
+    },
+    ui: { commandPalette: noopApi, slashCommand: noopApi },
+    ai: {
+      addTool(def) {
+        registeredTools.set(def.name, def);
+      },
+      removeTool({ name }) {
+        removedTools.push(name);
+        registeredTools.delete(name);
+      },
+    },
+  };
+
+  let mod = null;
+  try {
+    mod = await import(`../src/extension.js?ai-lifecycle=${Date.now()}`);
+    await mod.onload({ extensionAPI, extension: { version: "0.17.0" } });
+
+    assert.deepEqual([...registeredTools.keys()], [
+      "list_statuses",
+      "get_task_status",
+      "list_tasks",
+      "status_counts",
+      "set_task_status",
+    ]);
+
+    const agentSetting = panelConfig.settings.find((entry) => entry.id === "task-status-agent-tools");
+    assert.equal(agentSetting.name, "Let AI agents read and set statuses");
+    assert.equal(agentSetting.action.type, "switch");
+
+    // Mount a live icon to ensure unload removes both tools and icons
+    const iconHost = document.createElement("span");
+    windowLike.RoamTaskStatusTags.renderIcon(iconHost, "Waiting");
+    assert.equal(iconHost.children.length, 1);
+
+    const changes = [];
+    windowLike.RoamTaskStatusTags.addEventListener("change", (detail) => changes.push(detail));
+
+    const res = await registeredTools.get("set_task_status").handler(
+      {
+        changes: [
+          { uid: "((task00001))", status: "Waiting" },
+          { uid: "plain0001", status: "Active" },
+          { uid: "bttask001", status: "Waiting" },
+        ],
+      },
+      { tokenUserUid: "ai-agent-uid" }
+    );
+
+    assert.equal(res.updated, 1);
+    assert.equal(res.failed, 2);
+    assert.deepEqual(
+      res.results.map(({ uid, status, reason }) => ({ uid, status, reason })),
+      [
+        { uid: "task00001", status: "updated", reason: "certified" },
+        { uid: "plain0001", status: "rejected", reason: "not-a-task" },
+        { uid: "bttask001", status: "rejected", reason: "better-tasks-not-ready" },
+      ]
+    );
+    assert.equal(updateCalls.length, 1);
+    assert.deepEqual(updateCalls[0], {
+      uid: "task00001",
+      string: "{{[[TODO]]}} #[[task-status/Waiting]] Write tests",
+      "user-uid": "ai-agent-uid",
+    });
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].uid, "task00001");
+    assert.equal(changes[0].name, "Waiting");
+
+    // Toggle setting off -> removeTool for all 5; back on -> re-registers all 5
+    agentSetting.action.onChange(false);
+    assert.equal(registeredTools.size, 0);
+    assert.equal(removedTools.length, 5);
+    agentSetting.action.onChange(true);
+    assert.equal(registeredTools.size, 5);
+
+    // Unload removes all tools and all live rendered icons
+    await mod.onunload();
+    assert.equal(registeredTools.size, 0);
+    assert.equal(removedTools.length, 10);
+    assert.equal(iconHost.children.length, 0);
   } finally {
     await mod?.onunload?.();
     globalThis.window = originalWindow;

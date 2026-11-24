@@ -1,3 +1,4 @@
+import { createAiToolsManager } from "./ai-tools.js";
 import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
 import {
@@ -38,7 +39,9 @@ import {
   emitStatusCatalog,
   emitStatusChange,
   installPublicApi,
+  mapPublicResult,
   publicStatusRow,
+  resolveStatusKey,
   uninstallPublicApi,
 } from "./public-api.js";
 import {
@@ -622,6 +625,7 @@ function createTaskStatusExtension({
     ambientMotion: "task-status-ambient-motion",
     repeatCarryOver: "task-status-repeat-carry-over",
     followUpPrompt: "task-status-follow-up-prompt",
+    agentTools: "task-status-agent-tools",
   };
 
   const STATUS_LABEL_DISPLAY = Object.freeze({
@@ -740,6 +744,8 @@ function createTaskStatusExtension({
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
   let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
+  let agentToolsEnabled = loadBooleanSetting(SETTINGS_KEYS.agentTools, true);
+  let aiToolsManager = null;
   let colorProbeEl = null;
   let statusColorStyleEl = null;
   let portalRoot = null;
@@ -1793,6 +1799,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   function setFollowUpPromptEnabled(nextValue) {
     followUpPromptEnabled = normalizeBooleanSetting(nextValue, followUpPromptEnabled);
+  }
+
+  function setAgentToolsEnabled(nextValue) {
+    agentToolsEnabled = normalizeBooleanSetting(nextValue, agentToolsEnabled);
+    aiToolsManager?.sync(agentToolsEnabled);
   }
 
   function setRepeatCarryOver(value) {
@@ -4546,6 +4557,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.agentTools,
+          name: "Let AI agents read and set statuses",
+          description:
+            "Offers read and status-change tools to AI agents connected to this graph; writes go through the same checks as the chooser.",
+          action: {
+            type: "switch",
+            onChange: (value) => setAgentToolsEnabled(value),
+          },
+        },
+        {
           id: SETTINGS_KEYS.repeatCarryOver,
           name: "Statuses kept on the next repeat",
           description:
@@ -4638,6 +4659,35 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return false;
     }
 
+    aiToolsManager = createAiToolsManager({
+      extensionAPI,
+      api: publicApi,
+      setStatusForAgent: async (uid, name, { userUid } = {}) => {
+        let catalog;
+        try {
+          catalog = readStatusEntries();
+        } catch {
+          return { status: "unknown", didWrite: false, reason: "status-list-unreadable" };
+        }
+        const resolved = resolveStatusKey(name, catalog);
+        if (!resolved.ok) {
+          return { status: "rejected", didWrite: false, reason: resolved.reason };
+        }
+        let outcome;
+        try {
+          outcome = await setBlockStatus(uid, resolved.key, {
+            userUid,
+            requireExistingTask: true,
+            requireBetterTasksReady: true,
+          });
+        } catch {
+          return { status: "unknown", didWrite: false, reason: "set-status-failed" };
+        }
+        return mapPublicResult(outcome);
+      },
+    });
+    aiToolsManager.sync(agentToolsEnabled);
+
     repeatStatusReset.sync();
 
     startStatusPillObserver();
@@ -4672,6 +4722,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
     clearStatusColorOverrides();
     clearRenderedIcons(publicApi);
+    aiToolsManager?.dispose();
+    aiToolsManager = null;
     if (portalRoot?.remove) portalRoot.remove();
     portalRoot = null;
 
