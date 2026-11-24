@@ -228,3 +228,15 @@ Steps that need Svy, in order: confirm the license; review the build; say push; 
 ## 10. Out of scope
 
 Pushing, tagging, the Pages deploy, any Roam Depot fork or PR, changes to Better Tasks, changes to the public API shape beyond the new glyph ids, `.system-sync-include` (its deletion in the working tree is left exactly as it is, uncommitted).
+
+## 11. Second pass (RTS-7, 2026-11-23)
+
+Svy asked for the look to be "appealing, fun" over faithful, and for a Settings link. Work order: `/tmp/wo/rts-depot-polish.wo.md`. This pass overrides three earlier decisions:
+
+- Section 2 "Transition bursts ... Not ported": a single status-change pop now exists, behind `task-status-change-animation` (`Animate status changes`, on by default, off under reduced motion). Ambient looping motion is still limited to the Alert beacon.
+- Section 4 "no new keyframes": the pop and the hover and press feedback add keyframes and transitions on owned checkboxes only.
+- Section 3 chooser rows: rows show the status glyph in a column.
+
+Added: a live style preview row in settings (`task-status-style-preview`), a `Settings…` chooser item and a `Task Status: Open settings` command through `roamAlphaAPI.depot.openSettings({id})` (hidden when the API or the extension's own id is missing), README reference sections in `<details>`, and `docs/images/` screenshots rendered from `tests/fixtures/depot-gallery.html`.
+
+Added to the Depot checklist (section 8): after the Depot PR is opened and before it is merged, Svy installs the PR build in Roam with `roamAlphaAPI.depot.developer.install({url: "Svyk+Roam-Task-Status-Tags+<PR number>"})` and checks it. After a Pages push, `roamAlphaAPI.depot.developer.reload({id: "https://svyk.github.io/Roam-Task-Status-Tags/"})` is the first update step, then the About row for the running version.
