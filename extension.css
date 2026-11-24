@@ -964,7 +964,8 @@
   .ts-status-chooser .bp3-menu-header,
   .ts-status-chooser .ts-status-choice,
   .ts-status-chooser .ts-status-choice-remove,
-  .ts-status-chooser .ts-status-choice-view {
+  .ts-status-chooser .ts-status-choice-view,
+  .ts-status-chooser .ts-status-choice-settings {
     border-color: CanvasText !important;
     background: Canvas !important;
     color: CanvasText !important;
@@ -2623,8 +2624,8 @@ a.rm-page-ref[data-task-status-key="CANCELLED"],
 }
 
 /* Watching now: read-only panel of open tasks grouped by status. */
-.ts-status-chooser .ts-status-choice-view {
-  border-radius: 0 0 var(--svy-tag-radius, 5px) var(--svy-tag-radius, 5px);
+.ts-status-chooser .ts-status-choice-view,
+.ts-status-chooser .ts-status-choice-settings {
   color: var(--ts-menu-text) !important;
 }
 

@@ -283,6 +283,78 @@ function createBetterTasksStatusRouter({
   });
 }
 
+// src/depot-settings.js
+var EXTENSION_ID_NEEDLE = "roam-task-status-tags";
+function normalizeId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function findExtensionSettingsCandidates({ depot, extensionId = null } = {}) {
+  const candidates = [];
+  const seen = /* @__PURE__ */ new Set();
+  const addCandidate = (value) => {
+    const id = normalizeId(value);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    candidates.push(id);
+  };
+  addCandidate(extensionId);
+  if (typeof depot?.getInstalledExtensions !== "function") {
+    return candidates;
+  }
+  let installed;
+  try {
+    installed = depot.getInstalledExtensions();
+  } catch (_) {
+    return candidates;
+  }
+  if (!installed || typeof installed !== "object") {
+    return candidates;
+  }
+  const entries = Array.isArray(installed) ? installed.map((entry) => [entry?.id, entry]) : Object.entries(installed);
+  for (const [key, entry] of entries) {
+    if (!entry || entry.running !== true) continue;
+    const id = normalizeId(entry.id) || normalizeId(key);
+    if (!id) continue;
+    if (id.toLowerCase().includes(EXTENSION_ID_NEEDLE)) {
+      addCandidate(id);
+    }
+  }
+  return candidates;
+}
+function canOpenExtensionSettings({ roamAlphaAPI, extensionId = null } = {}) {
+  const depot = roamAlphaAPI?.depot;
+  if (typeof depot?.openSettings !== "function") return false;
+  return findExtensionSettingsCandidates({ depot, extensionId }).length > 0;
+}
+async function openExtensionSettings({
+  roamAlphaAPI,
+  extensionId = null,
+  warn = console.warn
+} = {}) {
+  const depot = roamAlphaAPI?.depot;
+  if (typeof depot?.openSettings !== "function") {
+    return { opened: false, reason: "api-unavailable" };
+  }
+  const candidates = findExtensionSettingsCandidates({ depot, extensionId });
+  if (!candidates.length) {
+    return { opened: false, reason: "no-candidates" };
+  }
+  let lastError = null;
+  for (const id of candidates) {
+    try {
+      await depot.openSettings({ id });
+      return { opened: true, id };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  try {
+    warn?.("[TaskStatus] Failed to open extension settings", lastError);
+  } catch (_) {
+  }
+  return { opened: false, reason: "rejected", error: lastError };
+}
+
 // src/lifecycle.js
 function isPromiseLike(value) {
   return value != null && typeof value.then === "function";
@@ -4159,7 +4231,8 @@ function resolveChooserDigitAction(event, { activeElement = null, statusActions 
 function createTaskStatusExtension({
   extensionAPI,
   runtimeVersion = BUNDLED_VERSION,
-  lifecycle = null
+  lifecycle = null,
+  extensionId = null
 }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const STATUS_PILL_SELECTOR = [
@@ -5766,6 +5839,28 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     });
   }
+  function isSettingsLinkAvailable() {
+    return canOpenExtensionSettings({
+      roamAlphaAPI: window.roamAlphaAPI,
+      extensionId
+    });
+  }
+  function openOwnExtensionSettings() {
+    return openExtensionSettings({
+      roamAlphaAPI: window.roamAlphaAPI,
+      extensionId
+    });
+  }
+  function makeSettingsChoice() {
+    return makeStatusMenuItem({
+      label: "Settings…",
+      className: "ts-status-choice-settings",
+      onChoose: () => {
+        closeStatusChooser();
+        void openOwnExtensionSettings();
+      }
+    });
+  }
   function makeStatusChoiceButton({
     statusKey,
     currentStatusKey,
@@ -6006,6 +6101,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     viewDivider.className = "bp3-menu-divider ts-status-choice-divider";
     viewDivider.setAttribute("role", "separator");
     choices.append(viewDivider, makeWatchingNowChoice());
+    if (isSettingsLinkAvailable()) {
+      choices.append(makeSettingsChoice());
+    }
     content.append(choices);
     chooser.append(makeBlueprintPopoverArrow(), content);
     (portalRoot || document.body).appendChild(chooser);
@@ -6217,6 +6315,22 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       log("Failed to add palette command:", viewLabel, err);
     }
     registeredCommands.palette.push({ label: viewLabel, api });
+    if (isSettingsLinkAvailable()) {
+      const settingsLabel = "Task Status: Open settings";
+      try {
+        const res = api.addCommand({
+          label: settingsLabel,
+          "disable-hotkey": false,
+          callback: () => {
+            void openOwnExtensionSettings();
+          }
+        });
+        if (isThenable(res)) await res;
+      } catch (err) {
+        log("Failed to add palette command:", settingsLabel, err);
+      }
+      registeredCommands.palette.push({ label: settingsLabel, api });
+    }
     if (msApi?.addCommand) {
       try {
         msApi.addCommand({
@@ -7507,7 +7621,13 @@ async function onload({ extensionAPI, extension }) {
   }
   const lifecycle = createLifecycle();
   const runtimeVersion = resolveTaskStatusRuntimeVersion(extension?.version);
-  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion, lifecycle });
+  const extensionId = typeof extension?.id === "string" && extension.id.trim() ? extension.id.trim() : null;
+  const instance = createTaskStatusExtension({
+    extensionAPI,
+    runtimeVersion,
+    lifecycle,
+    extensionId
+  });
   const runtime = Object.freeze({
     version: runtimeVersion,
     dispose: () => lifecycle.dispose()

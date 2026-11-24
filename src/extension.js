@@ -1,5 +1,9 @@
 import { createBetterTasksActivityRecorder } from "./better-tasks-activity.js";
 import { createBetterTasksStatusRouter } from "./better-tasks-bridge.js";
+import {
+  canOpenExtensionSettings,
+  openExtensionSettings,
+} from "./depot-settings.js";
 import { createLifecycle } from "./lifecycle.js";
 import {
   EPISODE_GLYPHS,
@@ -571,6 +575,7 @@ function createTaskStatusExtension({
   extensionAPI,
   runtimeVersion = BUNDLED_VERSION,
   lifecycle = null,
+  extensionId = null,
 }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const STATUS_PILL_SELECTOR = [
@@ -2487,6 +2492,31 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     });
   }
 
+  function isSettingsLinkAvailable() {
+    return canOpenExtensionSettings({
+      roamAlphaAPI: window.roamAlphaAPI,
+      extensionId,
+    });
+  }
+
+  function openOwnExtensionSettings() {
+    return openExtensionSettings({
+      roamAlphaAPI: window.roamAlphaAPI,
+      extensionId,
+    });
+  }
+
+  function makeSettingsChoice() {
+    return makeStatusMenuItem({
+      label: "Settings\u2026",
+      className: "ts-status-choice-settings",
+      onChoose: () => {
+        closeStatusChooser();
+        void openOwnExtensionSettings();
+      },
+    });
+  }
+
   function makeStatusChoiceButton({
     statusKey,
     currentStatusKey,
@@ -2783,6 +2813,9 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     viewDivider.className = "bp3-menu-divider ts-status-choice-divider";
     viewDivider.setAttribute("role", "separator");
     choices.append(viewDivider, makeWatchingNowChoice());
+    if (isSettingsLinkAvailable()) {
+      choices.append(makeSettingsChoice());
+    }
     content.append(choices);
     chooser.append(makeBlueprintPopoverArrow(), content);
 
@@ -3032,6 +3065,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       log("Failed to add palette command:", viewLabel, err);
     }
     registeredCommands.palette.push({ label: viewLabel, api });
+
+    if (isSettingsLinkAvailable()) {
+      const settingsLabel = "Task Status: Open settings";
+      try {
+        const res = api.addCommand({
+          label: settingsLabel,
+          "disable-hotkey": false,
+          callback: () => {
+            void openOwnExtensionSettings();
+          },
+        });
+        if (isThenable(res)) await res;
+      } catch (err) {
+        log("Failed to add palette command:", settingsLabel, err);
+      }
+      registeredCommands.palette.push({ label: settingsLabel, api });
+    }
 
     if (msApi?.addCommand) {
       try {
@@ -4510,7 +4560,16 @@ export async function onload({ extensionAPI, extension }) {
 
   const lifecycle = createLifecycle();
   const runtimeVersion = resolveTaskStatusRuntimeVersion(extension?.version);
-  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion, lifecycle });
+  const extensionId =
+    typeof extension?.id === "string" && extension.id.trim()
+      ? extension.id.trim()
+      : null;
+  const instance = createTaskStatusExtension({
+    extensionAPI,
+    runtimeVersion,
+    lifecycle,
+    extensionId,
+  });
   const runtime = Object.freeze({
     version: runtimeVersion,
     dispose: () => lifecycle.dispose(),
