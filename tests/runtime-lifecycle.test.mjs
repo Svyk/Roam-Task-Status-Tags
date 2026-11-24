@@ -682,15 +682,67 @@ test("status-change pop triggers only on extension writes, respects setting off,
     assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "ALERT");
     assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
 
-    // Re-enable, start a pop, then onunload releases all timers and clears attribute
+    // Re-enable, start a pop in Outline (no burst canvas created), then test Glass burst & unload cleanup
     popSetting.action.onChange(true);
     await windowLike.RoamTaskStatusTags.setStatus("popuid123", "Active");
     pill.setAttribute("data-tag", "task-status/Active");
     bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
     assert.equal(checkbox.getAttribute("data-ts-status-pop"), "true");
+    assert.equal(
+      document.body.children.filter((el) => el.getAttribute("data-ts-burst-canvas") === "true").length,
+      0,
+      "Outline style must never create a burst canvas"
+    );
+
+    // Switch to Glass: extension write plays a canvas burst on re-claimed checkbox, not CSS pop
+    const styleSetting = panelConfig.settings.find((s) => s.id === "task-status-checkbox-style");
+    styleSetting.action.onChange("Glass");
+    checkmark.getBoundingClientRect = () => ({ left: 40, top: 60, width: 18, height: 18 });
+    const origCreateElement = document.createElement.bind(document);
+    document.createElement = (name) => {
+      const el = origCreateElement(name);
+      if (name === "canvas") {
+        el.getContext = () => ({
+          setTransform() {},
+          clearRect() {},
+          save() {},
+          restore() {},
+          translate() {},
+          rotate() {},
+          beginPath() {},
+          closePath() {},
+          moveTo() {},
+          lineTo() {},
+          bezierCurveTo() {},
+          arc() {},
+          ellipse() {},
+          setLineDash() {},
+          stroke() {},
+          fill() {},
+          fillRect() {},
+        });
+      }
+      return el;
+    };
+
+    await windowLike.RoamTaskStatusTags.setStatus("popuid123", "Waiting");
+    pill.setAttribute("data-tag", "task-status/Waiting");
+    bodyObserver.cb([{ type: "attributes", attributeName: "data-tag", target: pill }]);
+    assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "WAITING");
+    assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+    assert.equal(
+      document.body.children.filter((el) => el.getAttribute("data-ts-burst-canvas") === "true").length,
+      1,
+      "Glass style should lazily create one burst canvas on extension write"
+    );
 
     await mod.onunload();
     assert.equal(checkbox.getAttribute("data-ts-status-pop"), null);
+    assert.equal(
+      document.body.children.filter((el) => el.getAttribute("data-ts-burst-canvas") === "true").length,
+      0,
+      "onunload must remove the burst canvas"
+    );
     assert.equal(timers.size, 0);
   } finally {
     await mod?.onunload?.();

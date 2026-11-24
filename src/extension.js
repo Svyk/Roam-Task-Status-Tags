@@ -23,6 +23,7 @@ import {
   parseCarryOverSetting,
   resetTagTitles,
 } from "./repeat-status-reset.js";
+import { createStatusBurstSystem } from "./status-burst.js";
 import { createStatusView } from "./status-view.js";
 import {
   THEME_ATTRIBUTE,
@@ -590,7 +591,7 @@ function createTaskStatusExtension({
     "a.rm-page-ref[data-task-status-key]",
   ].join(", ");
   const RENDER_SCOPE_SELECTOR = ".rm-block__input, .rm-block-ref";
-  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview";
+  const EXTENSION_UI_SELECTOR = ".ts-status-portal, .ts-status-names-panel, .ts-episode-counter, .ts-style-preview, .ts-burst-canvas";
   const STATUS_MUTATION_SELECTOR = `${STATUS_PILL_SELECTOR}, .rm-checkbox`;
 
   const CONFIG = {
@@ -727,6 +728,13 @@ function createTaskStatusExtension({
     lifecycle,
   });
   statusPopTracker.setEnabled(statusChangeAnimationEnabled);
+  const statusBurstSystem = createStatusBurstSystem({
+    documentLike: document,
+    windowLike: window,
+    lifecycle,
+    getStyle: () => checkboxStyleSetting,
+    isEnabled: () => statusChangeAnimationEnabled && checkboxStylingEnabled,
+  });
   let statusLabelDisplay = loadStatusLabelDisplaySetting();
   let repeatCarryOver = loadRepeatCarryOverSetting();
   let followUpPromptEnabled = loadBooleanSetting(SETTINGS_KEYS.followUpPrompt, true);
@@ -1683,10 +1691,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           statusChangeAnimationEnabled &&
           statusPopTracker.hasPendingWrite(blockUid, presentation.statusKey)
         ) {
-          if (statusPopTracker.triggerPop(presentation.checkbox, presentation.statusKey)) {
+          if (
+            playStatusChangeEffect(
+              presentation.checkbox,
+              presentation.statusKey,
+              presentation.shape
+            )
+          ) {
             consumedPopUids.add(blockUid);
           }
-        } else {
+        } else if (!checkboxStyleToAttributeValue(checkboxStyleSetting)) {
           statusPopTracker.restorePopAttributeIfActive(
             presentation.checkbox,
             presentation.statusKey
@@ -1717,6 +1731,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     } else {
       // Restore readable metadata before removing either alternate visual cue.
       statusPopTracker.clearAll();
+      statusBurstSystem.clear();
       clearOwnedStatusPillPresentations(document);
       statusPeekController?.setEnabled?.(false);
       clearOwnedStatusCheckboxes(document);
@@ -1746,6 +1761,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       statusChangeAnimationEnabled
     );
     statusPopTracker.setEnabled(statusChangeAnimationEnabled);
+    if (!statusChangeAnimationEnabled) statusBurstSystem.clear();
+  }
+
+  function playStatusChangeEffect(checkbox, statusKey, shape = null) {
+    if (!statusChangeAnimationEnabled || !checkboxStylingEnabled || !checkbox || !statusKey) {
+      return false;
+    }
+    if (checkboxStyleToAttributeValue(checkboxStyleSetting)) {
+      const input = checkbox.querySelector?.('input[type="checkbox"]');
+      if (input?.checked === true) return false;
+      const color =
+        normalizeCssColorValue(statusColorOverrides?.[statusKey]?.base) ||
+        getDefaultStatusColor(statusKey);
+      statusBurstSystem.emitForCheckbox(checkbox, {
+        shape: shape || getStatusCheckboxShape(statusKey, STATUSES[statusKey]?.name),
+        color,
+      });
+      return true;
+    }
+    return statusPopTracker.triggerPop(checkbox, statusKey);
   }
 
   function setFollowUpPromptEnabled(nextValue) {
@@ -2166,11 +2201,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
             ) || []
           );
           if (alreadyRendered.length) {
-            let popped = false;
+            let played = false;
             alreadyRendered.forEach((checkbox) => {
-              if (statusPopTracker.triggerPop(checkbox, statusKey)) popped = true;
+              if (playStatusChangeEffect(checkbox, statusKey)) played = true;
             });
-            if (popped) statusPopTracker.consumeWrite(blockUid);
+            if (played) statusPopTracker.consumeWrite(blockUid);
           }
         }
         publishChange(blockUid, statusKey);
@@ -4405,7 +4440,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: SETTINGS_KEYS.statusChangeAnimation,
           name: "Animate status changes",
           description:
-            "Plays a short pop and ring when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+            "Plays a particle burst (Glass, Solid, Minimal) or short pop (Outline) when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setStatusChangeAnimationEnabled(value),
@@ -4548,6 +4583,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     statusView = null;
     stopStatusPillObserver();
     statusPopTracker.dispose();
+    statusBurstSystem.dispose();
     episodeCounter.destroyAll(document);
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);

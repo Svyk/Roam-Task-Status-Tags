@@ -3321,6 +3321,34 @@ a.rm-page-ref[data-task-status-key]:hover {
   height: 16px;
 }
 
+/* Adapted from BetterTask by imhalid (MIT). See THIRD_PARTY_NOTICES.md. */
+.ts-burst-canvas[data-ts-burst-canvas="true"] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-burst-canvas[data-ts-burst-canvas="true"] {
+    display: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ts-burst-canvas[data-ts-burst-canvas="true"] {
+    display: none !important;
+  }
+}
+
+@media print {
+  .ts-burst-canvas[data-ts-burst-canvas="true"] {
+    display: none !important;
+  }
+}
+
 .ts-status-about {
   display: inline-flex;
   align-items: center;

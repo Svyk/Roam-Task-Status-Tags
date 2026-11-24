@@ -262,7 +262,7 @@ test("Alert attention is a scoped two-beat beacon with a long quiet interval", (
 test("observer refreshes only status-bearing host mutations and ignores its own portal", () => {
   assert.match(source, /refreshMutationScopes\(mutations\)/);
   assert.match(source, /refreshStatusVisuals\(scope\)/);
-  assert.match(source, /EXTENSION_UI_SELECTOR = "\.ts-status-portal, \.ts-status-names-panel, \.ts-episode-counter, \.ts-style-preview"/);
+  assert.match(source, /EXTENSION_UI_SELECTOR = "\.ts-status-portal, \.ts-status-names-panel, \.ts-episode-counter, \.ts-style-preview, \.ts-burst-canvas"/);
   assert.match(source, /STATUS_MUTATION_SELECTOR/);
   assert.match(source, /containsStatusVisual\(node\)/);
   assert.match(source, /if \(isInsideExtensionUi\(mutation\.target\)\) continue/);
