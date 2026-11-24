@@ -440,7 +440,7 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
     for (const selector of header.split(",").map((part) => part.trim()).filter(Boolean)) {
       assert.match(
         selector,
-        /\.rm-checkbox(?:\.rm-todo)?(?:\[[^\]]+\])*\s*(?:>\s*[^,]+)?$/,
+        /\.rm-checkbox(?:\.rm-todo)?(?:\[[^\]]+\])*(?::not\([^)]+\))?\s*(?:>\s*[^,]+)?$/,
         `checkbox style selector must end on an owned checkbox or descendant: ${selector}`
       );
       assert.match(
@@ -554,4 +554,78 @@ test("chooser glyph column and settings style preview reuse status glyphs and re
   assert.match(css, /\.ts-style-preview\s*\{/);
   assert.match(css, /\.ts-style-preview \.rm-checkbox\[data-ts-checkbox-status\]/);
   assert.doesNotMatch(css, /\.ts-style-preview[^}]*data-ts-checkbox-style/);
+});
+
+test("ambient icon motion is gated to non-Outline styles, animates transform/opacity/filter only, and is guarded for reduced motion, forced colors, and print", () => {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const expectedKeyframes = [
+    "ts-spin",
+    "ts-play-nudge",
+    "ts-breath",
+    "ts-ring-pulse",
+    "ts-sheen",
+    "ts-heartbeat",
+    "ts-curious",
+    "ts-alert-pulse",
+    "ts-alert-radar",
+    "ts-star-twinkle",
+    "ts-sparkle",
+    "ts-bug-wiggle",
+    "ts-draft-write",
+    "ts-hourglass-flip",
+    "ts-kawaii-bounce",
+    "ts-heart-float",
+    "ts-flower-sway",
+    "ts-sun-glow",
+    "ts-moon-rock",
+  ];
+  for (const name of expectedKeyframes) {
+    const start = stripped.indexOf(`@keyframes ${name}`);
+    assert.notEqual(start, -1, `missing ambient keyframe @keyframes ${name}`);
+    let depth = 0;
+    let end = start;
+    for (let i = stripped.indexOf("{", start); i < stripped.length; i += 1) {
+      if (stripped[i] === "{") depth += 1;
+      else if (stripped[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    const block = stripped.slice(start, end);
+    const propNames = [...block.matchAll(/([a-z-]+)\s*:/gi)].map((m) => m[1].toLowerCase());
+    for (const prop of propNames) {
+      assert.ok(
+        ["transform", "opacity", "filter"].includes(prop),
+        `@keyframes ${name} may only animate transform/opacity/filter, found ${prop}`
+      );
+    }
+  }
+
+  const ambientHeaders = [
+    ...stripped.matchAll(/([^{}@]*data-ts-ambient-motion[^{}@]*)\{/g),
+  ].map((match) => match[1].trim());
+  assert.ok(ambientHeaders.length >= 15, "expected ambient motion rules");
+  for (const header of ambientHeaders) {
+    for (const selector of header.split(",").map((part) => part.trim()).filter(Boolean)) {
+      if (!selector.includes("data-ts-ambient-motion")) continue;
+      assert.match(
+        selector,
+        /:root(?:\[data-ts-theme="dark"\])?\[data-ts-checkbox-style(?:="(?:glass|solid|minimal)")?\]\[data-ts-ambient-motion="on"\]/,
+        `ambient rule must require non-Outline data-ts-checkbox-style and data-ts-ambient-motion="on": ${selector}`
+      );
+      assert.match(
+        selector,
+        /\.rm-checkbox\[data-ts-checkbox-status\]\[data-ts-checkbox-shape(?:="[^"]+")?\]/,
+        `ambient rule must stay scoped to owned checkboxes: ${selector}`
+      );
+      assert.match(selector, /input:not\(:checked\)\s*~\s*\.checkmark::(?:before|after)/);
+    }
+  }
+
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?data-ts-ambient-motion="on"[\s\S]*?animation: none !important/);
+  assert.match(css, /@media \(forced-colors: active\)[\s\S]*?\.checkmark::before[\s\S]*?animation: none !important/);
+  assert.match(css, /@media print[\s\S]*?\.checkmark::before[\s\S]*?animation: none !important/);
 });

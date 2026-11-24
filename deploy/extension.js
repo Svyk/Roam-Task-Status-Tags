@@ -2638,6 +2638,7 @@ var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
+var AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
 var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 var STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
 var STATUS_POP_RECENT_WINDOW_MS = 2e3;
@@ -4276,6 +4277,7 @@ function createTaskStatusExtension({
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
     statusChangeAnimation: "task-status-change-animation",
+    ambientMotion: "task-status-ambient-motion",
     repeatCarryOver: "task-status-repeat-carry-over",
     followUpPrompt: "task-status-follow-up-prompt"
   };
@@ -4368,6 +4370,10 @@ function createTaskStatusExtension({
   let alertBeaconEnabled = loadBooleanSetting(SETTINGS_KEYS.alertBeacon, true);
   let statusChangeAnimationEnabled = loadBooleanSetting(
     SETTINGS_KEYS.statusChangeAnimation,
+    true
+  );
+  let ambientMotionEnabled = loadBooleanSetting(
+    SETTINGS_KEYS.ambientMotion,
     true
   );
   const statusPopTracker = createStatusPopTracker({
@@ -5341,6 +5347,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setCheckboxStyleSetting(nextValue) {
     checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
     syncDocumentCheckboxStyle();
+    notifyStylePreviewListeners();
+  }
+  function syncDocumentAmbientMotion() {
+    const root = document?.documentElement;
+    if (!root) return ambientMotionEnabled;
+    if (ambientMotionEnabled) {
+      if (root.getAttribute?.(AMBIENT_MOTION_ATTRIBUTE) !== "on") {
+        root.setAttribute?.(AMBIENT_MOTION_ATTRIBUTE, "on");
+      }
+    } else {
+      root.removeAttribute?.(AMBIENT_MOTION_ATTRIBUTE);
+    }
+    return ambientMotionEnabled;
+  }
+  function setAmbientMotionEnabled(nextValue) {
+    ambientMotionEnabled = normalizeBooleanSetting(nextValue, ambientMotionEnabled);
+    syncDocumentAmbientMotion();
     notifyStylePreviewListeners();
   }
   function setThemeSetting(nextValue) {
@@ -7341,6 +7364,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       const readSnapshot = () => ({
         style: checkboxStyleSetting,
         theme: resolveCurrentTheme(),
+        ambientMotion: ambientMotionEnabled,
         samples: getStylePreviewSamples()
       });
       const [snapshot, setSnapshot] = React.useState ? React.useState(readSnapshot) : [readSnapshot(), () => {
@@ -7361,6 +7385,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           className: "ts-style-preview",
           "data-ts-preview-style": snapshot.style,
           "data-ts-preview-theme": snapshot.theme,
+          "data-ts-preview-ambient": snapshot.ambientMotion ? "on" : "off",
           "aria-label": `Checkbox style preview (${snapshot.style}, ${snapshot.theme})`
         },
         snapshot.samples.map(
@@ -7483,6 +7508,15 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.ambientMotion,
+          name: "Animate status icons",
+          description: "Adds subtle looping motion to unchecked status icons in Glass, Solid, and Minimal styles. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+          action: {
+            type: "switch",
+            onChange: (value) => setAmbientMotionEnabled(value)
+          }
+        },
+        {
           id: SETTINGS_KEYS.followUpPrompt,
           name: "Ask for a follow-up date on Waiting / In Review",
           description: "Asks when to check back after you pick Waiting or In Review in the chooser, and sets the task's due date in place. Needs Better Tasks.",
@@ -7520,6 +7554,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function init(isActive = () => true) {
     syncDocumentTheme();
     syncDocumentCheckboxStyle();
+    syncDocumentAmbientMotion();
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
     portalRoot.setAttribute("data-task-status-portal", "true");
@@ -7592,6 +7627,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
     document?.documentElement?.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
+    document?.documentElement?.removeAttribute?.(AMBIENT_MOTION_ATTRIBUTE);
     repeatStatusReset.dispose();
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();

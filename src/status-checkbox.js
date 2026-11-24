@@ -2,6 +2,7 @@ export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 export const CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
+export const AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
 export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 export const STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
 export const STATUS_POP_RECENT_WINDOW_MS = 2000;

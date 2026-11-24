@@ -269,6 +269,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
           "task-status-label-display",
           "task-status-alert-beacon",
           "task-status-change-animation",
+          "task-status-ambient-motion",
           "task-status-follow-up-prompt",
           "task-status-repeat-carry-over",
           "task-status-status-names",
@@ -415,6 +416,17 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(popSetting.action.type, "switch");
       popSetting.action.onChange(false);
       popSetting.action.onChange(true);
+
+      const ambientSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-ambient-motion"
+      );
+      assert.equal(ambientSetting.name, "Animate status icons");
+      assert.equal(ambientSetting.action.type, "switch");
+      assert.equal(document.documentElement.getAttribute("data-ts-ambient-motion"), "on");
+      ambientSetting.action.onChange(false);
+      assert.equal(document.documentElement.getAttribute("data-ts-ambient-motion"), null);
+      ambientSetting.action.onChange(true);
+      assert.equal(document.documentElement.getAttribute("data-ts-ambient-motion"), "on");
       assert.equal(graphWriteCalls, 0);
 
       ownedCheckbox.setAttribute("data-ts-checkbox-status", "ALERT");
@@ -439,6 +451,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
       assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      assert.equal(document.documentElement.getAttribute("data-ts-ambient-motion"), null);
       assert.equal(activeTimers.size, 0);
       assert.ok(observed.every((observer) => observer.disconnected));
       assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
