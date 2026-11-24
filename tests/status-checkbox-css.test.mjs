@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { contrastRatio } from "../src/status-checkbox.js";
@@ -551,6 +551,9 @@ test("chooser glyph column and settings style preview reuse status glyphs and re
   assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-task-status-key\]/);
   assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-task-status-key\]::before/);
   assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph\[data-ts-status-glyph\]::before/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-glyph \.rm-checkbox\[data-ts-checkbox-status\]/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-heading\s*\{/);
+  assert.match(css, /\.ts-status-chooser \.ts-status-choice-footer\s*\{/);
   assert.match(css, /\.ts-style-preview\s*\{/);
   assert.match(css, /\.ts-style-preview \.rm-checkbox\[data-ts-checkbox-status\]/);
   assert.doesNotMatch(css, /\.ts-style-preview[^}]*data-ts-checkbox-style/);
@@ -628,4 +631,30 @@ test("ambient icon motion is gated to non-Outline styles, animates transform/opa
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?data-ts-ambient-motion="on"[\s\S]*?animation: none !important/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*?\.checkmark::before[\s\S]*?animation: none !important/);
   assert.match(css, /@media print[\s\S]*?\.checkmark::before[\s\S]*?animation: none !important/);
+});
+
+test("no upstream BetterTask bt- identifiers, Thymer classes, or forbidden :is() selectors exist in src/", async () => {
+  const strippedCss = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.doesNotMatch(strippedCss, /:is\(/, "upstream :is() selectors must be rewritten");
+  assert.doesNotMatch(
+    strippedCss,
+    /\b(?:listitem-task|listitem|line-check-div|state-done|state-started|state-blocked|state-canceled|state-alert)\b/,
+    "Thymer classes must not appear in CSS"
+  );
+
+  // Only Roam Better Tasks' own pre-existing identifiers may use the bt- prefix in src/.
+  const ALLOWED_ROAM_BT_IDENTIFIERS = new Set(["bt-pill", "bt-theme-dark", "bt-theme-light"]);
+  const srcDirUrl = new URL("../src/", import.meta.url);
+  const srcFiles = (await readdir(srcDirUrl)).filter((name) => /\.(?:js|css|mjs)$/.test(name));
+  assert.ok(srcFiles.length > 0, "expected src files");
+  for (const filename of srcFiles) {
+    const content = await readFile(new URL(filename, srcDirUrl), "utf8");
+    const matches = [...content.matchAll(/--?bt-[a-z0-9-]+|\bbt-[a-z0-9-]+\b/gi)].map((m) => m[0]);
+    for (const token of matches) {
+      assert.ok(
+        ALLOWED_ROAM_BT_IDENTIFIERS.has(token),
+        `unexpected BetterTask bt- identifier "${token}" in src/${filename}`
+      );
+    }
+  }
 });

@@ -93,6 +93,11 @@ class FakeElement extends EventTarget {
       }
       if (part === ".ts-status-choice-shortcut") return this.classList.contains("ts-status-choice-shortcut");
       if (part === ".ts-status-choice-glyph") return this.classList.contains("ts-status-choice-glyph");
+      if (part === ".ts-status-choice-heading") return this.classList.contains("ts-status-choice-heading");
+      if (part === ".ts-status-choice-footer") return this.classList.contains("ts-status-choice-footer");
+      if (part === ".rm-checkbox[data-ts-checkbox-status]") {
+        return this.classList.contains("rm-checkbox") && this.attributes.has("data-ts-checkbox-status");
+      }
       if (part === ".ts-status-chooser") return this.classList.contains("ts-status-chooser");
       if (part === ".bp3-popover-content") return this.classList.contains("bp3-popover-content");
       if (part === ".bp3-popover-arrow") return this.classList.contains("bp3-popover-arrow");
@@ -337,6 +342,15 @@ test("chooser renders hints on first nine rows, handles 1..9 and 0, and ignores 
     }
     const seriesChoice = statusChoices.find((el) => el.getAttribute("data-task-status-choice") === "SERIES");
     assert.equal(seriesChoice.querySelector(".ts-status-choice-glyph").getAttribute("data-ts-status-glyph"), "series");
+    assert.ok(
+      seriesChoice.querySelector(".rm-checkbox[data-ts-checkbox-status]"),
+      "chooser rows should render the real status checkbox icon"
+    );
+    const headings = chooser.querySelectorAll(".ts-status-choice-heading");
+    assert.deepEqual(headings.map((el) => el.textContent), ["Task status", "Media"]);
+    const footer = chooser.querySelector(".ts-status-choice-footer");
+    assert.ok(footer, "chooser should render a one-line footer key hint");
+    assert.equal(footer.textContent, "1\u20139 pick \u00b7 0 clear \u00b7 Esc close");
 
     // 2. While a date input has focus inside the chooser, digits are ignored
     const dateInput = new FakeElement("input");

@@ -588,7 +588,7 @@ function includingRoot(root, selector) {
 
 export function clearOwnedStatusCheckboxes(root) {
   const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
-    (checkbox) => !checkbox.closest?.(".ts-style-preview")
+    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser")
   );
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;

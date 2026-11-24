@@ -3834,7 +3834,7 @@ function includingRoot(root, selector) {
 }
 function clearOwnedStatusCheckboxes(root) {
   const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
-    (checkbox) => !checkbox.closest?.(".ts-style-preview")
+    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser")
   );
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
@@ -6581,6 +6581,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     className = "",
     ariaCurrent = false,
     glyphStatusKey = null,
+    showEmptyIcon = false,
     shortcutHint = "",
     onChoose
   }) {
@@ -6595,11 +6596,37 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     }
     if (glyphStatusKey) {
       const glyph = document.createElement("span");
-      glyph.className = "ts-status-choice-glyph";
+      glyph.className = "ts-status-choice-glyph ts-status-choice-glyph--real";
       glyph.setAttribute("aria-hidden", "true");
       glyph.setAttribute("data-task-status-key", glyphStatusKey);
       setStatusGlyphAttribute(glyph, glyphStatusKey);
+      const box = document.createElement("span");
+      box.className = "rm-checkbox rm-todo";
+      box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, glyphStatusKey);
+      box.setAttribute(
+        CHECKBOX_SHAPE_ATTRIBUTE,
+        getStatusCheckboxShape(glyphStatusKey, STATUSES[glyphStatusKey]?.name)
+      );
+      const container = document.createElement("span");
+      container.className = "check-container";
+      const fakeInput = document.createElement("input");
+      fakeInput.setAttribute("type", "checkbox");
+      fakeInput.setAttribute("tabindex", "-1");
+      fakeInput.setAttribute("aria-hidden", "true");
+      const checkmark = document.createElement("span");
+      checkmark.className = "checkmark";
+      container.append(fakeInput, checkmark);
+      box.append(container);
+      glyph.append(box);
       item.append(glyph);
+    } else if (showEmptyIcon) {
+      const emptyWrap = document.createElement("span");
+      emptyWrap.className = "ts-status-choice-glyph ts-status-choice-empty-wrap";
+      emptyWrap.setAttribute("aria-hidden", "true");
+      const emptyBox = document.createElement("span");
+      emptyBox.className = "ts-status-choice-empty-icon";
+      emptyWrap.append(emptyBox);
+      item.append(emptyWrap);
     }
     const text = document.createElement("div");
     text.className = "ts-status-choice-label bp3-fill bp3-text-overflow-ellipsis";
@@ -6880,6 +6907,11 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         divider.setAttribute("role", "separator");
         choices.append(divider);
       }
+      const heading = document.createElement("li");
+      heading.className = "ts-status-choice-heading";
+      heading.setAttribute("role", "presentation");
+      heading.textContent = groupKeys === taskKeys ? "Task status" : groupKeys === mediaKeys ? "Media" : "Extra";
+      choices.append(heading);
       appendChoices(groupKeys);
       hasPriorGroup = true;
     }
@@ -6890,6 +6922,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       makeStatusMenuItem({
         label: "Remove status",
         className: "ts-status-choice-remove",
+        showEmptyIcon: true,
+        shortcutHint: "0",
         onChoose: removeAction
       })
     );
@@ -6900,6 +6934,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (isSettingsLinkAvailable()) {
       choices.append(makeSettingsChoice());
     }
+    const footer = document.createElement("li");
+    footer.className = "ts-status-choice-footer";
+    footer.setAttribute("role", "presentation");
+    const maxDigit = Math.min(9, displayedStatusActions.length);
+    const digitHint = maxDigit > 1 ? `1–${maxDigit} pick · ` : maxDigit === 1 ? "1 pick · " : "";
+    footer.textContent = `${digitHint}0 clear · Esc close`;
+    choices.append(footer);
     content.append(choices);
     chooser.append(makeBlueprintPopoverArrow(), content);
     (portalRoot || document.body).appendChild(chooser);
