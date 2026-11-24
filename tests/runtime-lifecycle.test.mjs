@@ -283,6 +283,23 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     );
     assert.ok(scheduledDelays.includes(1500), "1500ms theme boot timeout should be scheduled");
 
+    const styleSetting = latestPanelConfig.settings.find(
+      (entry) => entry.id === "task-status-checkbox-style"
+    );
+    assert.equal(styleSetting.action.type, "select");
+    assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal"]);
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+    styleSetting.action.onChange("Glass");
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
+    styleSetting.action.onChange("Solid");
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+    styleSetting.action.onChange("Minimal");
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "minimal");
+    styleSetting.action.onChange("unknown-style");
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+    styleSetting.action.onChange("Solid");
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+
     const checkboxSetting = latestPanelConfig.settings.find(
       (entry) => entry.id === "task-status-style-native-checkboxes"
     );
@@ -335,6 +352,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     await secondExtension.onunload();
     assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
     assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
     assert.equal(activeTimers.size, 0);
     assert.ok(observed.every((observer) => observer.disconnected));
     assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);

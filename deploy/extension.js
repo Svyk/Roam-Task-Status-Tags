@@ -2565,15 +2565,37 @@ function createCertifiedBlockStringWriter({
 var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
+var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 var OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 var MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
 var HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
 var OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
+var CHECKBOX_STYLE_VALUES = Object.freeze({
+  OUTLINE: "Outline",
+  GLASS: "Glass",
+  SOLID: "Solid",
+  MINIMAL: "Minimal"
+});
+function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
+  const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(CHECKBOX_STYLE_VALUES).includes(normalized) ? normalized : fallback;
+}
+function checkboxStyleToAttributeValue(value) {
+  const normalized = normalizeCheckboxStyle(value);
+  if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
+  if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
+  if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
+  return null;
+}
 var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
 var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
+var NEAR_BLACK = Object.freeze({ r: 16, g: 22, b: 26 });
 var WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
+var NEAR_BLACK_CSS = "#10161a";
+var WHITE_CSS = "#ffffff";
 var BUILTIN_SHAPES = Object.freeze({
   ACTIVE: "active",
   WAITING: "waiting",
@@ -2697,6 +2719,12 @@ function rgbaCss(rgb, alpha) {
   const opacity = clamp(Number(alpha) || 0, 0, 1);
   return `rgba(${value.r}, ${value.g}, ${value.b}, ${opacity})`;
 }
+function pickOnAccentColor(accentRgb) {
+  const accent = normalizeRgb(accentRgb);
+  const whiteContrast = contrastRatio(WHITE, accent);
+  const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
 function buildStatusCheckboxColors({
   baseRgb,
   lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
@@ -2709,18 +2737,22 @@ function buildStatusCheckboxColors({
   const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
   const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
   const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
+  const roundedLightAccent = roundedRgb(lightAccent);
+  const roundedDarkAccent = roundedRgb(darkAccent);
   return Object.freeze({
     base: roundedRgb(base),
     lightSurface: roundedRgb(lightSurface),
     darkSurface: roundedRgb(darkSurface),
-    lightAccent: roundedRgb(lightAccent),
-    darkAccent: roundedRgb(darkAccent),
-    lightAccentCss: rgbCss(lightAccent),
-    darkAccentCss: rgbCss(darkAccent),
+    lightAccent: roundedLightAccent,
+    darkAccent: roundedDarkAccent,
+    lightAccentCss: rgbCss(roundedLightAccent),
+    darkAccentCss: rgbCss(roundedDarkAccent),
+    lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
+    darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16),
-    lightBeaconCss: rgbaCss(lightAccent, 0.52),
-    darkBeaconCss: rgbaCss(darkAccent, 0.68)
+    lightBeaconCss: rgbaCss(roundedLightAccent, 0.52),
+    darkBeaconCss: rgbaCss(roundedDarkAccent, 0.68)
   });
 }
 function buildStatusPillColors({
@@ -3941,6 +3973,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     defaultsVersion: "defaults-version",
     statusColorOverrides: "status-color-overrides",
     theme: "task-status-theme",
+    checkboxStyle: "task-status-checkbox-style",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -4006,6 +4039,7 @@ function createTaskStatusExtension({ extensionAPI }) {
   ];
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let themeSetting = loadThemeSetting();
+  let checkboxStyleSetting = loadCheckboxStyleSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -4222,6 +4256,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 .rm-checkbox[data-ts-checkbox-status="${keySelector}"] {
   --ts-checkbox-accent-light: ${checkboxValues.lightAccentCss};
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
+  --ts-checkbox-on-accent-light: ${checkboxValues.lightOnAccentCss};
+  --ts-checkbox-on-accent-dark: ${checkboxValues.darkOnAccentCss};
   --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
   --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
   --ts-checkbox-beacon-light: ${checkboxValues.lightBeaconCss};
@@ -4284,6 +4320,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeThemeSetting(parseMaybeJson(raw), fallback);
+  }
+  function loadCheckboxStyleSetting() {
+    const fallback = CHECKBOX_STYLE_VALUES.OUTLINE;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxStyle);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.checkboxStyle, fallback);
+      return fallback;
+    }
+    return normalizeCheckboxStyle(parseMaybeJson(raw), fallback);
   }
   function loadStatusLabelDisplaySetting() {
     const fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
@@ -4897,6 +4943,23 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       root?.setAttribute?.(THEME_ATTRIBUTE, next);
     }
     return next;
+  }
+  function syncDocumentCheckboxStyle() {
+    const attrValue = checkboxStyleToAttributeValue(checkboxStyleSetting);
+    const root = document?.documentElement;
+    if (!root) return attrValue;
+    if (attrValue) {
+      if (root.getAttribute?.(CHECKBOX_STYLE_ATTRIBUTE) !== attrValue) {
+        root.setAttribute?.(CHECKBOX_STYLE_ATTRIBUTE, attrValue);
+      }
+    } else {
+      root.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
+    }
+    return attrValue;
+  }
+  function setCheckboxStyleSetting(nextValue) {
+    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
+    syncDocumentCheckboxStyle();
   }
   function setThemeSetting(nextValue) {
     themeSetting = normalizeThemeSetting(nextValue, THEME_SETTING_VALUES.FOLLOW_ROAM);
@@ -6708,6 +6771,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.checkboxStyle,
+          name: "Checkbox style",
+          description: "Choose how unchecked task checkboxes look: Outline, Glass, Solid, or Minimal. Checked tasks stay with your Roam theme.",
+          action: {
+            type: "select",
+            items: Object.values(CHECKBOX_STYLE_VALUES),
+            onChange: (value) => setCheckboxStyleSetting(value)
+          }
+        },
+        {
           id: SETTINGS_KEYS.styleNativeCheckboxes,
           name: "Style native checkboxes by task status",
           description: "Adds an accessible color-and-shape treatment to the exact TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
@@ -6788,6 +6861,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
   async function init(isActive = () => true) {
     syncDocumentTheme();
+    syncDocumentCheckboxStyle();
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
     portalRoot.setAttribute("data-task-status-portal", "true");
@@ -6859,6 +6933,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     episodeCounter.destroyAll(document);
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
+    document?.documentElement?.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
     repeatStatusReset.dispose();
     clearStatusColorOverrides();
     if (portalRoot?.remove) portalRoot.remove();

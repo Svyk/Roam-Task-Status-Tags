@@ -42,12 +42,16 @@ import {
 import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  CHECKBOX_STYLE_ATTRIBUTE,
+  CHECKBOX_STYLE_VALUES,
   CHECKBOX_UID_ATTRIBUTE,
+  checkboxStyleToAttributeValue,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
   getStatusCheckboxShape,
   isMediaStatus,
+  normalizeCheckboxStyle,
   relativeLuminance,
   syncStatusPresentationForPill,
 } from "./status-checkbox.js";
@@ -536,6 +540,7 @@ function createTaskStatusExtension({ extensionAPI }) {
     defaultsVersion: "defaults-version",
     statusColorOverrides: "status-color-overrides",
     theme: "task-status-theme",
+    checkboxStyle: "task-status-checkbox-style",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -608,6 +613,7 @@ function createTaskStatusExtension({ extensionAPI }) {
 
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let themeSetting = loadThemeSetting();
+  let checkboxStyleSetting = loadCheckboxStyleSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -858,6 +864,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 .rm-checkbox[data-ts-checkbox-status="${keySelector}"] {
   --ts-checkbox-accent-light: ${checkboxValues.lightAccentCss};
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
+  --ts-checkbox-on-accent-light: ${checkboxValues.lightOnAccentCss};
+  --ts-checkbox-on-accent-dark: ${checkboxValues.darkOnAccentCss};
   --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
   --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
   --ts-checkbox-beacon-light: ${checkboxValues.lightBeaconCss};
@@ -933,6 +941,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeThemeSetting(parseMaybeJson(raw), fallback);
+  }
+
+  function loadCheckboxStyleSetting() {
+    const fallback = CHECKBOX_STYLE_VALUES.OUTLINE;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxStyle);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.checkboxStyle, fallback);
+      return fallback;
+    }
+    return normalizeCheckboxStyle(parseMaybeJson(raw), fallback);
   }
 
   function loadStatusLabelDisplaySetting() {
@@ -1677,6 +1696,25 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       root?.setAttribute?.(THEME_ATTRIBUTE, next);
     }
     return next;
+  }
+
+  function syncDocumentCheckboxStyle() {
+    const attrValue = checkboxStyleToAttributeValue(checkboxStyleSetting);
+    const root = document?.documentElement;
+    if (!root) return attrValue;
+    if (attrValue) {
+      if (root.getAttribute?.(CHECKBOX_STYLE_ATTRIBUTE) !== attrValue) {
+        root.setAttribute?.(CHECKBOX_STYLE_ATTRIBUTE, attrValue);
+      }
+    } else {
+      root.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
+    }
+    return attrValue;
+  }
+
+  function setCheckboxStyleSetting(nextValue) {
+    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
+    syncDocumentCheckboxStyle();
   }
 
   function setThemeSetting(nextValue) {
@@ -3830,6 +3868,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.checkboxStyle,
+          name: "Checkbox style",
+          description:
+            "Choose how unchecked task checkboxes look: Outline, Glass, Solid, or Minimal. Checked tasks stay with your Roam theme.",
+          action: {
+            type: "select",
+            items: Object.values(CHECKBOX_STYLE_VALUES),
+            onChange: (value) => setCheckboxStyleSetting(value),
+          },
+        },
+        {
           id: SETTINGS_KEYS.styleNativeCheckboxes,
           name: "Style native checkboxes by task status",
           description:
@@ -3920,6 +3969,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
 
   async function init(isActive = () => true) {
     syncDocumentTheme();
+    syncDocumentCheckboxStyle();
 
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
@@ -4007,6 +4057,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     episodeCounter.destroyAll(document);
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
+    document?.documentElement?.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
     repeatStatusReset.dispose();
 
     clearStatusColorOverrides();

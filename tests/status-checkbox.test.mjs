@@ -6,6 +6,8 @@ import {
   ALERT_BEACON_ATTRIBUTE,
   CHECKBOX_SHAPE_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
+  CHECKBOX_STYLE_ATTRIBUTE,
+  CHECKBOX_STYLE_VALUES,
   CHECKBOX_UID_ATTRIBUTE,
   HIDDEN_STATUS_PILL_ATTRIBUTE,
   MANAGED_STATUS_PILL_ATTRIBUTE,
@@ -13,6 +15,7 @@ import {
   applyManagedStatusPillPresentation,
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  checkboxStyleToAttributeValue,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusCheckboxAnnotation,
@@ -27,6 +30,8 @@ import {
   isMediaStatus,
   MEDIA_STATUS_SHAPES,
   isExactManagedStatusPill,
+  normalizeCheckboxStyle,
+  pickOnAccentColor,
   syncStatusCheckboxForPill,
   syncStatusPresentationForPill,
 } from "../src/status-checkbox.js";
@@ -160,7 +165,37 @@ test("every default status derives contrast-safe integer light and dark accents"
       contrastRatio(palette.darkAccent, palette.darkSurface) >= 3.2,
       `${statusKey} dark accent did not reach 3.2:1`
     );
+    for (const [accent, onAccentCss, mode] of [
+      [palette.lightAccent, palette.lightOnAccentCss, "light"],
+      [palette.darkAccent, palette.darkOnAccentCss, "dark"],
+    ]) {
+      assert.ok(
+        onAccentCss === "#ffffff" || onAccentCss === "#10161a",
+        `${statusKey} ${mode} on-accent must be white or #10161a`
+      );
+      assert.ok(
+        contrastRatio(hexRgb(onAccentCss), accent) >= 3.0,
+        `${statusKey} ${mode} on-accent did not reach 3:1`
+      );
+    }
   }
+});
+
+test("checkbox style normalization falls back to Outline and maps attribute values", () => {
+  assert.equal(CHECKBOX_STYLE_ATTRIBUTE, "data-ts-checkbox-style");
+  assert.deepEqual(Object.values(CHECKBOX_STYLE_VALUES), ["Outline", "Glass", "Solid", "Minimal"]);
+  assert.equal(normalizeCheckboxStyle("Glass"), "Glass");
+  assert.equal(normalizeCheckboxStyle({ target: { value: "Solid" } }), "Solid");
+  assert.equal(normalizeCheckboxStyle("Minimal"), "Minimal");
+  assert.equal(normalizeCheckboxStyle("Neon"), "Outline");
+  assert.equal(normalizeCheckboxStyle(null), "Outline");
+  assert.equal(checkboxStyleToAttributeValue("Outline"), null);
+  assert.equal(checkboxStyleToAttributeValue("Glass"), "glass");
+  assert.equal(checkboxStyleToAttributeValue("Solid"), "solid");
+  assert.equal(checkboxStyleToAttributeValue("Minimal"), "minimal");
+  assert.equal(checkboxStyleToAttributeValue("invalid"), null);
+  assert.equal(pickOnAccentColor({ r: 255, g: 255, b: 0 }), "#10161a");
+  assert.equal(pickOnAccentColor({ r: 30, g: 41, b: 59 }), "#ffffff");
 });
 
 test("every default status derives small-text-safe light and dark pill colors", () => {

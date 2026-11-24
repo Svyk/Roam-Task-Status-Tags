@@ -1,16 +1,46 @@
 export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
+export const CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 export const OWNED_CHECKBOX_SELECTOR = `.rm-checkbox[${CHECKBOX_STATUS_ATTRIBUTE}]`;
 export const MANAGED_STATUS_PILL_ATTRIBUTE = "data-ts-managed-status-pill";
 export const HIDDEN_STATUS_PILL_ATTRIBUTE = "data-ts-status-pill-hidden";
 export const OWNED_STATUS_PILL_SELECTOR = `[${MANAGED_STATUS_PILL_ATTRIBUTE}]`;
 
+export const CHECKBOX_STYLE_VALUES = Object.freeze({
+  OUTLINE: "Outline",
+  GLASS: "Glass",
+  SOLID: "Solid",
+  MINIMAL: "Minimal",
+});
+
+export function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
+  const candidate =
+    value && typeof value === "object"
+      ? value.target?.value ?? value.currentTarget?.value ?? value.value
+      : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(CHECKBOX_STYLE_VALUES).includes(normalized)
+    ? normalized
+    : fallback;
+}
+
+export function checkboxStyleToAttributeValue(value) {
+  const normalized = normalizeCheckboxStyle(value);
+  if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
+  if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
+  if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
+  return null;
+}
+
 const DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 const DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
 const BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
+const NEAR_BLACK = Object.freeze({ r: 16, g: 22, b: 26 });
 const WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
+const NEAR_BLACK_CSS = "#10161a";
+const WHITE_CSS = "#ffffff";
 
 const BUILTIN_SHAPES = Object.freeze({
   ACTIVE: "active",
@@ -163,6 +193,13 @@ export function rgbaCss(rgb, alpha) {
   return `rgba(${value.r}, ${value.g}, ${value.b}, ${opacity})`;
 }
 
+export function pickOnAccentColor(accentRgb) {
+  const accent = normalizeRgb(accentRgb);
+  const whiteContrast = contrastRatio(WHITE, accent);
+  const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
+
 export function buildStatusCheckboxColors({
   baseRgb,
   lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
@@ -177,19 +214,23 @@ export function buildStatusCheckboxColors({
   const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
   const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
   const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
+  const roundedLightAccent = roundedRgb(lightAccent);
+  const roundedDarkAccent = roundedRgb(darkAccent);
 
   return Object.freeze({
     base: roundedRgb(base),
     lightSurface: roundedRgb(lightSurface),
     darkSurface: roundedRgb(darkSurface),
-    lightAccent: roundedRgb(lightAccent),
-    darkAccent: roundedRgb(darkAccent),
-    lightAccentCss: rgbCss(lightAccent),
-    darkAccentCss: rgbCss(darkAccent),
+    lightAccent: roundedLightAccent,
+    darkAccent: roundedDarkAccent,
+    lightAccentCss: rgbCss(roundedLightAccent),
+    darkAccentCss: rgbCss(roundedDarkAccent),
+    lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
+    darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16),
-    lightBeaconCss: rgbaCss(lightAccent, 0.52),
-    darkBeaconCss: rgbaCss(darkAccent, 0.68),
+    lightBeaconCss: rgbaCss(roundedLightAccent, 0.52),
+    darkBeaconCss: rgbaCss(roundedDarkAccent, 0.68),
   });
 }
 

@@ -41,7 +41,7 @@ test("unchecked checkboxes use centered semantic glyphs instead of corner orname
   );
   assert.match(
     css,
-    /data-ts-checkbox-shape="waiting"[\s\S]*var\(--ts-checkbox-accent\) 0 3px[\s\S]*transparent 3px 6px[\s\S]*var\(--ts-checkbox-accent\) 6px 9px/
+    /data-ts-checkbox-shape="waiting"[\s\S]*var\(--ts-checkbox-ink\) 0 3px[\s\S]*transparent 3px 6px[\s\S]*var\(--ts-checkbox-ink\) 6px 9px/
   );
   assert.match(
     css,
@@ -58,7 +58,7 @@ test("In Review has its own palette tokens and half-filled circle glyph", () => 
   assert.match(css, /--ts-in-review-fg-dark:/);
   assert.match(
     css,
-    /data-ts-checkbox-shape="in-review"[\s\S]*var\(--ts-checkbox-accent\) 0 50%/
+    /data-ts-checkbox-shape="in-review"[\s\S]*var\(--ts-checkbox-ink\) 0 50%/
   );
 });
 
@@ -345,7 +345,7 @@ test("each media shape has a checkbox mask rule and a pill marker rule", () => {
     const mask = checkbox.match(/--ts-checkbox-glyph-mask: (url\("data:image\/svg\+xml[^"]+"\))/);
     assert.ok(mask, `${shape} checkbox mask`);
     assert.match(checkbox, /--ts-checkbox-glyph-width: 10px/);
-    assert.match(checkbox, /--ts-checkbox-glyph-background: var\(--ts-checkbox-accent\)/);
+    assert.match(checkbox, /--ts-checkbox-glyph-background: var\(--ts-checkbox-ink\)/);
     masks.add(mask[1]);
     const pill = ruleBody(`[data-ts-status-glyph="${shape}"] {`);
     assert.match(pill, /--ts-pill-marker-mask: url\("data:image\/svg\+xml/);
@@ -374,4 +374,51 @@ test("the existing shape rules are unchanged", () => {
     /--ts-checkbox-glyph-transform: rotate\(45deg\)/
   );
   assert.doesNotMatch(ruleBody('.rm-checkbox[data-ts-checkbox-shape="alert"] {'), /glyph-mask/);
+});
+
+test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts-checkbox-ink", () => {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // Every glyph rule (data-ts-checkbox-shape) uses --ts-checkbox-ink, never --ts-checkbox-accent directly.
+  const glyphRules = [
+    ...stripped.matchAll(/\.rm-checkbox\[data-ts-checkbox-shape="([^"]+)"\]\s*\{([^}]*)\}/g),
+  ];
+  assert.ok(glyphRules.length >= 15, "expected built-in, media, and custom glyph rules");
+  for (const [, shape, body] of glyphRules) {
+    assert.doesNotMatch(
+      body,
+      /--ts-checkbox-accent/,
+      `glyph rule for ${shape} must use --ts-checkbox-ink instead of --ts-checkbox-accent`
+    );
+    assert.match(
+      body,
+      /--ts-checkbox-ink/,
+      `glyph rule for ${shape} must paint with --ts-checkbox-ink`
+    );
+  }
+  const beforeRule = ruleBody(".rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark::before {");
+  assert.doesNotMatch(beforeRule, /--ts-checkbox-accent/);
+  assert.match(beforeRule, /var\(--ts-checkbox-ink\)/);
+
+  // Every data-ts-checkbox-style selector ends on an owned checkbox or its descendant.
+  const styleRuleHeaders = [
+    ...stripped.matchAll(/([^{}@]*data-ts-checkbox-style[^{}@]*)\{/g),
+  ].map((match) => match[1].trim());
+  assert.ok(styleRuleHeaders.length > 0, "expected checkbox style rules");
+  for (const header of styleRuleHeaders) {
+    for (const selector of header.split(",").map((part) => part.trim()).filter(Boolean)) {
+      assert.match(
+        selector,
+        /\.rm-checkbox\[data-ts-checkbox-status\](?:\[[^\]]+\])*(?:\s*>\s*[^,]+)?$/,
+        `checkbox style selector must end on an owned checkbox or descendant: ${selector}`
+      );
+    }
+  }
+
+  assert.match(css, /:root\[data-ts-checkbox-style="glass"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-style="solid"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-style="minimal"\]/);
+  assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-on-accent\)/);
+  assert.match(css, /@media print[\s\S]*:root\[data-ts-checkbox-style\]/);
+  assert.match(css, /@media \(forced-colors: active\)[\s\S]*:root\[data-ts-checkbox-style\]/);
 });
