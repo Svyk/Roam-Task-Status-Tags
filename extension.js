@@ -3995,7 +3995,29 @@ async function resolveTaskStatusTargetUids({
     return [];
   }
 }
-function createTaskStatusExtension({ extensionAPI }) {
+function isEditableField(element) {
+  if (!element) return false;
+  const tag = String(element.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (element.isContentEditable) return true;
+  const attr = element.getAttribute?.("contenteditable");
+  return attr === "" || attr === "true";
+}
+function resolveChooserDigitAction(event, { activeElement = null, statusActions = [], onRemove = null } = {}) {
+  if (!event || event.ctrlKey || event.metaKey || event.altKey) return null;
+  if (isEditableField(event.target) || isEditableField(activeElement)) return null;
+  const key = event.key;
+  if (key === "0") {
+    return typeof onRemove === "function" ? onRemove : null;
+  }
+  if (/^[1-9]$/.test(key)) {
+    const index = Number(key) - 1;
+    const action = statusActions[index];
+    return typeof action === "function" ? action : null;
+  }
+  return null;
+}
+function createTaskStatusExtension({ extensionAPI, runtimeVersion = BUNDLED_VERSION }) {
   const TOUCH_LISTENER_OPTIONS = { capture: true, passive: false };
   const STATUS_PILL_SELECTOR = [
     'span.rm-page-ref[data-tag^="task-status/"]',
@@ -4761,8 +4783,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   let statusPeekController = null;
   let statusView = null;
   let statusViewListeners = [];
-  function log(...args) {
-    if (CONFIG.debug) console.log("[TaskStatus]", ...args);
+  function log() {
   }
   function getTextHelpers() {
     return createTaskStatusTextHelpers({
@@ -5482,7 +5503,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     arrow.append(svg);
     return arrow;
   }
-  function makeStatusMenuItem({ label, className = "", ariaCurrent = false, onChoose }) {
+  function makeStatusMenuItem({
+    label,
+    className = "",
+    ariaCurrent = false,
+    shortcutHint = "",
+    onChoose
+  }) {
     const li = document.createElement("li");
     const item = document.createElement("a");
     item.className = `ts-status-choice bp3-menu-item bp3-popover-dismiss ${className}`.trim();
@@ -5496,6 +5523,13 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     text.className = "ts-status-choice-label bp3-fill bp3-text-overflow-ellipsis";
     text.textContent = label;
     item.append(text);
+    if (shortcutHint) {
+      const hint = document.createElement("span");
+      hint.className = "ts-status-choice-shortcut bp3-menu-item-label";
+      hint.setAttribute("aria-hidden", "true");
+      hint.textContent = shortcutHint;
+      item.append(hint);
+    }
     item.addEventListener("mousedown", stopRoamNavigation);
     item.addEventListener("click", (event) => {
       stopRoamNavigation(event);
@@ -5519,25 +5553,32 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       }
     });
   }
-  function makeStatusChoiceButton({ statusKey, currentStatusKey, targetUids }) {
+  function makeStatusChoiceButton({
+    statusKey,
+    currentStatusKey,
+    targetUids,
+    shortcutHint = ""
+  }) {
     const status = STATUSES[statusKey];
+    const onChoose = () => {
+      if (wantsFollowUpPrompt(statusKey, targetUids)) {
+        void chooseStatusWithFollowUp(targetUids[0], statusKey).catch((err) => {
+          log("Status chooser follow-up error:", err);
+          closeStatusChooser();
+        });
+        return;
+      }
+      void setStatusForBlockUids(targetUids, statusKey).catch((err) => log("Status chooser set error:", err)).finally(closeStatusChooser);
+    };
     const item = makeStatusMenuItem({
       label: status?.label || statusKey,
       ariaCurrent: statusKey === currentStatusKey,
-      onChoose: () => {
-        if (wantsFollowUpPrompt(statusKey, targetUids)) {
-          void chooseStatusWithFollowUp(targetUids[0], statusKey).catch((err) => {
-            log("Status chooser follow-up error:", err);
-            closeStatusChooser();
-          });
-          return;
-        }
-        void setStatusForBlockUids(targetUids, statusKey).catch((err) => log("Status chooser set error:", err)).finally(closeStatusChooser);
-      }
+      shortcutHint,
+      onChoose
     });
     const choice = item.querySelector(".ts-status-choice");
     if (choice) choice.setAttribute("data-task-status-choice", statusKey);
-    return item;
+    return { item, onChoose };
   }
   function findBlockGutterAnchor(blockUid) {
     if (!/^[A-Za-z0-9_-]+$/.test(String(blockUid || ""))) return null;
@@ -5709,14 +5750,18 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       choices.append(count);
     }
     const activeKeys = CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active);
+    const displayedStatusActions = [];
     const appendChoices = (keys) => keys.forEach((key) => {
-      choices.append(
-        makeStatusChoiceButton({
-          statusKey: key,
-          currentStatusKey: statusKey,
-          targetUids
-        })
-      );
+      const index = displayedStatusActions.length;
+      const shortcutHint = index < 9 ? String(index + 1) : "";
+      const { item, onChoose } = makeStatusChoiceButton({
+        statusKey: key,
+        currentStatusKey: statusKey,
+        targetUids,
+        shortcutHint
+      });
+      displayedStatusActions.push(onChoose);
+      choices.append(item);
     });
     const taskKeys = activeKeys.filter((key) => statusGroup(key) === "task");
     const mediaKeys = activeKeys.filter((key) => statusGroup(key) === "media");
@@ -5733,13 +5778,14 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       appendChoices(groupKeys);
       hasPriorGroup = true;
     }
+    const removeAction = () => {
+      void setStatusForBlockUids(targetUids, null).catch((err) => log("Status chooser remove error:", err)).finally(closeStatusChooser);
+    };
     choices.append(
       makeStatusMenuItem({
         label: "Remove status",
         className: "ts-status-choice-remove",
-        onChoose: () => {
-          void setStatusForBlockUids(targetUids, null).catch((err) => log("Status chooser remove error:", err)).finally(closeStatusChooser);
-        }
+        onChoose: removeAction
       })
     );
     const viewDivider = document.createElement("li");
@@ -5760,20 +5806,43 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       if (statusChooserEl?.contains(event.target)) return;
       closeStatusChooser();
     };
-    const closeOnKeyDown = (event) => {
-      if (event.key === "Escape") {
-        stopRoamNavigation(event);
-        closeStatusChooser({ restoreFocus: true });
+    const handleChooserKeyEvent = (event) => {
+      if (statusChooserEl !== chooser || followUpPrompt) return;
+      if (event.type === "keydown") {
+        if (event.key === "Escape") {
+          stopRoamNavigation(event);
+          closeStatusChooser({ restoreFocus: true });
+          return;
+        }
+        const digitAction2 = resolveChooserDigitAction(event, {
+          activeElement: document.activeElement,
+          statusActions: displayedStatusActions,
+          onRemove: removeAction
+        });
+        if (digitAction2) {
+          stopRoamNavigation(event);
+          digitAction2();
+        }
+        return;
       }
+      const digitAction = resolveChooserDigitAction(event, {
+        activeElement: document.activeElement,
+        statusActions: displayedStatusActions,
+        onRemove: removeAction
+      });
+      if (digitAction) stopRoamNavigation(event);
     };
     const closeOnViewportChange = () => closeStatusChooser();
+    const chooserKeyEvents = ["keydown", "keypress", "keyup"];
     document.addEventListener("mousedown", closeOnOutsideMouseDown, true);
-    document.addEventListener("keydown", closeOnKeyDown, true);
+    chooserKeyEvents.forEach((type) => window.addEventListener(type, handleChooserKeyEvent, true));
     window.addEventListener("resize", closeOnViewportChange, true);
     window.addEventListener("scroll", closeOnViewportChange, true);
     statusChooserTeardown = () => {
       document.removeEventListener("mousedown", closeOnOutsideMouseDown, true);
-      document.removeEventListener("keydown", closeOnKeyDown, true);
+      chooserKeyEvents.forEach(
+        (type) => window.removeEventListener(type, handleChooserKeyEvent, true)
+      );
       window.removeEventListener("resize", closeOnViewportChange, true);
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
@@ -6895,13 +6964,30 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         )
       );
     };
+    const AboutRow = () => {
+      if (!React?.createElement) return null;
+      return React.createElement(
+        "div",
+        { className: "ts-status-about" },
+        React.createElement("span", null, `Task Status Tags v${runtimeVersion}`),
+        React.createElement(
+          "a",
+          {
+            href: "https://github.com/Svyk/Roam-Task-Status-Tags#readme",
+            target: "_blank",
+            rel: "noopener noreferrer"
+          },
+          "README on GitHub"
+        )
+      );
+    };
     const panelConfig = {
       tabTitle: "Task Status Tags",
       settings: [
         {
           id: SETTINGS_KEYS.theme,
           name: "Theme",
-          description: "Choose Light or Dark colors, or Follow Roam to match your graph theme automatically.",
+          description: "Match your Roam theme automatically, or pick Light or Dark colors. Applies right away.",
           action: {
             type: "select",
             items: Object.values(THEME_SETTING_VALUES),
@@ -6921,7 +7007,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.styleNativeCheckboxes,
           name: "Style native checkboxes by task status",
-          description: "Adds an accessible color-and-shape treatment to the exact TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
+          description: "Adds a color-and-shape marker to the native TODO/DONE checkbox. This is cosmetic and never changes completion or Better Tasks data.",
           action: {
             type: "switch",
             onChange: (value) => setCheckboxStylingEnabled(value)
@@ -6930,7 +7016,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.statusLabelDisplay,
           name: "Status label display",
-          description: "Checkbox-only keeps the queryable task-status tag in the block but hides its exact rendered pill after the checkbox is safely styled. Hover or focus the checkbox to reveal a theme-aware status control in the block's left gutter.",
+          description: "Checkbox-only hides the rendered status pill once the checkbox is styled, and reveals it on hover or focus. Checkbox + status pill keeps the pill visible.",
           action: {
             type: "select",
             items: Object.values(STATUS_LABEL_DISPLAY),
@@ -6940,7 +7026,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.alertBeacon,
           name: "Animate Alert status",
-          description: "Adds a brief two-beat attention halo to exact unchecked Alert tasks, then stays quiet. This is cosmetic, writes no task data, and automatically stays still for reduced-motion, forced-colors, and print.",
+          description: "Adds a brief two-beat halo to unchecked Alert tasks, then stays quiet. This is cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setAlertBeaconEnabled(value)
@@ -6949,7 +7035,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.followUpPrompt,
           name: "Ask for a follow-up date on Waiting / In Review",
-          description: "When the status chooser sets Waiting or In Review on one open Better Tasks task, it asks when to check back: Tomorrow, In 3 days, Next week, a date, or Skip. The date is written as the task's Better Tasks due date, through Better Tasks, in place. An existing due date is shown and can be kept. Needs Better Tasks; Escape cancels without writing.",
+          description: "Asks when to check back after you pick Waiting or In Review in the chooser, and sets the task's due date in place. Needs Better Tasks.",
           action: {
             type: "switch",
             onChange: (value) => setFollowUpPromptEnabled(value)
@@ -6958,7 +7044,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.repeatCarryOver,
           name: "Statuses kept on the next repeat",
-          description: "When Better Tasks creates the next occurrence of a repeating task, every status not listed here is removed from the new occurrence (one write, through Better Tasks). Listed statuses carry over. Comma-separated status names, any case. Empty means none carry over.",
+          description: "Comma-separated status names kept on the next occurrence of a repeating task; every other status is cleared. Needs Better Tasks.",
           action: {
             type: "input",
             placeholder: "Series, Movie, ...",
@@ -6972,26 +7058,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           action: { type: "reactComponent", component: StatusNamesPanel }
         },
         {
-          id: "task-status-help",
-          name: "Help",
-          description: "Stores a queryable workflow label as a task-status/<Name> tag after TODO/DONE. In checkbox-only mode, hover or focus reveals the control in the block's left gutter; Enter or Alt+Down opens the chooser there, Space remains native completion, and Shift+click removes.",
-          action: {
-            type: "button",
-            content: "Print Help",
-            onClick: () => {
-              const exampleKey = CONFIG.cycleOrder[0];
-              const exampleTagTitle = STATUSES?.[exampleKey]?.tagTitle || `${STATUS_TAG_PREFIX}${DEFAULT_STATUS_NAMES[exampleKey] || "Active"}`;
-              console.log("[TaskStatus] Usage:");
-              console.log(
-                `  - Format: {{[[TODO]]}} #[[${exampleTagTitle}]] Task text`
-              );
-              console.log("  - Click status tag: choose status");
-              console.log("  - Shift+click status tag: remove status");
-              console.log("  - Checkbox-only mode: hover/focus checkbox to reveal status");
-              console.log("  - Enter or Alt+Down: choose status; Space: native completion");
-              console.log("  - Command palette: 'Task Status: ...'");
-            }
-          }
+          id: "task-status-about",
+          name: "About",
+          description: "",
+          action: { type: "reactComponent", component: AboutRow }
         }
       ]
     };
@@ -7055,7 +7125,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.addEventListener("mousedown", handleStatusMouseDown, true);
     window.addEventListener("touchstart", handleStatusTouchStart, TOUCH_LISTENER_OPTIONS);
     window.addEventListener("click", handleStatusClick, true);
-    console.log("[TaskStatus] Loaded. Statuses:", CONFIG.cycleOrder.join(", "));
     return true;
   }
   async function cleanup() {
@@ -7081,7 +7150,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     window.removeEventListener("click", handleStatusClick, true);
     pendingOperations.clear();
     await unregisterAllCommands();
-    console.log("[TaskStatus] Unloaded.");
   }
   publicApi = createPublicApi({
     readCatalog: readStatusEntries,
@@ -7120,9 +7188,10 @@ async function onload({ extensionAPI, extension }) {
     await previousRuntime.dispose();
   }
   const lifecycle = createLifecycle();
-  const instance = createTaskStatusExtension({ extensionAPI });
+  const runtimeVersion = resolveTaskStatusRuntimeVersion(extension?.version);
+  const instance = createTaskStatusExtension({ extensionAPI, runtimeVersion });
   const runtime = Object.freeze({
-    version: resolveTaskStatusRuntimeVersion(extension?.version),
+    version: runtimeVersion,
     dispose: () => lifecycle.dispose()
   });
   activeLifecycle = lifecycle;
@@ -7135,10 +7204,9 @@ async function onload({ extensionAPI, extension }) {
     if (activeLifecycle === lifecycle) activeLifecycle = null;
   });
   try {
-    const initialized = await instance.init(
+    await instance.init(
       () => window[GLOBAL_KEY] === runtime && !lifecycle.disposed
     );
-    if (initialized) console.info(`[TaskStatus] Runtime v${runtime.version}`);
   } catch (error) {
     await lifecycle.dispose().catch((cleanupError) => console.error(cleanupError));
     throw error;
@@ -7157,11 +7225,13 @@ export {
   STATUS_DEFAULTS_VERSION,
   createTaskStatusTextHelpers,
   extension_default as default,
+  isEditableField,
   mergeExtraStatuses,
   migrateStatusListDefaults,
   nextTaskCycleStatus,
   onload,
   onunload,
+  resolveChooserDigitAction,
   resolveTaskStatusRuntimeVersion,
   resolveTaskStatusTargetUids
 };

@@ -165,7 +165,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
     document,
     CSS: { supports: () => true },
     React: {
-      createElement: () => null,
+      createElement: (type, props, ...children) => ({ type, props, children }),
       useEffect: () => {},
       useMemo: (fn) => fn(),
       useRef: (value) => ({ current: value }),
@@ -233,140 +233,184 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
   };
 
   try {
-    const nonce = Date.now();
-    const firstExtension = await import(`../src/extension.js?runtime=${nonce}-first`);
-    const secondExtension = await import(`../src/extension.js?runtime=${nonce}-second`);
-    const firstLoad = firstExtension.onload({
-      extensionAPI,
-      extension: { version: "0.2.0-first" },
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const firstRuntime = windowLike.__svyk_roamTaskStatusTags;
-    assert.ok(firstRuntime);
-    assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
-    assert.equal(activeCommands.size, 0);
+    const originalConsoleLog = console.log;
+    const originalConsoleInfo = console.info;
+    const noisyCalls = [];
+    console.log = (...args) => noisyCalls.push(["log", ...args]);
+    console.info = (...args) => noisyCalls.push(["info", ...args]);
+    try {
+      const nonce = Date.now();
+      const firstExtension = await import(`../src/extension.js?runtime=${nonce}-first`);
+      const secondExtension = await import(`../src/extension.js?runtime=${nonce}-second`);
+      const firstLoad = firstExtension.onload({
+        extensionAPI,
+        extension: { version: "0.2.0-first" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const firstRuntime = windowLike.__svyk_roamTaskStatusTags;
+      assert.ok(firstRuntime);
+      assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
+      assert.equal(activeCommands.size, 0);
 
-    await secondExtension.onload({ extensionAPI, extension: { version: "0.2.0-second" } });
-    const secondRuntime = windowLike.__svyk_roamTaskStatusTags;
-    assert.notEqual(secondRuntime, firstRuntime);
-    assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
-    assert.ok(activeCommands.size > 0);
-    assert.equal(slashCalls.added.length, 14);
+      await secondExtension.onload({ extensionAPI, extension: { version: "0.2.0-second" } });
+      const secondRuntime = windowLike.__svyk_roamTaskStatusTags;
+      assert.notEqual(secondRuntime, firstRuntime);
+      assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
+      assert.ok(activeCommands.size > 0);
+      assert.equal(slashCalls.added.length, 14);
 
-    const ownedCheckbox = new FakeElement("span");
-    ownedCheckbox.className = "rm-checkbox rm-todo";
-    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
-    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
-    ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
-    ownedCheckbox.setAttribute("data-foreign-owner", "keep");
-    document.body.appendChild(ownedCheckbox);
+      assert.deepEqual(
+        latestPanelConfig.settings.map((entry) => entry.id),
+        [
+          "task-status-theme",
+          "task-status-checkbox-style",
+          "task-status-style-native-checkboxes",
+          "task-status-label-display",
+          "task-status-alert-beacon",
+          "task-status-follow-up-prompt",
+          "task-status-repeat-carry-over",
+          "task-status-status-names",
+          "task-status-about",
+        ]
+      );
+      assert.match(
+        latestPanelConfig.settings.find((entry) => entry.id === "task-status-follow-up-prompt").description,
+        /Better Tasks/
+      );
+      assert.match(
+        latestPanelConfig.settings.find((entry) => entry.id === "task-status-repeat-carry-over").description,
+        /Better Tasks/
+      );
+      const aboutSetting = latestPanelConfig.settings.find((entry) => entry.id === "task-status-about");
+      assert.equal(aboutSetting.name, "About");
+      assert.equal(aboutSetting.action.type, "reactComponent");
+      const aboutTree = aboutSetting.action.component();
+      assert.equal(aboutTree.props.className, "ts-status-about");
+      assert.equal(aboutTree.children[0].children[0], "Task Status Tags v0.2.0-second");
+      assert.equal(
+        aboutTree.children[1].props.href,
+        "https://github.com/Svyk/Roam-Task-Status-Tags#readme"
+      );
 
-    const themeSetting = latestPanelConfig.settings.find(
-      (entry) => entry.id === "task-status-theme"
-    );
-    assert.equal(themeSetting.action.type, "select");
-    assert.deepEqual(themeSetting.action.items, ["Follow Roam", "Light", "Dark"]);
-    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
-    themeSetting.action.onChange("Dark");
-    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "dark");
-    themeSetting.action.onChange("Light");
-    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
-    themeSetting.action.onChange("not-a-theme");
-    assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
-    assert.ok(
-      observed.some((observer) =>
-        observer.targets.some(
-          (entry) => entry.target === document.head && entry.options?.childList === true
-        )
-      ),
-      "head childList observer should be registered"
-    );
-    assert.ok(scheduledDelays.includes(1500), "1500ms theme boot timeout should be scheduled");
+      const ownedCheckbox = new FakeElement("span");
+      ownedCheckbox.className = "rm-checkbox rm-todo";
+      ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
+      ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+      ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
+      ownedCheckbox.setAttribute("data-foreign-owner", "keep");
+      document.body.appendChild(ownedCheckbox);
 
-    const styleSetting = latestPanelConfig.settings.find(
-      (entry) => entry.id === "task-status-checkbox-style"
-    );
-    assert.equal(styleSetting.action.type, "select");
-    assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal"]);
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
-    styleSetting.action.onChange("Glass");
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
-    styleSetting.action.onChange("Solid");
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
-    styleSetting.action.onChange("Minimal");
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "minimal");
-    styleSetting.action.onChange("unknown-style");
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
-    styleSetting.action.onChange("Solid");
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+      const themeSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-theme"
+      );
+      assert.equal(themeSetting.action.type, "select");
+      assert.deepEqual(themeSetting.action.items, ["Follow Roam", "Light", "Dark"]);
+      assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+      themeSetting.action.onChange("Dark");
+      assert.equal(document.documentElement.getAttribute("data-ts-theme"), "dark");
+      themeSetting.action.onChange("Light");
+      assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+      themeSetting.action.onChange("not-a-theme");
+      assert.equal(document.documentElement.getAttribute("data-ts-theme"), "light");
+      assert.ok(
+        observed.some((observer) =>
+          observer.targets.some(
+            (entry) => entry.target === document.head && entry.options?.childList === true
+          )
+        ),
+        "head childList observer should be registered"
+      );
+      assert.ok(scheduledDelays.includes(1500), "1500ms theme boot timeout should be scheduled");
 
-    const checkboxSetting = latestPanelConfig.settings.find(
-      (entry) => entry.id === "task-status-style-native-checkboxes"
-    );
-    assert.equal(checkboxSetting.action.type, "switch");
-    checkboxSetting.action.onChange(false);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
-    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
-    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
-    ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
+      const styleSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-checkbox-style"
+      );
+      assert.equal(styleSetting.action.type, "select");
+      assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal"]);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      styleSetting.action.onChange("Glass");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
+      styleSetting.action.onChange("Solid");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+      styleSetting.action.onChange("Minimal");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "minimal");
+      styleSetting.action.onChange("unknown-style");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      styleSetting.action.onChange("Solid");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
 
-    const displaySetting = latestPanelConfig.settings.find(
-      (entry) => entry.id === "task-status-label-display"
-    );
-    assert.equal(displaySetting.action.type, "select");
-    assert.deepEqual(displaySetting.action.items, [
-      "Checkbox only — reveal on intent",
-      "Checkbox + status pill",
-    ]);
-    displaySetting.action.onChange("Checkbox + status pill");
-    displaySetting.action.onChange("Checkbox only — reveal on intent");
+      const checkboxSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-style-native-checkboxes"
+      );
+      assert.equal(checkboxSetting.action.type, "switch");
+      checkboxSetting.action.onChange(false);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
+      ownedCheckbox.setAttribute("data-ts-checkbox-status", "ACTIVE");
+      ownedCheckbox.setAttribute("data-ts-checkbox-shape", "active");
+      ownedCheckbox.setAttribute("data-ts-checkbox-block-uid", "abcdefghi");
 
-    const alertBeaconSetting = latestPanelConfig.settings.find(
-      (entry) => entry.id === "task-status-alert-beacon"
-    );
-    assert.equal(alertBeaconSetting.action.type, "switch");
-    alertBeaconSetting.action.onChange(false);
-    alertBeaconSetting.action.onChange(true);
-    assert.equal(graphWriteCalls, 0);
+      const displaySetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-label-display"
+      );
+      assert.equal(displaySetting.action.type, "select");
+      assert.deepEqual(displaySetting.action.items, [
+        "Checkbox only — reveal on intent",
+        "Checkbox + status pill",
+      ]);
+      displaySetting.action.onChange("Checkbox + status pill");
+      displaySetting.action.onChange("Checkbox only — reveal on intent");
 
-    ownedCheckbox.setAttribute("data-ts-checkbox-status", "ALERT");
-    ownedCheckbox.setAttribute("data-ts-checkbox-shape", "alert");
-    ownedCheckbox.setAttribute("data-ts-alert-beacon", "true");
+      const alertBeaconSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-alert-beacon"
+      );
+      assert.equal(alertBeaconSetting.action.type, "switch");
+      alertBeaconSetting.action.onChange(false);
+      alertBeaconSetting.action.onChange(true);
+      assert.equal(graphWriteCalls, 0);
 
-    const ownedPill = new FakeElement("span");
-    ownedPill.className = "rm-page-ref";
-    ownedPill.setAttribute("data-ts-managed-status-pill", "true");
-    ownedPill.setAttribute("data-ts-status-pill-hidden", "true");
-    ownedPill.setAttribute("data-foreign-owner", "keep");
-    document.body.appendChild(ownedPill);
+      ownedCheckbox.setAttribute("data-ts-checkbox-status", "ALERT");
+      ownedCheckbox.setAttribute("data-ts-checkbox-shape", "alert");
+      ownedCheckbox.setAttribute("data-ts-alert-beacon", "true");
 
-    releaseFirstPanel();
-    const cleanupFirst = await firstLoad;
-    await cleanupFirst();
-    assert.equal(windowLike.__svyk_roamTaskStatusTags, secondRuntime);
-    assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
-    assert.ok(activeCommands.size > 0);
+      const ownedPill = new FakeElement("span");
+      ownedPill.className = "rm-page-ref";
+      ownedPill.setAttribute("data-ts-managed-status-pill", "true");
+      ownedPill.setAttribute("data-ts-status-pill-hidden", "true");
+      ownedPill.setAttribute("data-foreign-owner", "keep");
+      document.body.appendChild(ownedPill);
 
-    await secondExtension.onunload();
-    assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
-    assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
-    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
-    assert.equal(activeTimers.size, 0);
-    assert.ok(observed.every((observer) => observer.disconnected));
-    assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
-    assert.equal(activeCommands.size, 0);
-    assert.equal(slashCalls.removed.length, 14);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-ts-alert-beacon"), null);
-    assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
-    assert.equal(ownedPill.getAttribute("data-ts-managed-status-pill"), null);
-    assert.equal(ownedPill.getAttribute("data-ts-status-pill-hidden"), null);
-    assert.equal(ownedPill.getAttribute("data-foreign-owner"), "keep");
-    assert.equal(graphWriteCalls, 0);
+      releaseFirstPanel();
+      const cleanupFirst = await firstLoad;
+      await cleanupFirst();
+      assert.equal(windowLike.__svyk_roamTaskStatusTags, secondRuntime);
+      assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 1);
+      assert.ok(activeCommands.size > 0);
+
+      await secondExtension.onunload();
+      assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
+      assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      assert.equal(activeTimers.size, 0);
+      assert.ok(observed.every((observer) => observer.disconnected));
+      assert.equal(document.body.children.filter((node) => node.className === "ts-status-portal").length, 0);
+      assert.equal(activeCommands.size, 0);
+      assert.equal(slashCalls.removed.length, 14);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-status"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-shape"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-checkbox-block-uid"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-ts-alert-beacon"), null);
+      assert.equal(ownedCheckbox.getAttribute("data-foreign-owner"), "keep");
+      assert.equal(ownedPill.getAttribute("data-ts-managed-status-pill"), null);
+      assert.equal(ownedPill.getAttribute("data-ts-status-pill-hidden"), null);
+      assert.equal(ownedPill.getAttribute("data-foreign-owner"), "keep");
+      assert.equal(graphWriteCalls, 0);
+      assert.deepEqual(noisyCalls, [], "load, settings changes, and unload must not log or info");
+    } finally {
+      console.log = originalConsoleLog;
+      console.info = originalConsoleInfo;
+    }
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;

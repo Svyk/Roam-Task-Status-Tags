@@ -1038,6 +1038,22 @@ a.rm-page-ref[data-task-status-key]:hover {
   min-width: 0;
 }
 
+.ts-status-chooser .ts-status-choice-shortcut {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--ts-menu-muted) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+
+.ts-status-about {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
 /* One portaled status control, revealed only on checkbox hover or keyboard focus. */
 .ts-status-portal > .ts-status-peek[data-task-status-key] {
   appearance: none;

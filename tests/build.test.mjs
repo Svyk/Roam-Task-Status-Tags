@@ -39,6 +39,8 @@ test("build emits deterministic, matching browser ESM artifacts with a default e
   assert.equal(pagesCss, rootCss);
   assert.doesNotMatch(rootJs, /sourceMappingURL/);
   assert.doesNotMatch(rootJs, /^import\s/m);
+  assert.doesNotMatch(rootJs, /console\.log\(/);
+  assert.doesNotMatch(rootJs, /console\.info\(/);
   assert.match(rootJs, /export\s*\{[\s\S]*default/);
   assert.match(
     rootJs,
