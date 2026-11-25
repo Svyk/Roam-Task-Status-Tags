@@ -2907,277 +2907,61 @@
  * Uniform checkbox scaling (Compact sets no data-ts-checkbox-size attribute and
  * keeps Roam's native geometry byte-for-byte).
  * Medium (16px), Large (18px, default), and Extra large (20px) zoom every task
- * checkbox uniformly on Roam's 12x12 .check-container so plain TODOs, DONE
- * ticks, status tiles, glyphs, beacons, and animations scale together without
- * changing line height or shifting the first line.
+ * checkbox uniformly on Roam's 12x12 .check-container (whose .checkmark tile is
+ * 14x14 at top:-1px; left:-1px) so plain TODOs, DONE ticks, Outline, Glass,
+ * Solid, Minimal, and Sticker tiles all reach exact 16/18/20px outer sizes,
+ * keep a 7px gap to the first letter, and preserve 29px one-line block height.
  */
 :root[data-ts-checkbox-size="medium"] .rm-checkbox > .check-container {
-  --ts-sticker-rim-width: 1.125px;
-  zoom: 1.333333;
-  vertical-align: -1.8px;
+  --ts-sticker-rim-width: 1.3125px;
+  zoom: 1.1429;
+  vertical-align: -1.15px;
 }
 
 :root[data-ts-checkbox-size="large"] .rm-checkbox > .check-container {
-  --ts-sticker-rim-width: 1px;
-  zoom: 1.5;
-  vertical-align: -2.25px;
+  --ts-sticker-rim-width: 1.1667px;
+  zoom: 1.2858;
+  vertical-align: -1.7px;
 }
 
 :root[data-ts-checkbox-size="xlarge"] .rm-checkbox > .check-container {
-  --ts-sticker-rim-width: 0.9px;
-  zoom: 1.666667;
-  vertical-align: -2.65px;
+  --ts-sticker-rim-width: 1.05px;
+  zoom: 1.4286;
+  vertical-align: -2.15px;
 }
 
-:root[data-ts-checkbox-size] .rm-checkbox {
-  --ts-size-tile-border-width: 1.25px;
-  margin-right: 3.2px;
+:root[data-ts-checkbox-size="medium"] .rm-checkbox {
+  margin-right: 4.35px;
 }
 
-:root[data-ts-checkbox-size]
+:root[data-ts-checkbox-size="large"] .rm-checkbox {
+  margin-right: 4.5px;
+}
+
+:root[data-ts-checkbox-size="xlarge"] .rm-checkbox {
+  margin-right: 4.65px;
+}
+
+:root[data-ts-checkbox-size="medium"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
-  margin-right: -0.6px;
+  margin-right: 0.55px;
 }
 
+:root[data-ts-checkbox-size="large"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+  margin-right: 0.7px;
+}
+
+:root[data-ts-checkbox-size="xlarge"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+  margin-right: 0.85px;
+}
+
+/* Click target equals the visible 14px base tile (16/18/20px zoomed); no slop onto text. */
 :root[data-ts-checkbox-size]
   .rm-checkbox[data-ts-checkbox-status]
   > .check-container::after {
-  inset: 0;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  border-width: var(--ts-size-tile-border-width, 1.25px) !important;
-  border-radius: 30% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 30% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 40% 40% 40% 12% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 18% 44% 18% 18% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-theme="dark"][data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 30% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  width: 64%;
-  height: 64%;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  width: 58%;
-  height: 58%;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="custom"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  width: 50%;
-  height: 50%;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  width: 82%;
-  height: 82%;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="custom"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  width: 62%;
-  height: 62%;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-width: 0 !important;
-  border-radius: 28% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 28% !important;
-}
-
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="starred"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="watching"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="rewatch"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-checkbox-size][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark {
-  border-radius: 50% !important;
+  inset: -1px;
 }
 
 /* Keep chooser row icons (16px) and extension UI previews unzoomed. */
@@ -3185,7 +2969,6 @@
 :root[data-ts-checkbox-size] .ts-style-preview .rm-checkbox,
 :root[data-ts-checkbox-size] .ts-rendered-icon .rm-checkbox,
 :root[data-ts-checkbox-size] .ts-status-names-panel .rm-checkbox {
-  --ts-size-tile-border-width: 1.6px;
   --ts-sticker-rim-width: 1.5px;
   margin-right: 0;
 }
