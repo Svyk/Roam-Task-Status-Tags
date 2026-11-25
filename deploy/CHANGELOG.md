@@ -34,7 +34,7 @@
 
 ## 0.16.0 - 2026-11-24
 
-- Port BetterTask for Thymer status icon artwork, Neon Glass / Vivid Solid / Minimal Crisp preset styles, ambient icon animations, canvas transition bursts, and picker styling under the MIT License with author permission. See `THIRD_PARTY_NOTICES.md`.
+- Port BetterTask for Thymer status icon artwork, Neon Glass / Vivid Solid / Minimal Crisp preset styles, ambient icon animations, canvas transition bursts, and picker styling. See `THIRD_PARTY_NOTICES.md`.
 - Map the Glass, Solid, and Minimal checkbox styles to the upstream Neon Glass, Vivid Solid, and Minimal Crisp presets in both light and dark modes. Outline keeps the v0.14.0 look for all built-in statuses.
 - Keep unmapped statuses (In Review, Holding, Incubating, the media statuses, and custom statuses) cohesive inside the same Glass, Solid, and Minimal tile language.
 - Add four new opt-in extra statuses (**Kawaii**, **Flower**, **Sun**, **Moon**) alongside the earlier seven. **Add more statuses** in settings now offers all eleven.

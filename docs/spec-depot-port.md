@@ -243,7 +243,7 @@ Added to the Depot checklist (section 8): after the Depot PR is opened and befor
 
 ## 12. Third pass (RTS-8, 2026-11-24)
 
-The clean-room boundary in section 1 is superseded for BetterTask for Thymer (`github.com/imhalid/thymer-plugins/tree/main/plugins/better-task`, commit `cb1350d4d6b03d7939c77de2b1d99a685f093e66`). The author (imhalid) confirmed MIT license permission to Svyatoslav Kleshchev on 2026-11-24; attribution and the full MIT license text live in `THIRD_PARTY_NOTICES.md`.
+The clean-room boundary in section 1 is superseded for BetterTask for Thymer (`github.com/imhalid/thymer-plugins/tree/main/plugins/better-task`, commit `cb1350d4d6b03d7939c77de2b1d99a685f093e66`). The README credits the author (imhalid) with a link, and the MIT license text lives in `THIRD_PARTY_NOTICES.md`.
 
 ### Ported
 

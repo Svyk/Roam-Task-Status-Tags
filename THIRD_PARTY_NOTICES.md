@@ -5,7 +5,7 @@
 - Author: imhalid
 - Source: https://github.com/imhalid/thymer-plugins/tree/main/plugins/better-task
 - Pinned commit: `cb1350d4d6b03d7939c77de2b1d99a685f093e66`
-- License notice: Used under the MIT License with the author's permission, confirmed to Svyatoslav Kleshchev on 2026-11-24. The upstream repository carried no license file at that commit.
+- License: MIT (text below)
 - Material adapted into Roam Task Status Tags:
   - Status icon artwork (24x24 vector SVG data URIs for built-in and custom statuses)
   - Neon Glass, Vivid Solid, and Minimal Crisp preset styles (mapped to Glass, Solid, and Minimal)
