@@ -229,6 +229,36 @@ function pickOnAccentColor(accentRgb) {
   if (whiteContrast >= 3.4) return WHITE_CSS;
   return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
 }
+function pickStickerOnAccentColor(accentRgb) {
+  const accent = normalizeRgb(accentRgb);
+  const whiteContrast = contrastRatio(WHITE, accent);
+  const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
+function deriveStickerAccent(baseRgb, surface, minimumTileContrast, minimumGlyphContrast = 4.65) {
+  const accent = deriveAccessibleAccent(baseRgb, surface, minimumTileContrast);
+  const bestContrast = (rgb) => Math.max(contrastRatio(WHITE, rgb), contrastRatio(NEAR_BLACK, rgb));
+  if (bestContrast(accent) >= minimumGlyphContrast) return accent;
+  const isLightSurface = relativeLuminance(surface) > 0.5;
+  const preferredTargets = isLightSurface ? [BLACK, WHITE] : [WHITE, BLACK];
+  for (const target of preferredTargets) {
+    let low = 0;
+    let high = 1;
+    let best = null;
+    for (let index = 0; index < 28; index += 1) {
+      const middle = (low + high) / 2;
+      const candidate = mixRgb(accent, target, middle);
+      if (bestContrast(candidate) >= minimumGlyphContrast && contrastRatio(candidate, surface) >= minimumTileContrast) {
+        best = candidate;
+        high = middle;
+      } else {
+        low = middle;
+      }
+    }
+    if (best) return best;
+  }
+  return accent;
+}
 function buildStatusCheckboxColors({
   baseRgb,
   lightSurfaceRgb = DEFAULT_LIGHT_SURFACE,
@@ -243,6 +273,12 @@ function buildStatusCheckboxColors({
   const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
   const roundedLightAccent = roundedRgb(lightAccent);
   const roundedDarkAccent = roundedRgb(darkAccent);
+  const roundedLightStickerAccent = roundedRgb(
+    deriveStickerAccent(base, lightSurface, certificationContrast)
+  );
+  const roundedDarkStickerAccent = roundedRgb(
+    deriveStickerAccent(base, darkSurface, certificationContrast)
+  );
   return Object.freeze({
     base: roundedRgb(base),
     lightSurface: roundedRgb(lightSurface),
@@ -253,6 +289,12 @@ function buildStatusCheckboxColors({
     darkAccentCss: rgbCss(roundedDarkAccent),
     lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
     darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
+    lightStickerAccent: roundedLightStickerAccent,
+    darkStickerAccent: roundedDarkStickerAccent,
+    lightStickerAccentCss: rgbCss(roundedLightStickerAccent),
+    darkStickerAccentCss: rgbCss(roundedDarkStickerAccent),
+    lightStickerOnAccentCss: pickStickerOnAccentColor(roundedLightStickerAccent),
+    darkStickerOnAccentCss: pickStickerOnAccentColor(roundedDarkStickerAccent),
     lightWashCss: rgbaCss(base, 0.09),
     darkWashCss: rgbaCss(base, 0.16),
     lightBeaconCss: rgbaCss(roundedLightAccent, 0.52),
@@ -6092,6 +6134,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
   --ts-checkbox-on-accent-light: ${checkboxValues.lightOnAccentCss};
   --ts-checkbox-on-accent-dark: ${checkboxValues.darkOnAccentCss};
+  --ts-checkbox-sticker-accent-light: ${checkboxValues.lightStickerAccentCss};
+  --ts-checkbox-sticker-accent-dark: ${checkboxValues.darkStickerAccentCss};
+  --ts-checkbox-sticker-on-accent-light: ${checkboxValues.lightStickerOnAccentCss};
+  --ts-checkbox-sticker-on-accent-dark: ${checkboxValues.darkStickerOnAccentCss};
   --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
   --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
   --ts-checkbox-beacon-light: ${checkboxValues.lightBeaconCss};

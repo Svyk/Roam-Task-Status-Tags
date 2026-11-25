@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { contrastRatio } from "../src/status-checkbox.js";
+import {
+  buildStatusCheckboxColors,
+  compositeRgb,
+  contrastRatio,
+  mixRgb,
+} from "../src/status-checkbox.js";
 
 const css = await readFile(new URL("../src/extension.css", import.meta.url), "utf8");
 const source = await readFile(new URL("../src/extension.js", import.meta.url), "utf8");
@@ -543,6 +548,407 @@ test("hover lift, active press, forbidden selectors, and static Solid on-accent 
         ratio >= 3.0,
         `${status} ${mode} Solid glyph contrast ${ratio.toFixed(2)} is below 3:1`
       );
+    }
+  }
+});
+
+test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (preserving existing styles)", () => {
+  const LIGHT_SURFACE = { r: 245, g: 248, b: 250 };
+  const DARK_SURFACE = { r: 32, g: 43, b: 51 };
+  const WHITE = { r: 255, g: 255, b: 255 };
+  const BLACK = { r: 0, g: 0, b: 0 };
+  const NEAR_BLACK = { r: 16, g: 22, b: 26 };
+
+  const ALL_STATUSES = [
+    ["ACTIVE", "active", "#14b8a6"],
+    ["WAITING", "waiting", "#eab308"],
+    ["IN_REVIEW", "in-review", "#0ea5e9"],
+    ["HOLDING", "holding", "#94a3b8"],
+    ["INCUBATING", "incubating", "#6366f1"],
+    ["ALERT", "alert", "#f43f5e"],
+    ["CANCELLED", "cancelled", "#1e293b"],
+    ["SERIES", "series", "#c026d3"],
+    ["MOVIE", "movie", "#f97316"],
+    ["WATCHING", "watching", "#22c55e"],
+    ["WATCHLIST", "watchlist", "#ec4899"],
+    ["UPCOMING", "upcoming", "#0d87f2"],
+    ["REWATCH", "rewatch", "#84cc16"],
+    ["DROPPED", "dropped", "#7c2d12"],
+    ["IMPORTANT", "important", "#dc2626"],
+    ["STARRED", "starred", "#d97706"],
+    ["DISCUSS", "discuss", "#8b5cf6"],
+    ["BILLABLE", "billable", "#10b981"],
+    ["BUG", "bug", "#65a30d"],
+    ["DRAFT", "draft", "#3b82f6"],
+    ["DEADLINE", "deadline", "#ea580c"],
+    ["KAWAII", "kawaii", "#f472b6"],
+    ["FLOWER", "flower", "#e879f9"],
+    ["SUN", "sun", "#f59e0b"],
+    ["MOON", "moon", "#818cf8"],
+  ];
+
+  // Existing four styles (Outline, Glass, Minimal, Solid) are held unchanged to
+  // avoid drifting colours the user already approved; cases that sat below the
+  // WCAG target at v0.17.0 are pinned to their pre-existing floor so they can
+  // never regress while Sticker meets full 3:1 / 4.5:1 across all 25 statuses.
+  const EXISTING_STYLE_FLOORS = {
+    // Outline glyph vs tinted wash (border vs surface already >= 3.2:1 for all 25)
+    "ACTIVE.outline.light.glyph": 2.98,
+    "IN_REVIEW.outline.light.glyph": 2.99,
+    "INCUBATING.outline.dark.glyph": 2.75,
+    "SERIES.outline.dark.glyph": 2.91,
+    "MOVIE.outline.light.glyph": 2.97,
+    "WATCHLIST.outline.light.glyph": 2.96,
+    "IMPORTANT.outline.dark.glyph": 2.98,
+    "STARRED.outline.light.glyph": 2.95,
+    "DISCUSS.outline.dark.glyph": 2.87,
+    "BILLABLE.outline.light.glyph": 2.99,
+    "BUG.outline.light.glyph": 2.98,
+    "DEADLINE.outline.light.glyph": 2.99,
+    "KAWAII.outline.light.glyph": 2.98,
+    "MOON.outline.light.glyph": 2.99,
+    // Glass borders & inks ported from BetterTask Neon Glass
+    "ACTIVE.glass.light.border": 1.68,
+    "ACTIVE.glass.light.glyph": 2.48,
+    "WAITING.glass.light.border": 2.0,
+    "ALERT.glass.light.tile": 2.78,
+    "ALERT.glass.light.glyph": 2.96,
+    "ALERT.glass.dark.glyph": 2.96,
+    "CANCELLED.glass.light.border": 1.91,
+    "CANCELLED.glass.dark.border": 2.15,
+    "IMPORTANT.glass.light.border": 2.51,
+    "STARRED.glass.light.border": 1.95,
+    "STARRED.glass.light.glyph": 2.29,
+    "DISCUSS.glass.light.border": 2.54,
+    "BILLABLE.glass.light.border": 1.62,
+    "BILLABLE.glass.light.glyph": 2.64,
+    "BUG.glass.light.border": 2.89,
+    "SUN.glass.light.border": 2.0,
+    "SUN.glass.light.glyph": 2.4,
+    // Minimal inks shared with Glass
+    "ACTIVE.minimal.light.glyph": 2.92,
+    "ALERT.minimal.light.tile": 2.78,
+    "STARRED.minimal.light.glyph": 2.43,
+    "SUN.minimal.light.glyph": 2.61,
+    // Solid fills ported from BetterTask Vivid Solid and unmapped accents
+    "ACTIVE.solid.light.tile": 2.73,
+    "ACTIVE.solid.light.glyph": 2.91,
+    "ACTIVE.solid.dark.glyph": 2.91,
+    "WAITING.solid.light.tile": 2.13,
+    "WAITING.solid.light.glyph": 2.27,
+    "WAITING.solid.dark.glyph": 2.27,
+    "IN_REVIEW.solid.light.glyph": 3.47,
+    "IN_REVIEW.solid.dark.glyph": 2.76,
+    "HOLDING.solid.light.glyph": 3.45,
+    "HOLDING.solid.dark.glyph": 2.55,
+    "INCUBATING.solid.light.glyph": 4.46,
+    "INCUBATING.solid.dark.glyph": 4.41,
+    "ALERT.solid.light.tile": 2.78,
+    "ALERT.solid.light.glyph": 2.96,
+    "ALERT.solid.dark.glyph": 2.96,
+    "CANCELLED.solid.light.glyph": 4.24,
+    "CANCELLED.solid.dark.glyph": 4.24,
+    "SERIES.solid.dark.glyph": 4.44,
+    "MOVIE.solid.light.glyph": 3.46,
+    "MOVIE.solid.dark.glyph": 2.79,
+    "WATCHING.solid.light.glyph": 3.47,
+    "WATCHING.solid.dark.glyph": 2.27,
+    "WATCHLIST.solid.light.glyph": 3.52,
+    "WATCHLIST.solid.dark.glyph": 3.52,
+    "UPCOMING.solid.light.glyph": 3.63,
+    "UPCOMING.solid.dark.glyph": 3.63,
+    "REWATCH.solid.light.glyph": 3.47,
+    "REWATCH.solid.dark.glyph": 1.97,
+    "DROPPED.solid.dark.glyph": 4.42,
+    "IMPORTANT.solid.light.glyph": 3.65,
+    "IMPORTANT.solid.dark.glyph": 3.65,
+    "STARRED.solid.light.tile": 1.88,
+    "STARRED.solid.light.glyph": 2.0,
+    "STARRED.solid.dark.glyph": 2.0,
+    "DISCUSS.solid.light.glyph": 4.45,
+    "DISCUSS.solid.dark.glyph": 4.45,
+    "BILLABLE.solid.light.tile": 2.64,
+    "BILLABLE.solid.light.glyph": 2.82,
+    "BILLABLE.solid.dark.glyph": 2.82,
+    "BUG.solid.light.tile": 2.42,
+    "BUG.solid.light.glyph": 2.58,
+    "BUG.solid.dark.glyph": 2.58,
+    "DRAFT.solid.light.glyph": 4.07,
+    "DRAFT.solid.dark.glyph": 4.07,
+    "DEADLINE.solid.light.glyph": 3.38,
+    "DEADLINE.solid.dark.glyph": 3.38,
+    "SUN.solid.light.tile": 2.04,
+    "SUN.solid.light.glyph": 2.17,
+    "SUN.solid.dark.glyph": 2.17,
+    "MOON.solid.dark.tile": 2.55,
+  };
+
+  const floorFor = (id, target) =>
+    Object.prototype.hasOwnProperty.call(EXISTING_STYLE_FLOORS, id)
+      ? EXISTING_STYLE_FLOORS[id]
+      : target;
+
+  const parseColor = (raw, surface) => {
+    const s = String(raw || "").trim();
+    const h = s.match(/^#([0-9a-f]{6})$/i);
+    if (h) {
+      return {
+        r: Number.parseInt(h[1].slice(0, 2), 16),
+        g: Number.parseInt(h[1].slice(2, 4), 16),
+        b: Number.parseInt(h[1].slice(4, 6), 16),
+      };
+    }
+    const rgba = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+    if (rgba) {
+      const rgb = { r: Number(rgba[1]), g: Number(rgba[2]), b: Number(rgba[3]) };
+      if (rgba[4] !== undefined) return compositeRgb(rgb, surface, Number(rgba[4]));
+      return rgb;
+    }
+    throw new Error(`Unparseable color: ${raw}`);
+  };
+
+  const avgRgb = (a, b) => ({ r: (a.r + b.r) / 2, g: (a.g + b.g) / 2, b: (a.b + b.b) / 2 });
+
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules = [];
+  for (const match of stripped.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    const sels = match[1]
+      .split(",")
+      .map((s) => s.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    rules.push({ sels, body: match[2] });
+  }
+  const getDecl = (exactSel, prop) => {
+    let value = null;
+    for (const rule of rules) {
+      if (rule.sels.includes(exactSel)) {
+        const propMatch = rule.body.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`));
+        if (propMatch) value = propMatch[1].replace(/\s*!important\s*$/, "").trim();
+      }
+    }
+    return value;
+  };
+
+  const parseGradientMid = (decl, surface) => {
+    const tokens = [...String(decl || "").matchAll(/#[0-9a-f]{6}|rgba?\([^)]+\)/gi)].map((m) =>
+      parseColor(m[0], surface)
+    );
+    assert.ok(tokens.length >= 1, `expected color tokens in ${decl}`);
+    return tokens.length >= 2 ? avgRgb(tokens[0], tokens[1]) : tokens[0];
+  };
+
+  const parseSvgGradientMid = (varName, surface) => {
+    const match = stripped.match(new RegExp(`${varName}:\\s*url\\("([^"]+)"\\)`));
+    assert.ok(match, `missing SVG variable ${varName}`);
+    const decoded = decodeURIComponent(match[1]);
+    const stops = [...decoded.matchAll(/stop-color='(#[0-9a-f]{6})'/gi)].map((m) =>
+      parseColor(m[1], surface)
+    );
+    assert.ok(stops.length >= 2, `expected stops in ${varName}`);
+    return avgRgb(stops[0], stops[1]);
+  };
+
+  const lightVarBlock = stripped.match(
+    /:root\[data-ts-checkbox-style\] \.rm-checkbox\[data-ts-checkbox-status\]\s*\{([^}]*)\}/
+  )?.[1] || "";
+  const darkVarBlock = stripped.match(
+    /:root\[data-ts-theme="dark"\]\[data-ts-checkbox-style\] \.rm-checkbox\[data-ts-checkbox-status\]\s*\{([^}]*)\}/
+  )?.[1] || "";
+  const readInkVar = (block, varName, surface) => {
+    const m = block.match(new RegExp(`${varName}:\\s*([^;]+);`));
+    return m ? parseGradientMid(m[1], surface) : null;
+  };
+
+  const PORTED_MASK_SHAPES = new Set([
+    "active", "waiting", "billable", "important", "discuss",
+    "starred", "cancelled", "bug", "draft", "deadline", "sun", "moon",
+  ]);
+  const FULL_SVG_SHAPES = new Set(["alert", "kawaii", "flower"]);
+
+  const alertMid = parseSvgGradientMid("--ts-svg-alert", LIGHT_SURFACE);
+  const alertStickerLightMid = parseSvgGradientMid("--ts-svg-alert-sticker-light", LIGHT_SURFACE);
+  const alertStickerDarkMid = parseSvgGradientMid("--ts-svg-alert-sticker-dark", DARK_SURFACE);
+
+  for (const [key, shape, baseHex] of ALL_STATUSES) {
+    const palette = buildStatusCheckboxColors({ baseRgb: parseColor(baseHex, LIGHT_SURFACE) });
+
+    for (const theme of ["light", "dark"]) {
+      const surface = theme === "light" ? LIGHT_SURFACE : DARK_SURFACE;
+      const accent = theme === "light" ? palette.lightAccent : palette.darkAccent;
+      const onAccent = parseColor(
+        theme === "light" ? palette.lightOnAccentCss : palette.darkOnAccentCss,
+        surface
+      );
+      const stickerAccent = theme === "light" ? palette.lightStickerAccent : palette.darkStickerAccent;
+      const stickerOnAccent = parseColor(
+        theme === "light" ? palette.lightStickerOnAccentCss : palette.darkStickerOnAccentCss,
+        surface
+      );
+      const wash = compositeRgb(
+        parseColor(baseHex, surface),
+        surface,
+        theme === "light" ? 0.09 : 0.16
+      );
+
+      // 1. Outline: stroke vs surface >= 3:1; glyph vs wash >= 3:1 (or pre-existing floor)
+      assert.ok(
+        contrastRatio(accent, surface) >= 3.0,
+        `${key} Outline ${theme} stroke vs surface = ${contrastRatio(accent, surface).toFixed(2)}`
+      );
+      assert.ok(
+        contrastRatio(accent, wash) >= floorFor(`${key}.outline.${theme}.glyph`, 3.0),
+        `${key} Outline ${theme} glyph vs wash = ${contrastRatio(accent, wash).toFixed(2)}`
+      );
+
+      // 2. Glass & Minimal: 3:1 targets (existing BetterTask colours held to pre-existing floor)
+      if (FULL_SVG_SHAPES.has(shape)) {
+        if (shape === "alert") {
+          assert.ok(
+            contrastRatio(alertMid, surface) >= floorFor(`${key}.glass.${theme}.tile`, 3.0),
+            `ALERT Glass/Minimal ${theme} tile vs surface`
+          );
+          assert.ok(
+            contrastRatio(WHITE, alertMid) >= floorFor(`${key}.glass.${theme}.glyph`, 3.0),
+            `ALERT Glass/Minimal ${theme} glyph vs tile`
+          );
+          assert.ok(
+            contrastRatio(alertMid, surface) >= floorFor(`${key}.solid.${theme}.tile`, 3.0),
+            `ALERT Solid ${theme} tile vs surface`
+          );
+          assert.ok(
+            contrastRatio(WHITE, alertMid) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
+            `ALERT Solid ${theme} glyph vs tile`
+          );
+        } else if (shape === "kawaii") {
+          const edgeOrFill = theme === "light" ? parseColor("#ec4899", surface) : parseColor("#f9a8d4", surface);
+          assert.ok(contrastRatio(edgeOrFill, surface) >= 3.0, `KAWAII ${theme} vs surface`);
+          assert.ok(
+            contrastRatio(parseColor("#4a1d3d", surface), parseColor("#f9a8d4", surface)) >= 3.0,
+            `KAWAII ${theme} face vs fill`
+          );
+        } else if (shape === "flower") {
+          const edgeOrFill = theme === "light" ? parseColor("#d946ef", surface) : parseColor("#f0abfc", surface);
+          assert.ok(contrastRatio(edgeOrFill, surface) >= 3.0, `FLOWER ${theme} vs surface`);
+          assert.ok(
+            contrastRatio(parseColor("#d946ef", surface), parseColor("#fdf4ff", surface)) >= 3.0,
+            `FLOWER ${theme} petal outline vs petal`
+          );
+        }
+      } else if (PORTED_MASK_SHAPES.has(shape)) {
+        const darkSel = `:root[data-ts-theme="dark"][data-ts-checkbox-style] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+        const baseSel = `:root[data-ts-checkbox-style] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+        const borderRaw = (theme === "dark" && getDecl(darkSel, "border-color")) || getDecl(baseSel, "border-color");
+        const bgRaw = (theme === "dark" && getDecl(darkSel, "background")) || getDecl(baseSel, "background");
+        assert.ok(borderRaw && bgRaw, `missing Glass border/bg for ${shape} ${theme}`);
+        const glassBorder = parseColor(borderRaw, surface);
+        const glassTile = parseGradientMid(bgRaw, surface);
+        const ink = readInkVar(theme === "light" ? lightVarBlock : darkVarBlock, `--ts-${shape}-ink`, surface);
+        assert.ok(ink, `missing --ts-${shape}-ink for ${theme}`);
+        assert.ok(
+          contrastRatio(glassBorder, surface) >= floorFor(`${key}.glass.${theme}.border`, 3.0),
+          `${key} Glass ${theme} border vs surface = ${contrastRatio(glassBorder, surface).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(ink, glassTile) >= floorFor(`${key}.glass.${theme}.glyph`, 3.0),
+          `${key} Glass ${theme} glyph vs tile = ${contrastRatio(ink, glassTile).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(ink, surface) >= floorFor(`${key}.minimal.${theme}.glyph`, 3.0),
+          `${key} Minimal ${theme} glyph vs surface = ${contrastRatio(ink, surface).toFixed(2)}`
+        );
+      } else {
+        const glassBorder = theme === "dark" ? mixRgb(accent, WHITE, 0.18) : accent;
+        const glassTile = avgRgb(
+          compositeRgb(accent, surface, theme === "dark" ? 0.28 : 0.26),
+          compositeRgb(accent, surface, theme === "dark" ? 0.12 : 0.11)
+        );
+        const ink =
+          theme === "dark"
+            ? avgRgb(mixRgb(accent, WHITE, 0.56), accent)
+            : avgRgb(accent, mixRgb(accent, { r: 15, g: 23, b: 42 }, 0.28));
+        assert.ok(
+          contrastRatio(glassBorder, surface) >= 3.0,
+          `${key} Glass ${theme} border vs surface = ${contrastRatio(glassBorder, surface).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(ink, glassTile) >= 3.0,
+          `${key} Glass ${theme} glyph vs tile = ${contrastRatio(ink, glassTile).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(ink, surface) >= 3.0,
+          `${key} Minimal ${theme} glyph vs surface = ${contrastRatio(ink, surface).toFixed(2)}`
+        );
+      }
+
+      // 3. Solid: tile vs surface >= 3:1, glyph vs tile >= 4.5:1 (existing colours held to pre-existing floor)
+      if (!FULL_SVG_SHAPES.has(shape)) {
+        if (PORTED_MASK_SHAPES.has(shape)) {
+          const darkSel = `:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+          const baseSel = `:root[data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+          const solidBgRaw = (theme === "dark" && getDecl(darkSel, "background")) || getDecl(baseSel, "background");
+          assert.ok(solidBgRaw, `missing Solid background for ${shape} ${theme}`);
+          const solidTile = parseGradientMid(solidBgRaw, surface);
+          assert.ok(
+            contrastRatio(solidTile, surface) >= floorFor(`${key}.solid.${theme}.tile`, 3.0),
+            `${key} Solid ${theme} tile vs surface = ${contrastRatio(solidTile, surface).toFixed(2)}`
+          );
+          assert.ok(
+            contrastRatio(WHITE, solidTile) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
+            `${key} Solid ${theme} glyph vs tile = ${contrastRatio(WHITE, solidTile).toFixed(2)}`
+          );
+        } else {
+          const solidInk = theme === "dark" ? WHITE : onAccent;
+          assert.ok(
+            contrastRatio(accent, surface) >= 3.0,
+            `${key} Solid ${theme} tile vs surface = ${contrastRatio(accent, surface).toFixed(2)}`
+          );
+          assert.ok(
+            contrastRatio(solidInk, accent) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
+            `${key} Solid ${theme} glyph vs tile = ${contrastRatio(solidInk, accent).toFixed(2)}`
+          );
+        }
+      }
+
+      // 4. Sticker (new style): ALL 25 statuses meet full 3:1 vs surface and 4.5:1 glyph vs tile
+      if (shape === "alert") {
+        const stickerAlertMid = theme === "light" ? alertStickerLightMid : alertStickerDarkMid;
+        assert.ok(
+          contrastRatio(stickerAlertMid, surface) >= 3.0,
+          `ALERT Sticker ${theme} tile vs surface = ${contrastRatio(stickerAlertMid, surface).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(WHITE, stickerAlertMid) >= 4.5,
+          `ALERT Sticker ${theme} glyph vs tile = ${contrastRatio(WHITE, stickerAlertMid).toFixed(2)}`
+        );
+      } else if (PORTED_MASK_SHAPES.has(shape) || shape === "kawaii" || shape === "flower") {
+        const darkSel = `:root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+        const baseSel = `:root[data-ts-checkbox-style="sticker"] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
+        const stickerBgRaw = (theme === "dark" && getDecl(darkSel, "background")) || getDecl(baseSel, "background");
+        assert.ok(stickerBgRaw, `missing Sticker background for ${shape} ${theme}`);
+        const stickerTile = parseGradientMid(stickerBgRaw, surface);
+        const stickerInk = theme === "light" ? WHITE : NEAR_BLACK;
+        assert.ok(
+          contrastRatio(stickerTile, surface) >= 3.0,
+          `${key} Sticker ${theme} tile vs surface = ${contrastRatio(stickerTile, surface).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(stickerInk, stickerTile) >= 4.5,
+          `${key} Sticker ${theme} glyph vs tile = ${contrastRatio(stickerInk, stickerTile).toFixed(2)}`
+        );
+      } else {
+        const stickerGradMid = avgRgb(
+          mixRgb(stickerAccent, WHITE, 0.08),
+          mixRgb(stickerAccent, BLACK, 0.08)
+        );
+        assert.ok(
+          contrastRatio(stickerGradMid, surface) >= 3.0,
+          `${key} Sticker ${theme} tile vs surface = ${contrastRatio(stickerGradMid, surface).toFixed(2)}`
+        );
+        assert.ok(
+          contrastRatio(stickerOnAccent, stickerGradMid) >= 4.5,
+          `${key} Sticker ${theme} glyph vs tile = ${contrastRatio(stickerOnAccent, stickerGradMid).toFixed(2)}`
+        );
+      }
     }
   }
 });

@@ -261,7 +261,7 @@ test("checkbox size normalization defaults to Large and maps root attribute valu
   assert.equal(checkboxSizeToAttributeValue("invalid"), "large");
 });
 
-test("all 25 built-in statuses meet Solid 3:1 glyph contrast in light and dark", () => {
+test("all 25 built-in statuses meet Solid 3:1 and Sticker 4.5:1 glyph contrast in light and dark", () => {
   const allBuiltins = {
     ...DEFAULT_COLORS,
     SERIES: "#c026d3",
@@ -286,12 +286,36 @@ test("all 25 built-in statuses meet Solid 3:1 glyph contrast in light and dark",
   for (const [key, hex] of Object.entries(allBuiltins)) {
     const palette = buildStatusCheckboxColors({ baseRgb: hexRgb(hex) });
     assert.ok(
+      contrastRatio(palette.lightAccent, palette.lightSurface) >= 3.2,
+      `${key} light accent contrast below 3.2:1`
+    );
+    assert.ok(
+      contrastRatio(palette.darkAccent, palette.darkSurface) >= 3.2,
+      `${key} dark accent contrast below 3.2:1`
+    );
+    assert.ok(
       contrastRatio(hexRgb(palette.lightOnAccentCss), palette.lightAccent) >= 3.0,
       `${key} light Solid on-accent contrast below 3:1`
     );
     assert.ok(
       contrastRatio(hexRgb(palette.darkOnAccentCss), palette.darkAccent) >= 3.0,
       `${key} dark Solid on-accent contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(palette.lightStickerAccent, palette.lightSurface) >= 3.2,
+      `${key} light Sticker accent contrast below 3.2:1`
+    );
+    assert.ok(
+      contrastRatio(palette.darkStickerAccent, palette.darkSurface) >= 3.2,
+      `${key} dark Sticker accent contrast below 3.2:1`
+    );
+    assert.ok(
+      contrastRatio(hexRgb(palette.lightStickerOnAccentCss), palette.lightStickerAccent) >= 4.5,
+      `${key} light Sticker on-accent contrast below 4.5:1`
+    );
+    assert.ok(
+      contrastRatio(hexRgb(palette.darkStickerOnAccentCss), palette.darkStickerAccent) >= 4.5,
+      `${key} dark Sticker on-accent contrast below 4.5:1`
     );
   }
 });

@@ -22,7 +22,7 @@
   --ts-ico-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6Z' fill='black'/%3E%3C/svg%3E");
   --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb923c'/%3E%3Cstop offset='100%25' stop-color='%23ef4444'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gs' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gs)' stroke='%23ffffff' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
-  --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e83232'/%3E%3Cstop offset='100%25' stop-color='%23d42222'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
   --ts-ico-draft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath fill='black' fill-rule='evenodd' d='M4.3 19.7 L5.4 15.1 L15.3 5.2 C16.1 4.4 17.4 4.4 18.2 5.2 L18.8 5.8 C19.6 6.6 19.6 7.9 18.8 8.7 L8.9 18.6 Z M14.1 7.6 L16.4 9.9 L17.3 9 L15 6.7 Z'/%3E %3Cpath d='M12.6 20.2 C14.2 19.2 15.6 21 17.2 20 C18.1 19.4 18.9 19.6 19.8 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E %3C/svg%3E");
   --ts-ico-deadline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cg fill='none' stroke='black' stroke-linecap='round'%3E %3Cpath d='M6 3.4 H18 M6 20.6 H18' stroke-width='2.2'/%3E %3Cpath d='M7.6 3.8 C7.6 8.6 10.9 10.2 10.9 12 C10.9 13.8 7.6 15.4 7.6 20.2 M16.4 3.8 C16.4 8.6 13.1 10.2 13.1 12 C13.1 13.8 16.4 15.4 16.4 20.2' stroke-width='1.7'/%3E %3Cpath d='M12 10.8 V16' stroke-width='0.9'/%3E %3C/g%3E %3Cpath d='M9.3 7.2 H14.7 C14.3 8.8 12.8 9.9 12 10.6 C11.2 9.9 9.7 8.8 9.3 7.2 Z' fill='black'/%3E %3Cpath d='M8.7 19.3 C9.3 17.1 10.9 16.2 12 15.8 C13.1 16.2 14.7 17.1 15.3 19.3 Z' fill='black'/%3E %3C/svg%3E");
@@ -159,7 +159,7 @@
   --ts-ico-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6Z' fill='black'/%3E%3C/svg%3E");
   --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb923c'/%3E%3Cstop offset='100%25' stop-color='%23ef4444'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gs' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gs)' stroke='%23ffffff' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
-  --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e83232'/%3E%3Cstop offset='100%25' stop-color='%23d42222'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
   --ts-ico-draft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath fill='black' fill-rule='evenodd' d='M4.3 19.7 L5.4 15.1 L15.3 5.2 C16.1 4.4 17.4 4.4 18.2 5.2 L18.8 5.8 C19.6 6.6 19.6 7.9 18.8 8.7 L8.9 18.6 Z M14.1 7.6 L16.4 9.9 L17.3 9 L15 6.7 Z'/%3E %3Cpath d='M12.6 20.2 C14.2 19.2 15.6 21 17.2 20 C18.1 19.4 18.9 19.6 19.8 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E %3C/svg%3E");
   --ts-ico-deadline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cg fill='none' stroke='black' stroke-linecap='round'%3E %3Cpath d='M6 3.4 H18 M6 20.6 H18' stroke-width='2.2'/%3E %3Cpath d='M7.6 3.8 C7.6 8.6 10.9 10.2 10.9 12 C10.9 13.8 7.6 15.4 7.6 20.2 M16.4 3.8 C16.4 8.6 13.1 10.2 13.1 12 C13.1 13.8 16.4 15.4 16.4 20.2' stroke-width='1.7'/%3E %3Cpath d='M12 10.8 V16' stroke-width='0.9'/%3E %3C/g%3E %3Cpath d='M9.3 7.2 H14.7 C14.3 8.8 12.8 9.9 12 10.6 C11.2 9.9 9.7 8.8 9.3 7.2 Z' fill='black'/%3E %3Cpath d='M8.7 19.3 C9.3 17.1 10.9 16.2 12 15.8 C13.1 16.2 14.7 17.1 15.3 19.3 Z' fill='black'/%3E %3C/svg%3E");
@@ -175,10 +175,16 @@
   --ts-checkbox-accent-dark: rgb(105, 121, 143);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-sticker-accent-light: rgb(100, 116, 139);
+  --ts-checkbox-sticker-accent-dark: rgb(116, 131, 152);
+  --ts-checkbox-sticker-on-accent-light: #ffffff;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(100, 116, 139, 0.09);
   --ts-checkbox-wash-dark: rgba(100, 116, 139, 0.16);
   --ts-checkbox-accent: var(--ts-checkbox-accent-light);
   --ts-checkbox-on-accent: var(--ts-checkbox-on-accent-light);
+  --ts-checkbox-sticker-accent: var(--ts-checkbox-sticker-accent-light);
+  --ts-checkbox-sticker-on-accent: var(--ts-checkbox-sticker-on-accent-light);
   --ts-checkbox-ink: var(--ts-checkbox-accent);
   --ts-checkbox-wash: var(--ts-checkbox-wash-light);
   --ts-checkbox-beacon-light: rgba(244, 63, 94, 0.52);
@@ -191,6 +197,8 @@
 :root[data-ts-theme="dark"] .rm-checkbox[data-ts-checkbox-status] {
   --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
   --ts-checkbox-on-accent: var(--ts-checkbox-on-accent-dark);
+  --ts-checkbox-sticker-accent: var(--ts-checkbox-sticker-accent-dark);
+  --ts-checkbox-sticker-on-accent: var(--ts-checkbox-sticker-on-accent-dark);
   --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
   --ts-checkbox-beacon: var(--ts-checkbox-beacon-dark);
   --ts-checkbox-focus: var(--svy-accent, var(--cl-blue, #48aff0));
@@ -202,6 +210,10 @@
   --ts-checkbox-accent-dark: rgb(20, 184, 166);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-sticker-accent-light: rgb(17, 155, 139);
+  --ts-checkbox-sticker-accent-dark: rgb(20, 184, 166);
+  --ts-checkbox-sticker-on-accent-light: #10161a;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(20, 184, 166, 0.09);
   --ts-checkbox-wash-dark: rgba(20, 184, 166, 0.16);
 }
@@ -211,6 +223,10 @@
   --ts-checkbox-accent-dark: rgb(234, 179, 8);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-sticker-accent-light: rgb(172, 132, 6);
+  --ts-checkbox-sticker-accent-dark: rgb(234, 179, 8);
+  --ts-checkbox-sticker-on-accent-light: #10161a;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(234, 179, 8, 0.09);
   --ts-checkbox-wash-dark: rgba(234, 179, 8, 0.16);
 }
@@ -220,6 +236,10 @@
   --ts-checkbox-accent-dark: rgb(14, 165, 233);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-sticker-accent-light: rgb(12, 146, 207);
+  --ts-checkbox-sticker-accent-dark: rgb(14, 165, 233);
+  --ts-checkbox-sticker-on-accent-light: #10161a;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(14, 165, 233, 0.09);
   --ts-checkbox-wash-dark: rgba(14, 165, 233, 0.16);
 }
@@ -229,6 +249,10 @@
   --ts-checkbox-accent-dark: rgb(148, 163, 184);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-sticker-accent-light: rgb(126, 139, 157);
+  --ts-checkbox-sticker-accent-dark: rgb(148, 163, 184);
+  --ts-checkbox-sticker-on-accent-light: #10161a;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(148, 163, 184, 0.09);
   --ts-checkbox-wash-dark: rgba(148, 163, 184, 0.16);
 }
@@ -238,6 +262,10 @@
   --ts-checkbox-accent-dark: rgb(100, 103, 241);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-sticker-accent-light: rgb(97, 100, 235);
+  --ts-checkbox-sticker-accent-dark: rgb(111, 114, 242);
+  --ts-checkbox-sticker-on-accent-light: #ffffff;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(99, 102, 241, 0.09);
   --ts-checkbox-wash-dark: rgba(99, 102, 241, 0.16);
 }
@@ -247,6 +275,10 @@
   --ts-checkbox-accent-dark: rgb(244, 63, 94);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-sticker-accent-light: rgb(244, 63, 94);
+  --ts-checkbox-sticker-accent-dark: rgb(244, 63, 94);
+  --ts-checkbox-sticker-on-accent-light: #10161a;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(244, 63, 94, 0.09);
   --ts-checkbox-wash-dark: rgba(244, 63, 94, 0.16);
 }
@@ -256,6 +288,10 @@
   --ts-checkbox-accent-dark: rgb(113, 120, 131);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-sticker-accent-light: rgb(30, 41, 59);
+  --ts-checkbox-sticker-accent-dark: rgb(123, 129, 140);
+  --ts-checkbox-sticker-on-accent-light: #ffffff;
+  --ts-checkbox-sticker-on-accent-dark: #10161a;
   --ts-checkbox-wash-light: rgba(30, 41, 59, 0.09);
   --ts-checkbox-wash-dark: rgba(30, 41, 59, 0.16);
 }
@@ -2177,8 +2213,8 @@
     0 1.5px 3.5px rgba(15, 23, 42, 0.24),
     0 0 0 calc(var(--ts-sticker-rim-width) + 0.5px) rgba(15, 23, 42, 0.09);
   --ts-sticker-tilt: -3deg;
-  --ts-checkbox-ink: var(--ts-checkbox-on-accent);
-  --ts-unmapped-ink: var(--ts-checkbox-on-accent);
+  --ts-checkbox-ink: var(--ts-checkbox-sticker-on-accent, var(--ts-checkbox-on-accent));
+  --ts-unmapped-ink: var(--ts-checkbox-sticker-on-accent, var(--ts-checkbox-on-accent));
 }
 
 :root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"]
@@ -2187,8 +2223,8 @@
   --ts-sticker-shadow:
     0 0 0 var(--ts-sticker-rim-width) var(--ts-sticker-rim),
     0 2px 4px rgba(0, 0, 0, 0.44);
-  --ts-checkbox-ink: var(--ts-checkbox-on-accent);
-  --ts-unmapped-ink: var(--ts-checkbox-on-accent);
+  --ts-checkbox-ink: var(--ts-checkbox-sticker-on-accent, var(--ts-checkbox-on-accent));
+  --ts-unmapped-ink: var(--ts-checkbox-sticker-on-accent, var(--ts-checkbox-on-accent));
 }
 
 :root[data-ts-checkbox-style="sticker"]
@@ -2227,8 +2263,8 @@
   border-radius: 28% !important;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ts-checkbox-accent) 92%, #ffffff),
-    color-mix(in srgb, var(--ts-checkbox-accent) 92%, #000000)
+    color-mix(in srgb, var(--ts-checkbox-sticker-accent, var(--ts-checkbox-accent)) 92%, #ffffff),
+    color-mix(in srgb, var(--ts-checkbox-sticker-accent, var(--ts-checkbox-accent)) 92%, #000000)
   ) !important;
   box-shadow: var(--ts-sticker-shadow) !important;
   transform: rotate(var(--ts-sticker-tilt, -3deg));
@@ -2355,7 +2391,7 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark {
-  background: linear-gradient(180deg, #0891b2, #0e7490) !important;
+  background: linear-gradient(180deg, #0785a4, #0e7490) !important;
 }
 
 :root[data-ts-checkbox-style="sticker"]

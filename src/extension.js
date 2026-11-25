@@ -1038,6 +1038,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
   --ts-checkbox-on-accent-light: ${checkboxValues.lightOnAccentCss};
   --ts-checkbox-on-accent-dark: ${checkboxValues.darkOnAccentCss};
+  --ts-checkbox-sticker-accent-light: ${checkboxValues.lightStickerAccentCss};
+  --ts-checkbox-sticker-accent-dark: ${checkboxValues.darkStickerAccentCss};
+  --ts-checkbox-sticker-on-accent-light: ${checkboxValues.lightStickerOnAccentCss};
+  --ts-checkbox-sticker-on-accent-dark: ${checkboxValues.darkStickerOnAccentCss};
   --ts-checkbox-wash-light: ${checkboxValues.lightWashCss};
   --ts-checkbox-wash-dark: ${checkboxValues.darkWashCss};
   --ts-checkbox-beacon-light: ${checkboxValues.lightBeaconCss};
