@@ -4,7 +4,10 @@ import test from "node:test";
 import { createTaskStatusTextHelpers } from "../src/extension.js";
 import {
   ALERT_BEACON_ATTRIBUTE,
+  CHECKBOX_PILL_HIDDEN_ATTRIBUTE,
   CHECKBOX_SHAPE_ATTRIBUTE,
+  CHECKBOX_SIZE_ATTRIBUTE,
+  CHECKBOX_SIZE_VALUES,
   CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
@@ -17,6 +20,7 @@ import {
   applyManagedStatusPillPresentation,
   buildStatusCheckboxColors,
   buildStatusPillColors,
+  checkboxSizeToAttributeValue,
   checkboxStyleToAttributeValue,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
@@ -35,6 +39,7 @@ import {
   isMediaStatus,
   MEDIA_STATUS_SHAPES,
   isExactManagedStatusPill,
+  normalizeCheckboxSize,
   normalizeCheckboxStyle,
   pickOnAccentColor,
   syncStatusCheckboxForPill,
@@ -203,6 +208,27 @@ test("checkbox style normalization falls back to Outline and maps attribute valu
   assert.equal(pickOnAccentColor({ r: 30, g: 41, b: 59 }), "#ffffff");
   assert.equal(pickOnAccentColor({ r: 244, g: 63, b: 94 }), "#ffffff");
   assert.equal(pickOnAccentColor({ r: 234, g: 179, b: 8 }), "#10161a");
+});
+
+test("checkbox size normalization defaults to Large and maps root attribute values", () => {
+  assert.equal(CHECKBOX_SIZE_ATTRIBUTE, "data-ts-checkbox-size");
+  assert.deepEqual(Object.values(CHECKBOX_SIZE_VALUES), [
+    "Compact",
+    "Medium",
+    "Large",
+    "Extra large",
+  ]);
+  assert.equal(normalizeCheckboxSize("Compact"), "Compact");
+  assert.equal(normalizeCheckboxSize("Medium"), "Medium");
+  assert.equal(normalizeCheckboxSize({ target: { value: "Large" } }), "Large");
+  assert.equal(normalizeCheckboxSize("Extra large"), "Extra large");
+  assert.equal(normalizeCheckboxSize("Huge"), "Large");
+  assert.equal(normalizeCheckboxSize(null), "Large");
+  assert.equal(checkboxSizeToAttributeValue("Compact"), null);
+  assert.equal(checkboxSizeToAttributeValue("Medium"), "medium");
+  assert.equal(checkboxSizeToAttributeValue("Large"), "large");
+  assert.equal(checkboxSizeToAttributeValue("Extra large"), "xlarge");
+  assert.equal(checkboxSizeToAttributeValue("invalid"), "large");
 });
 
 test("all 25 built-in statuses meet Solid 3:1 glyph contrast in light and dark", () => {
@@ -621,6 +647,7 @@ test("checkbox-only presentation hides only after exact checkbox annotation succ
   assert.equal(result.managed, true);
   assert.equal(result.hidden, true);
   assert.equal(checkbox.getAttribute(CHECKBOX_STATUS_ATTRIBUTE), "WAITING");
+  assert.equal(checkbox.getAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE), "true");
   assert.equal(pill.getAttribute(MANAGED_STATUS_PILL_ATTRIBUTE), "true");
   assert.equal(pill.getAttribute(HIDDEN_STATUS_PILL_ATTRIBUTE), "true");
 });

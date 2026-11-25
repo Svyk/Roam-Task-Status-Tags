@@ -2,6 +2,8 @@ export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 export const CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
+export const CHECKBOX_SIZE_ATTRIBUTE = "data-ts-checkbox-size";
+export const CHECKBOX_PILL_HIDDEN_ATTRIBUTE = "data-ts-pill-hidden";
 export const AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
 export const ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 export const STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
@@ -18,6 +20,32 @@ export const CHECKBOX_STYLE_VALUES = Object.freeze({
   SOLID: "Solid",
   MINIMAL: "Minimal",
 });
+
+export const CHECKBOX_SIZE_VALUES = Object.freeze({
+  COMPACT: "Compact",
+  MEDIUM: "Medium",
+  LARGE: "Large",
+  EXTRA_LARGE: "Extra large",
+});
+
+export function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.LARGE) {
+  const candidate =
+    value && typeof value === "object"
+      ? value.target?.value ?? value.currentTarget?.value ?? value.value
+      : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(CHECKBOX_SIZE_VALUES).includes(normalized)
+    ? normalized
+    : fallback;
+}
+
+export function checkboxSizeToAttributeValue(value) {
+  const normalized = normalizeCheckboxSize(value);
+  if (normalized === CHECKBOX_SIZE_VALUES.MEDIUM) return "medium";
+  if (normalized === CHECKBOX_SIZE_VALUES.LARGE) return "large";
+  if (normalized === CHECKBOX_SIZE_VALUES.EXTRA_LARGE) return "xlarge";
+  return null;
+}
 
 export function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
   const candidate =
@@ -406,6 +434,7 @@ export function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
   checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
 }
@@ -562,6 +591,11 @@ export function syncStatusPresentationForPill({
   if (!checkboxResult.annotated) return checkboxResult;
 
   applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  if (hideManagedPill) {
+    checkboxResult.checkbox.setAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE, "true");
+  } else {
+    checkboxResult.checkbox.removeAttribute?.(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
+  }
   const input = checkboxResult.checkbox?.querySelector?.('input[type="checkbox"]');
   const shouldBeacon =
     Boolean(alertBeaconEnabled) &&

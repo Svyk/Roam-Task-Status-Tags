@@ -2165,6 +2165,197 @@
 }
 
 /*
+ * Uniform checkbox scaling (Compact sets no data-ts-checkbox-size attribute and
+ * keeps Roam's native geometry byte-for-byte).
+ * Medium (16px), Large (18px, default), and Extra large (20px) zoom every task
+ * checkbox uniformly on Roam's 12x12 .check-container so plain TODOs, DONE
+ * ticks, status tiles, glyphs, beacons, and animations scale together without
+ * changing line height or shifting the first line.
+ */
+:root[data-ts-checkbox-size="medium"] .rm-checkbox > .check-container {
+  zoom: 1.333333;
+  vertical-align: -1.8px;
+}
+
+:root[data-ts-checkbox-size="large"] .rm-checkbox > .check-container {
+  zoom: 1.5;
+  vertical-align: -2.25px;
+}
+
+:root[data-ts-checkbox-size="xlarge"] .rm-checkbox > .check-container {
+  zoom: 1.666667;
+  vertical-align: -2.65px;
+}
+
+:root[data-ts-checkbox-size] .rm-checkbox {
+  --ts-size-tile-border-width: 1.25px;
+  margin-right: 3.2px;
+}
+
+:root[data-ts-checkbox-size]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+  margin-right: -0.6px;
+}
+
+:root[data-ts-checkbox-size]
+  .rm-checkbox[data-ts-checkbox-status]
+  > .check-container::after {
+  inset: 0;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-width: var(--ts-size-tile-border-width, 1.25px) !important;
+  border-radius: 30% !important;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 30% !important;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 40% 40% 40% 12% !important;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 18% 44% 18% 18% !important;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-radius: 30% !important;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  width: 64%;
+  height: 64%;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  width: 58%;
+  height: 58%;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="custom"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  width: 50%;
+  height: 50%;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  width: 82%;
+  height: 82%;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="custom"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  width: 62%;
+  height: 62%;
+}
+
+/* Keep chooser row icons (16px) and extension UI previews unzoomed. */
+:root[data-ts-checkbox-size] .ts-status-chooser .rm-checkbox,
+:root[data-ts-checkbox-size] .ts-style-preview .rm-checkbox,
+:root[data-ts-checkbox-size] .ts-rendered-icon .rm-checkbox,
+:root[data-ts-checkbox-size] .ts-status-names-panel .rm-checkbox {
+  --ts-size-tile-border-width: 1.6px;
+  margin-right: 0;
+}
+
+:root[data-ts-checkbox-size] .ts-status-chooser .rm-checkbox > .check-container,
+:root[data-ts-checkbox-size] .ts-style-preview .rm-checkbox > .check-container,
+:root[data-ts-checkbox-size] .ts-rendered-icon .rm-checkbox > .check-container,
+:root[data-ts-checkbox-size] .ts-status-names-panel .rm-checkbox > .check-container {
+  zoom: 1;
+  vertical-align: baseline;
+}
+
+/*
  * Adapted from BetterTask by imhalid (MIT). See THIRD_PARTY_NOTICES.md.
  * Ambient looping motion for mapped statuses in Glass, Solid, and Minimal only.
  * Animates transform, opacity, and filter only; Outline stays still except Alert beacon.

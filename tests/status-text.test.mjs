@@ -58,6 +58,30 @@ test("removes slash command fragments before applying status", () => {
   );
 });
 
+test("applying status after a leading slash command or leading spaces never leaves two spaces after the tag", () => {
+  const input = "/task status: Active Buy milk";
+  const start = input.indexOf("task status");
+  const end = start + "task status: Active".length;
+  const withoutSlash = helpers.removeSlashCommandFragment(input, [start, end]);
+  assert.equal(withoutSlash, " Buy milk");
+  assert.equal(
+    helpers.applyStatusToText(withoutSlash, "ACTIVE"),
+    "{{[[TODO]]}} #[[task-status/Active]] Buy milk"
+  );
+  assert.equal(
+    helpers.applyStatusToText("  Buy milk", "WAITING"),
+    "{{[[TODO]]}} #[[task-status/Waiting]] Buy milk"
+  );
+  assert.equal(
+    helpers.applyStatusToText("   ", "ACTIVE"),
+    "{{[[TODO]]}} #[[task-status/Active]]"
+  );
+  assert.equal(
+    helpers.applyStatusToText("{{[[TODO]]}}  #[[task-status/Active]]  Buy milk", "WAITING"),
+    "{{[[TODO]]}} #[[task-status/Waiting]] Buy milk"
+  );
+});
+
 test("ignores non-canonical status tags in the managed slot", () => {
   const canonicalHelpers = createTaskStatusTextHelpers({
     cycleOrder: ["ACTIVE", "WAITING"],

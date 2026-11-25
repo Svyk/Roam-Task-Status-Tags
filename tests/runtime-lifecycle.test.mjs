@@ -264,6 +264,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
         [
           "task-status-theme",
           "task-status-checkbox-style",
+          "task-status-checkbox-size",
           "task-status-style-preview",
           "task-status-style-native-checkboxes",
           "task-status-label-display",
@@ -342,6 +343,22 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
       styleSetting.action.onChange("Solid");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
+
+      const sizeSetting = latestPanelConfig.settings.find(
+        (entry) => entry.id === "task-status-checkbox-size"
+      );
+      assert.equal(sizeSetting.name, "Checkbox size");
+      assert.equal(sizeSetting.action.type, "select");
+      assert.deepEqual(sizeSetting.action.items, ["Compact", "Medium", "Large", "Extra large"]);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "large");
+      sizeSetting.action.onChange("Compact");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), null);
+      sizeSetting.action.onChange("Medium");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "medium");
+      sizeSetting.action.onChange("Extra large");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "xlarge");
+      sizeSetting.action.onChange("unknown-size");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "large");
 
       const previewSetting = latestPanelConfig.settings.find(
         (entry) => entry.id === "task-status-style-preview"
@@ -452,6 +469,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(windowLike.__svyk_roamTaskStatusTags, undefined);
       assert.equal(document.documentElement.getAttribute("data-ts-theme"), null);
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), null);
       assert.equal(document.documentElement.getAttribute("data-ts-ambient-motion"), null);
       assert.equal(activeTimers.size, 0);
       assert.ok(observed.every((observer) => observer.disconnected));

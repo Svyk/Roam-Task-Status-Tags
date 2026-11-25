@@ -54,10 +54,13 @@ import {
   buildStatusCheckboxColors,
   buildStatusPillColors,
   CHECKBOX_SHAPE_ATTRIBUTE,
+  CHECKBOX_SIZE_ATTRIBUTE,
+  CHECKBOX_SIZE_VALUES,
   CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
   CHECKBOX_UID_ATTRIBUTE,
+  checkboxSizeToAttributeValue,
   checkboxStyleToAttributeValue,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
@@ -66,6 +69,7 @@ import {
   getStatusCheckboxShape,
   getStatusGroup,
   isMediaStatus,
+  normalizeCheckboxSize,
   normalizeCheckboxStyle,
   relativeLuminance,
   syncStatusPresentationForPill,
@@ -423,7 +427,7 @@ export function createTaskStatusTextHelpers(options = {}) {
 
     const status = statuses?.[statusKey];
     const statusTag = status ? `#[[${status.tagTitle}]]` : "";
-    const body = parsed.managed ? parsed.body : original;
+    const body = parsed.managed ? parsed.body : stripPrefixSeparator(original);
     const leading = parsed.managed ? parsed.leading : "";
 
     return joinManagedPrefix({
@@ -618,6 +622,7 @@ function createTaskStatusExtension({
     statusColorOverrides: "status-color-overrides",
     theme: "task-status-theme",
     checkboxStyle: "task-status-checkbox-style",
+    checkboxSize: "task-status-checkbox-size",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -716,6 +721,7 @@ function createTaskStatusExtension({
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let themeSetting = loadThemeSetting();
   let checkboxStyleSetting = loadCheckboxStyleSetting();
+  let checkboxSizeSetting = loadCheckboxSizeSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -1086,6 +1092,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeCheckboxStyle(parseMaybeJson(raw), fallback);
+  }
+
+  function loadCheckboxSizeSetting() {
+    const fallback = CHECKBOX_SIZE_VALUES.LARGE;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxSize);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.checkboxSize, fallback);
+      return fallback;
+    }
+    return normalizeCheckboxSize(parseMaybeJson(raw), fallback);
   }
 
   function loadStatusLabelDisplaySetting() {
@@ -1936,6 +1953,26 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setCheckboxStyleSetting(nextValue) {
     checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
     syncDocumentCheckboxStyle();
+    notifyStylePreviewListeners();
+  }
+
+  function syncDocumentCheckboxSize() {
+    const attrValue = checkboxSizeToAttributeValue(checkboxSizeSetting);
+    const root = document?.documentElement;
+    if (!root) return attrValue;
+    if (attrValue) {
+      if (root.getAttribute?.(CHECKBOX_SIZE_ATTRIBUTE) !== attrValue) {
+        root.setAttribute?.(CHECKBOX_SIZE_ATTRIBUTE, attrValue);
+      }
+    } else {
+      root.removeAttribute?.(CHECKBOX_SIZE_ATTRIBUTE);
+    }
+    return attrValue;
+  }
+
+  function setCheckboxSizeSetting(nextValue) {
+    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.LARGE);
+    syncDocumentCheckboxSize();
     notifyStylePreviewListeners();
   }
 
@@ -4487,6 +4524,17 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           },
         },
         {
+          id: SETTINGS_KEYS.checkboxSize,
+          name: "Checkbox size",
+          description:
+            "Applies to every task checkbox (status icons, plain TODOs, and DONE boxes) so the text stays lined up.",
+          action: {
+            type: "select",
+            items: Object.values(CHECKBOX_SIZE_VALUES),
+            onChange: (value) => setCheckboxSizeSetting(value),
+          },
+        },
+        {
           id: "task-status-style-preview",
           name: "Style preview",
           description: "Live preview of the chosen checkbox style and theme.",
@@ -4598,6 +4646,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function init(isActive = () => true) {
     syncDocumentTheme();
     syncDocumentCheckboxStyle();
+    syncDocumentCheckboxSize();
     syncDocumentAmbientMotion();
 
     portalRoot = document.createElement("div");
@@ -4717,6 +4766,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
     document?.documentElement?.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
+    document?.documentElement?.removeAttribute?.(CHECKBOX_SIZE_ATTRIBUTE);
     document?.documentElement?.removeAttribute?.(AMBIENT_MOTION_ATTRIBUTE);
     repeatStatusReset.dispose();
 

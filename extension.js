@@ -5,6 +5,8 @@ var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
 var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
+var CHECKBOX_SIZE_ATTRIBUTE = "data-ts-checkbox-size";
+var CHECKBOX_PILL_HIDDEN_ATTRIBUTE = "data-ts-pill-hidden";
 var AMBIENT_MOTION_ATTRIBUTE = "data-ts-ambient-motion";
 var ALERT_BEACON_ATTRIBUTE = "data-ts-alert-beacon";
 var STATUS_POP_ATTRIBUTE = "data-ts-status-pop";
@@ -20,6 +22,24 @@ var CHECKBOX_STYLE_VALUES = Object.freeze({
   SOLID: "Solid",
   MINIMAL: "Minimal"
 });
+var CHECKBOX_SIZE_VALUES = Object.freeze({
+  COMPACT: "Compact",
+  MEDIUM: "Medium",
+  LARGE: "Large",
+  EXTRA_LARGE: "Extra large"
+});
+function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.LARGE) {
+  const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
+  const normalized = String(candidate || "").trim();
+  return Object.values(CHECKBOX_SIZE_VALUES).includes(normalized) ? normalized : fallback;
+}
+function checkboxSizeToAttributeValue(value) {
+  const normalized = normalizeCheckboxSize(value);
+  if (normalized === CHECKBOX_SIZE_VALUES.MEDIUM) return "medium";
+  if (normalized === CHECKBOX_SIZE_VALUES.LARGE) return "large";
+  if (normalized === CHECKBOX_SIZE_VALUES.EXTRA_LARGE) return "xlarge";
+  return null;
+}
 function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
   const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
   const normalized = String(candidate || "").trim();
@@ -335,6 +355,7 @@ function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
   checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
 }
@@ -456,6 +477,11 @@ function syncStatusPresentationForPill({
   });
   if (!checkboxResult.annotated) return checkboxResult;
   applyManagedStatusPillPresentation(statusPill, { hidden: hideManagedPill });
+  if (hideManagedPill) {
+    checkboxResult.checkbox.setAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE, "true");
+  } else {
+    checkboxResult.checkbox.removeAttribute?.(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
+  }
   const input = checkboxResult.checkbox?.querySelector?.('input[type="checkbox"]');
   const shouldBeacon = Boolean(alertBeaconEnabled) && checkboxResult.statusKey === "ALERT" && input?.checked === false;
   if (shouldBeacon) {
@@ -5515,7 +5541,7 @@ function createTaskStatusTextHelpers(options = {}) {
     const parsed = parseManagedPrefix(original);
     const status = statuses?.[statusKey];
     const statusTag = status ? `#[[${status.tagTitle}]]` : "";
-    const body = parsed.managed ? parsed.body : original;
+    const body = parsed.managed ? parsed.body : stripPrefixSeparator(original);
     const leading = parsed.managed ? parsed.leading : "";
     return joinManagedPrefix({
       leading,
@@ -5676,6 +5702,7 @@ function createTaskStatusExtension({
     statusColorOverrides: "status-color-overrides",
     theme: "task-status-theme",
     checkboxStyle: "task-status-checkbox-style",
+    checkboxSize: "task-status-checkbox-size",
     styleNativeCheckboxes: "task-status-style-native-checkboxes",
     statusLabelDisplay: "task-status-label-display",
     alertBeacon: "task-status-alert-beacon",
@@ -5767,6 +5794,7 @@ function createTaskStatusExtension({
   let statusColorOverrides = loadObjectSetting(SETTINGS_KEYS.statusColorOverrides, {});
   let themeSetting = loadThemeSetting();
   let checkboxStyleSetting = loadCheckboxStyleSetting();
+  let checkboxSizeSetting = loadCheckboxSizeSetting();
   let checkboxStylingEnabled = loadBooleanSetting(
     SETTINGS_KEYS.styleNativeCheckboxes,
     true
@@ -6089,6 +6117,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       return fallback;
     }
     return normalizeCheckboxStyle(parseMaybeJson(raw), fallback);
+  }
+  function loadCheckboxSizeSetting() {
+    const fallback = CHECKBOX_SIZE_VALUES.LARGE;
+    if (!extensionAPI?.settings?.get) return fallback;
+    const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxSize);
+    if (raw === null || typeof raw === "undefined") {
+      saveSetting(SETTINGS_KEYS.checkboxSize, fallback);
+      return fallback;
+    }
+    return normalizeCheckboxSize(parseMaybeJson(raw), fallback);
   }
   function loadStatusLabelDisplaySetting() {
     const fallback = STATUS_LABEL_DISPLAY.CHECKBOX_ONLY;
@@ -6792,6 +6830,24 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   function setCheckboxStyleSetting(nextValue) {
     checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
     syncDocumentCheckboxStyle();
+    notifyStylePreviewListeners();
+  }
+  function syncDocumentCheckboxSize() {
+    const attrValue = checkboxSizeToAttributeValue(checkboxSizeSetting);
+    const root = document?.documentElement;
+    if (!root) return attrValue;
+    if (attrValue) {
+      if (root.getAttribute?.(CHECKBOX_SIZE_ATTRIBUTE) !== attrValue) {
+        root.setAttribute?.(CHECKBOX_SIZE_ATTRIBUTE, attrValue);
+      }
+    } else {
+      root.removeAttribute?.(CHECKBOX_SIZE_ATTRIBUTE);
+    }
+    return attrValue;
+  }
+  function setCheckboxSizeSetting(nextValue) {
+    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.LARGE);
+    syncDocumentCheckboxSize();
     notifyStylePreviewListeners();
   }
   function syncDocumentAmbientMotion() {
@@ -8967,6 +9023,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           }
         },
         {
+          id: SETTINGS_KEYS.checkboxSize,
+          name: "Checkbox size",
+          description: "Applies to every task checkbox (status icons, plain TODOs, and DONE boxes) so the text stays lined up.",
+          action: {
+            type: "select",
+            items: Object.values(CHECKBOX_SIZE_VALUES),
+            onChange: (value) => setCheckboxSizeSetting(value)
+          }
+        },
+        {
           id: "task-status-style-preview",
           name: "Style preview",
           description: "Live preview of the chosen checkbox style and theme.",
@@ -9068,6 +9134,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   async function init(isActive = () => true) {
     syncDocumentTheme();
     syncDocumentCheckboxStyle();
+    syncDocumentCheckboxSize();
     syncDocumentAmbientMotion();
     portalRoot = document.createElement("div");
     portalRoot.className = "ts-status-portal";
@@ -9170,6 +9237,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     stopThemeObserver();
     document?.documentElement?.removeAttribute?.(THEME_ATTRIBUTE);
     document?.documentElement?.removeAttribute?.(CHECKBOX_STYLE_ATTRIBUTE);
+    document?.documentElement?.removeAttribute?.(CHECKBOX_SIZE_ATTRIBUTE);
     document?.documentElement?.removeAttribute?.(AMBIENT_MOTION_ATTRIBUTE);
     repeatStatusReset.dispose();
     clearStatusColorOverrides();

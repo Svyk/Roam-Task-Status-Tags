@@ -454,6 +454,30 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.match(css, /:root\[data-ts-checkbox-style="glass"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="solid"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="minimal"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-size="medium"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-size="large"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-size="xlarge"\]/);
+
+  // Every data-ts-checkbox-size selector is gated by :root[...data-ts-checkbox-size...]
+  // and ends on .rm-checkbox or its descendants.
+  const sizeRuleHeaders = [
+    ...stripped.matchAll(/([^{}@]*data-ts-checkbox-size[^{}@]*)\{/g),
+  ].map((match) => match[1].trim());
+  assert.ok(sizeRuleHeaders.length > 0, "expected checkbox size rules");
+  for (const header of sizeRuleHeaders) {
+    for (const selector of header.split(",").map((part) => part.trim()).filter(Boolean)) {
+      assert.match(
+        selector,
+        /^:root(?:\[data-ts-theme="dark"\])?\[data-ts-checkbox-size(?:="(?:medium|large|xlarge)")?\]/,
+        `checkbox size selector must be gated by :root[data-ts-checkbox-size...]: ${selector}`
+      );
+      assert.match(
+        selector,
+        /\.rm-checkbox(?:\.rm-todo)?(?:\[[^\]]+\])*(?::not\([^)]+\))?\s*(?:>\s*[^,]+)?$/,
+        `checkbox size selector must end on .rm-checkbox or its descendant: ${selector}`
+      );
+    }
+  }
   assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-on-accent\)/);
   assert.match(css, /@media print[\s\S]*:root\[data-ts-checkbox-style\]/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*:root\[data-ts-checkbox-style\]/);
