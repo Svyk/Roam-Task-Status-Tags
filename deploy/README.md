@@ -1,6 +1,6 @@
 # Roam Task Status Tags
 
-Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's native `{{[[TODO]]}}` and `{{[[DONE]]}}` checkboxes intact. Each status is stored as a single `#[[task-status/<Name>]]` tag on the task line, so Roam queries, backlinks, and exports continue to work. Unchecked checkboxes show a color-and-shape icon in your choice of four styles, and checked tasks return to your Roam theme.
+Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's native `{{[[TODO]]}}` and `{{[[DONE]]}}` checkboxes intact. Each status is stored as a single `#[[task-status/<Name>]]` tag on the task line, so Roam queries, backlinks, and exports continue to work. Unchecked checkboxes show a color-and-shape icon in your choice of five styles and four sizes, and checked tasks return to your Roam theme.
 
 ```text
 {{[[TODO]]}} #[[task-status/Active]] Call landlord about repairs
@@ -18,17 +18,19 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 2. Type `/task status: Active` or run `Task Status: Set Active` from the command palette.
 3. Hover or focus the styled checkbox to reveal its status label in the left gutter.
 4. Click the revealed label (or press `Enter` / `Alt+ArrowDown`) to open the chooser, then press `1` to `9` to pick a status or `0` to clear it.
-5. Open **Settings…** at the bottom of the chooser (or run `Task Status: Open settings`) to pick a theme, choose a checkbox style with live preview, toggle **Animate status changes** or **Animate status icons**, or click **Add more statuses** to add eleven extra statuses.
+5. Open **Settings…** at the bottom of the chooser (or run `Task Status: Open settings`) to pick a theme, choose a checkbox style and size with live preview, toggle **Animate status changes** or **Animate status icons**, or add optional extras one by one from the **More statuses** gallery.
 
 ## Checkbox Styles & Effects
 
-- **Outline** (default): colored border and subtle tinted wash with a centered status glyph, unchanged from v0.14.0 for built-in statuses.
-- **Glass**: translucent frosted icon tiles with colored gradient strokes, soft outer glow, and per-status silhouettes.
+- **Glass** (default): translucent frosted icon tiles with colored gradient strokes, soft outer glow, and per-status silhouettes.
+- **Outline**: colored border and subtle tinted wash with a centered status glyph, unchanged from v0.14.0 for built-in statuses.
 - **Solid**: saturated app-icon tiles with vivid top-to-bottom gradients, crisp inner highlights, and white glyphs.
 - **Minimal**: bare vector status glyphs with no box and a soft tinted wash on hover.
-- **Eleven extra statuses**: opt-in via **Add more statuses** in settings (Important, Starred, Discuss, Billable, Bug, Draft, Deadline, Kawaii, Flower, Sun, Moon).
-- **Animate status icons**: subtle looping ambient motion on Glass, Solid, and Minimal icons, on by default and disabled under reduced motion, forced colors, and print.
-- **Transition bursts**: per-status particle bursts drawn on a lightweight canvas when this extension sets or changes an unchecked status in Glass, Solid, or Minimal (Outline keeps its CSS pop).
+- **Sticker**: opaque die-cut vinyl tiles with a 1.5px paper rim (warm off-white on dark themes, white with a soft drop shadow on light themes), stable per-block tilt, hover straighten-and-lift, and a slap landing animation on status change.
+- **Checkbox size**: `Compact` (14px, Roam's own), `Medium` (16px), `Large` (18px, default), and `Extra large` (20px) scale status tiles, plain TODOs, and DONE boxes together while keeping a steady 7px gap to text and unchanged 29px line height.
+- **Eleven extra statuses**: opt-in one at a time via the visual **More statuses** gallery in settings (with an **Add all** shortcut) for Important, Starred, Discuss, Billable, Bug, Draft, Deadline, Kawaii, Flower, Sun, and Moon.
+- **Animate status icons**: subtle looping ambient motion on Glass, Solid, and Minimal icons, plus Sticker hover straighten/lift and slap landing; on by default and disabled under reduced motion, forced colors, and print.
+- **Transition bursts**: per-status particle bursts drawn on a lightweight canvas when this extension sets or changes an unchecked status in Glass, Solid, or Minimal (Outline keeps its CSS pop; Sticker uses its slap landing).
 
 Works with or without Better Tasks. Without Better Tasks, status tags, checkbox styles, ambient icon motion, transition bursts, the chooser, the episode counter, and the Watching now panel work directly on Roam blocks. When Better Tasks is installed, status writes route through Better Tasks, repeating tasks reset their status on the next occurrence, and Waiting or In Review can set a follow-up due date.
 
@@ -294,19 +296,20 @@ A read-only panel that lists open tasks grouped by status.
 Open `Settings -> Extensions -> Task Status Tags`, pick **Settings…** at the bottom of the chooser, or run `Task Status: Open settings` from the command palette.
 
 - `Theme` matches your Roam theme (`Follow Roam`, default) or forces `Light` or `Dark`.
-- `Checkbox style` selects `Outline`, `Glass`, `Solid`, or `Minimal`, with a live **Style preview** row directly underneath.
+- `Checkbox style` selects `Outline`, `Glass` (default), `Solid`, `Minimal`, or `Sticker`, with a live **Style preview** strip underneath showing every active status.
+- `Checkbox size` selects `Compact` (14px), `Medium` (16px), `Large` (18px, default), or `Extra large` (20px) and applies to every task checkbox so text stays lined up.
 - `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
 - `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
 - `Animate Alert status` toggles the attention pulse on unchecked Alert tasks.
-- `Animate status changes` (on by default) toggles the canvas transition burst in Glass / Solid / Minimal (or CSS pop in Outline) played when this extension sets or changes an unchecked task's status.
-- `Animate status icons` (on by default) toggles subtle looping ambient motion on status icons in Glass, Solid, and Minimal (disabled under reduced motion, forced colors, and print, and always off in Outline).
+- `Animate status changes` (on by default) toggles the canvas transition burst in Glass / Solid / Minimal (or CSS pop in Outline; slap landing in Sticker) played when this extension sets or changes an unchecked task's status.
+- `Animate status icons` (on by default) toggles subtle looping ambient motion on status icons in Glass, Solid, and Minimal, and hover/slap motion in Sticker (disabled under reduced motion, forced colors, and print, and always off in Outline).
 - `Ask for a follow-up date on Waiting / In Review` (on by default) turns the follow-up date prompt on or off (needs Better Tasks).
 - `Let AI agents read and set statuses` (on by default) offers read and status-change tools to AI agents connected to this graph, using the same checks and routing as the chooser.
 - `Statuses kept on the next repeat` lists the statuses that carry over to the next occurrence of a repeating Better Tasks task. Every other status is removed from the new occurrence.
 
 Statuses:
 
-- Add a status, or click **Add more statuses** to append the eleven optional extra statuses.
+- Add a custom status, or click any chip in the **More statuses** gallery (or **Add all**) to add from the eleven optional extra statuses.
 - Edit a status name.
 - Drag the handle to reorder statuses.
 - Use the row action menu (`...`) to delete a status.

@@ -1000,7 +1000,7 @@ test("AI agent tools register with setting, enforce agent guards, attribute user
   let mod = null;
   try {
     mod = await import(`../src/extension.js?ai-lifecycle=${Date.now()}`);
-    await mod.onload({ extensionAPI, extension: { version: "0.17.0" } });
+    await mod.onload({ extensionAPI, extension: { version: "0.18.0" } });
 
     assert.deepEqual([...registeredTools.keys()], [
       "list_statuses",

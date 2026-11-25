@@ -264,3 +264,43 @@ The clean-room boundary in section 1 is superseded for BetterTask for Thymer (`g
 - Hashtag-on-top-of-base-status coupling (Roam Task Status Tags keeps one managed `#[[task-status/<Name>]]` tag per task).
 - Smart Markdown task paste, hashtag chip toning, Thymer autocomplete dropdown styling, upstream's settings page, and upstream commands.
 
+## 13. Size and proportion (RTS-10, 2026-11-24)
+
+### Measured baseline (v0.17.0, Glass, dark)
+
+- Block text: Inter 14px, line-height 21px (`cap-height` 10.2px, `x-height` 7.6px). Block height: `min-height: 29px`, `padding: 4px 0`, `white-space: pre-wrap`.
+- `.rm-checkbox` is `display: inline` (12px wide); `.check-container` is a 12x12 `inline-block` (`position: relative`, `vertical-align: baseline`, `line-height: 14px`); `.checkmark` sits at `top: -1px; left: -1px` as a 14x14 tile centred at 14.5px inside the 29px block.
+- Inner glyph height ranged from 8.5px (Waiting) to 13.4px (Alert). At `devicePixelRatio` 1.095 (1x display with mild zoom), an 8.5px glyph renders in roughly 9 device pixels.
+- Gap from the tile's right edge to the first visible letter varied by source whitespace: ~3px on a plain TODO (one space), ~6.9px on a status task with a hidden prefix tag (two spaces), and ~10.9px if an extra space was left after the tag.
+- The 11 optional extra statuses were hidden behind an unlabeled button and missed in normal use.
+
+### Evidence
+
+1. **Legge & Bigelow (2011, J. Vision):** fluent reading needs x-height >= 0.2 degrees. At the CSS reference pixel (0.0213 deg/px), an 8.5px glyph is 0.18 deg; keeping the glyph at or above text cap height (10.2px) requires a tile of at least 17px.
+2. **Lindberg & Nasanen (2003, Displays):** icon search slows below ~0.7 degrees while extra inter-icon spacing adds little; larger tiles inside the existing line height beat extra whitespace.
+3. **Stevens' power law (area exponent ~0.7-0.8):** 14 to 16px looks ~20% larger; 14 to 18px looks ~40% larger.
+4. **Carter & Silverstein (2010, J. SID) & Ware:** colour discriminability falls on small targets, favouring filled/frosted area (Glass, Solid, Sticker) over hairlines.
+5. **Bouma (1970); Pelli & Tillman (2008):** parafoveal crowding preserves coarse silhouette and colour area, not fine interior detail.
+6. **WCAG 2.2 (1.4.11 & 1.4.1):** 3:1 non-text contrast for tile/stroke vs surface and 3:1 (4.5:1 on solid fills like Solid/Sticker) for glyph vs tile; colour is never the sole cue.
+7. **24-unit pixel grid:** at 18px one grid unit is 0.75 CSS px (1.5 device px at 2x), placing 2-unit strokes cleanly on whole pixels (1.5 CSS px minimum stroke at Large). 16px and 20px do not divide 24 evenly.
+8. **Hick-Hyman:** choice time and command-palette noise scale with option count, so extras remain opt-in one at a time via a visual **More statuses** gallery rather than enabled by default.
+
+### Final numbers and decisions (v0.18.0)
+
+- **Setting `task-status-checkbox-size` ("Checkbox size"):** `Compact` (14px, no root attribute, byte-for-byte v0.17.0 geometry), `Medium` (16px, `data-ts-checkbox-size="medium"`), `Large` (18px, default, `data-ts-checkbox-size="large"`), `Extra large` (20px, `data-ts-checkbox-size="xlarge"`). Removed on unload.
+- **Scaling mechanism:** uniform CSS `zoom` on `.rm-checkbox > .check-container` keyed to the native 14px `.checkmark` base so plain TODO boxes, DONE theme ticks, Outline, Glass, Solid, Minimal, and Sticker tiles all scale identically:
+  - `Medium`: `zoom: 1.1429` (`16/14`), `vertical-align: -1.15px`, `margin-right: 4.35px` (plain/DONE) / `0.55px` (hidden-pill status).
+  - `Large` (default): `zoom: 1.2858` (`18/14`), `vertical-align: -1.7px`, `margin-right: 4.5px` (plain/DONE) / `0.7px` (hidden-pill status).
+  - `Extra large`: `zoom: 1.4286` (`20/14`), `vertical-align: -2.15px`, `margin-right: 4.65px` (plain/DONE) / `0.85px` (hidden-pill status).
+  - Click target (`> .check-container::after`): `inset: -1px`, matching the exact zoomed 14px tile (16/18/20px) with zero dead zone and zero slop into the first letter. Chooser icons (16px) and settings previews reset to `zoom: 1`.
+- **Measured in headless Chromium (Inter 14px/21px, 29px block, `white-space: pre-wrap`):**
+  - Tile outer size (TODO / DONE / status, all 5 styles): Compact `14.00px`, Medium `15.98-16.00px`, Large `17.98-18.00px`, Extra large `19.98-20.00px`.
+  - One-line block height: `29.00px` with and without scaling at all four sizes; wrapped block first-line vertical shift: `0.00px`.
+  - Tile centre offset from line-box centre (14.5px): Compact `-0.50px`, Medium `-0.03 to -0.04px`, Large `-0.03 to -0.04px`, Extra large `0.00 to -0.01px`.
+  - Gap to first letter (TODO / DONE / hidden-pill status): Compact `2.80 / 2.80 / 6.59px` (unchanged); Medium `6.98 / 6.98 / 6.98-7.00px`; Large `7.00 / 7.00 / 6.98-7.00px`; Extra large `7.00 / 7.00 / 7.00-7.02px`.
+  - Burst canvas centre offset: `0.00-0.01px` across all four sizes (`.checkmark.getBoundingClientRect()` returns scaled viewport coordinates directly).
+- **Default style:** `Glass` is now the fallback style for installs with no saved value; saved values are never altered.
+- **Fifth style `Sticker`:** opaque die-cut tiles with a 1.5px neutral paper rim (`#ffffff` + soft drop shadow on light; `#f4efe6` on dark), per-block deterministic tilt (`-5deg`, `-2.5deg`, `+2.5deg`, `+5deg`), hover straighten/lift and slap landing gated by `task-status-ambient-motion` and reduced motion, and dedicated contrast-certified Sticker fills/inks (`>= 3:1` vs surface, `>= 4.5:1` glyph vs tile across all 25 statuses and custom statuses) without altering the four existing styles.
+- **More statuses gallery:** replaces the single bulk button with per-extra preview chips (plus an **Add all** button); the settings **Style preview** strip wraps and shows every active status.
+
+

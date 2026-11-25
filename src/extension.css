@@ -2248,12 +2248,7 @@
 }
 
 :root[data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark,
-:root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container
   > input:not(:checked)
   ~ .checkmark {
@@ -2270,23 +2265,40 @@
   transform: rotate(var(--ts-sticker-tilt, -3deg));
 }
 
+:root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-width: 0 !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ts-checkbox-sticker-accent, var(--ts-checkbox-accent)) 92%, #ffffff),
+    color-mix(in srgb, var(--ts-checkbox-sticker-accent, var(--ts-checkbox-accent)) 92%, #000000)
+  ) !important;
+  box-shadow: var(--ts-sticker-shadow) !important;
+  transform: rotate(var(--ts-sticker-tilt, -3deg));
+}
+
 :root[data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:hover
   > input:not(:checked)
   ~ .checkmark,
 :root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:hover
   > input:not(:checked)
   ~ .checkmark,
 :root[data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:active
   > input:not(:checked)
   ~ .checkmark,
 :root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:active
   > input:not(:checked)
   ~ .checkmark {
@@ -2878,12 +2890,12 @@
 
 /* Sticker hover straighten and lift (gated by ambient motion) */
 :root[data-ts-checkbox-style="sticker"][data-ts-ambient-motion="on"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:hover
   > input:not(:checked)
   ~ .checkmark,
 :root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"][data-ts-ambient-motion="on"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:hover
   > input:not(:checked)
   ~ .checkmark {
@@ -2891,12 +2903,12 @@
 }
 
 :root[data-ts-checkbox-style="sticker"][data-ts-ambient-motion="on"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:active
   > input:not(:checked)
   ~ .checkmark,
 :root[data-ts-theme="dark"][data-ts-checkbox-style="sticker"][data-ts-ambient-motion="on"]
-  .rm-checkbox[data-ts-checkbox-status]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape]
   > .check-container:active
   > input:not(:checked)
   ~ .checkmark {
