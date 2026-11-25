@@ -27,6 +27,7 @@ import {
   clearOwnedStatusPillPresentations,
   clearStatusCheckboxAnnotation,
   clearStatusPillPresentation,
+  compositeRgb,
   computeStickerTiltSlot,
   contrastRatio,
   countExactStatusTagOccurrences,
@@ -261,7 +262,7 @@ test("checkbox size normalization defaults to Medium and maps root attribute val
   assert.equal(checkboxSizeToAttributeValue("invalid"), "medium");
 });
 
-test("all 25 built-in statuses meet Solid 3:1 and Sticker 4.5:1 glyph contrast in light and dark", () => {
+test("all 25 built-in statuses + custom meet Outline 3:1 wash and Solid & Sticker 4.5:1 glyph contrast", () => {
   const allBuiltins = {
     ...DEFAULT_COLORS,
     SERIES: "#c026d3",
@@ -282,9 +283,13 @@ test("all 25 built-in statuses meet Solid 3:1 and Sticker 4.5:1 glyph contrast i
     FLOWER: "#e879f9",
     SUN: "#f59e0b",
     MOON: "#818cf8",
+    CUSTOM: "#64748b",
   };
   for (const [key, hex] of Object.entries(allBuiltins)) {
-    const palette = buildStatusCheckboxColors({ baseRgb: hexRgb(hex) });
+    const baseRgb = hexRgb(hex);
+    const palette = buildStatusCheckboxColors({ baseRgb });
+    const lightWash = compositeRgb(baseRgb, palette.lightSurface, 0.09);
+    const darkWash = compositeRgb(baseRgb, palette.darkSurface, 0.16);
     assert.ok(
       contrastRatio(palette.lightAccent, palette.lightSurface) >= 3.2,
       `${key} light accent contrast below 3.2:1`
@@ -294,12 +299,36 @@ test("all 25 built-in statuses meet Solid 3:1 and Sticker 4.5:1 glyph contrast i
       `${key} dark accent contrast below 3.2:1`
     );
     assert.ok(
+      contrastRatio(palette.lightAccent, lightWash) >= 3.0,
+      `${key} light Outline wash contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(palette.darkAccent, darkWash) >= 3.0,
+      `${key} dark Outline wash contrast below 3:1`
+    );
+    assert.ok(
       contrastRatio(hexRgb(palette.lightOnAccentCss), palette.lightAccent) >= 3.0,
-      `${key} light Solid on-accent contrast below 3:1`
+      `${key} light on-accent contrast below 3:1`
     );
     assert.ok(
       contrastRatio(hexRgb(palette.darkOnAccentCss), palette.darkAccent) >= 3.0,
-      `${key} dark Solid on-accent contrast below 3:1`
+      `${key} dark on-accent contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(palette.lightSolidAccent, palette.lightSurface) >= 3.0,
+      `${key} light Solid accent contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(palette.darkSolidAccent, palette.darkSurface) >= 3.0,
+      `${key} dark Solid accent contrast below 3:1`
+    );
+    assert.ok(
+      contrastRatio(hexRgb(palette.lightSolidOnAccentCss), palette.lightSolidAccent) >= 4.5,
+      `${key} light Solid on-accent contrast below 4.5:1`
+    );
+    assert.ok(
+      contrastRatio(hexRgb(palette.darkSolidOnAccentCss), palette.darkSolidAccent) >= 4.5,
+      `${key} dark Solid on-accent contrast below 4.5:1`
     );
     assert.ok(
       contrastRatio(palette.lightStickerAccent, palette.lightSurface) >= 3.2,

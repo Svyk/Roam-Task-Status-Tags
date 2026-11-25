@@ -68,6 +68,7 @@ var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
 var BLACK = Object.freeze({ r: 0, g: 0, b: 0 });
 var NEAR_BLACK = Object.freeze({ r: 16, g: 22, b: 26 });
+var SOLID_GRADIENT_SHADOW = Object.freeze({ r: 15, g: 23, b: 42 });
 var WHITE = Object.freeze({ r: 255, g: 255, b: 255 });
 var NEAR_BLACK_CSS = "#10161a";
 var WHITE_CSS = "#ffffff";
@@ -229,11 +230,67 @@ function pickOnAccentColor(accentRgb) {
   if (whiteContrast >= 3.4) return WHITE_CSS;
   return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
 }
+function pickSolidOnAccentColor(accentRgb) {
+  const accent = normalizeRgb(accentRgb);
+  const whiteContrast = contrastRatio(WHITE, accent);
+  const darkContrast = contrastRatio(NEAR_BLACK, accent);
+  return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
 function pickStickerOnAccentColor(accentRgb) {
   const accent = normalizeRgb(accentRgb);
   const whiteContrast = contrastRatio(WHITE, accent);
   const darkContrast = contrastRatio(NEAR_BLACK, accent);
   return whiteContrast >= darkContrast ? WHITE_CSS : NEAR_BLACK_CSS;
+}
+function deriveOutlineAccent(baseRgb, surface, washAlpha, minimumSurfaceContrast, minimumWashContrast = 3.03) {
+  const accent = deriveAccessibleAccent(baseRgb, surface, minimumSurfaceContrast);
+  const wash = compositeRgb(baseRgb, surface, washAlpha);
+  const rounded = roundedRgb(accent);
+  if (contrastRatio(rounded, wash) >= 3) return rounded;
+  const target = relativeLuminance(surface) > 0.5 ? BLACK : WHITE;
+  let low = 0;
+  let high = 1;
+  for (let index = 0; index < 28; index += 1) {
+    const middle = (low + high) / 2;
+    const candidate = roundedRgb(mixRgb(accent, target, middle));
+    if (contrastRatio(candidate, wash) >= minimumWashContrast && contrastRatio(candidate, surface) >= minimumSurfaceContrast) {
+      high = middle;
+    } else {
+      low = middle;
+    }
+  }
+  return roundedRgb(mixRgb(accent, target, high));
+}
+function solidGradientMidpoint(accentRgb) {
+  const top = mixRgb(accentRgb, WHITE, 0.14);
+  const bottom = mixRgb(accentRgb, SOLID_GRADIENT_SHADOW, 0.14);
+  return {
+    r: (top.r + bottom.r) / 2,
+    g: (top.g + bottom.g) / 2,
+    b: (top.b + bottom.b) / 2
+  };
+}
+function deriveSolidAccent(accentRgb, surface, minimumTileContrast = 3.05, minimumGlyphContrast = 4.55) {
+  const passes = (candidate) => {
+    const gradMid = solidGradientMidpoint(candidate);
+    const ink = pickSolidOnAccentColor(gradMid) === WHITE_CSS ? WHITE : NEAR_BLACK;
+    return contrastRatio(candidate, surface) >= minimumTileContrast && contrastRatio(gradMid, surface) >= minimumTileContrast && contrastRatio(ink, candidate) >= minimumGlyphContrast && contrastRatio(ink, gradMid) >= minimumGlyphContrast;
+  };
+  const start = roundedRgb(accentRgb);
+  if (passes(start)) return start;
+  const candidates = [];
+  for (const target of [BLACK, WHITE]) {
+    for (let step = 1; step <= 400; step += 1) {
+      const amount = step / 400;
+      const candidate = roundedRgb(mixRgb(accentRgb, target, amount));
+      if (passes(candidate)) {
+        candidates.push({ amount, color: candidate });
+        break;
+      }
+    }
+  }
+  candidates.sort((a, b) => a.amount - b.amount);
+  return candidates[0]?.color || start;
 }
 function deriveStickerAccent(baseRgb, surface, minimumTileContrast, minimumGlyphContrast = 4.65) {
   const accent = deriveAccessibleAccent(baseRgb, surface, minimumTileContrast);
@@ -269,10 +326,10 @@ function buildStatusCheckboxColors({
   const lightSurface = normalizeRgb(lightSurfaceRgb, DEFAULT_LIGHT_SURFACE);
   const darkSurface = normalizeRgb(darkSurfaceRgb, DEFAULT_DARK_SURFACE);
   const certificationContrast = Math.max(1, Number(minimumContrast) || 3.2) + 0.05;
-  const lightAccent = deriveAccessibleAccent(base, lightSurface, certificationContrast);
-  const darkAccent = deriveAccessibleAccent(base, darkSurface, certificationContrast);
-  const roundedLightAccent = roundedRgb(lightAccent);
-  const roundedDarkAccent = roundedRgb(darkAccent);
+  const roundedLightAccent = deriveOutlineAccent(base, lightSurface, 0.09, certificationContrast);
+  const roundedDarkAccent = deriveOutlineAccent(base, darkSurface, 0.16, certificationContrast);
+  const roundedLightSolidAccent = deriveSolidAccent(roundedLightAccent, lightSurface);
+  const roundedDarkSolidAccent = deriveSolidAccent(roundedDarkAccent, darkSurface);
   const roundedLightStickerAccent = roundedRgb(
     deriveStickerAccent(base, lightSurface, certificationContrast)
   );
@@ -289,6 +346,12 @@ function buildStatusCheckboxColors({
     darkAccentCss: rgbCss(roundedDarkAccent),
     lightOnAccentCss: pickOnAccentColor(roundedLightAccent),
     darkOnAccentCss: pickOnAccentColor(roundedDarkAccent),
+    lightSolidAccent: roundedLightSolidAccent,
+    darkSolidAccent: roundedDarkSolidAccent,
+    lightSolidAccentCss: rgbCss(roundedLightSolidAccent),
+    darkSolidAccentCss: rgbCss(roundedDarkSolidAccent),
+    lightSolidOnAccentCss: pickSolidOnAccentColor(solidGradientMidpoint(roundedLightSolidAccent)),
+    darkSolidOnAccentCss: pickSolidOnAccentColor(solidGradientMidpoint(roundedDarkSolidAccent)),
     lightStickerAccent: roundedLightStickerAccent,
     darkStickerAccent: roundedDarkStickerAccent,
     lightStickerAccentCss: rgbCss(roundedLightStickerAccent),
@@ -6134,6 +6197,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   --ts-checkbox-accent-dark: ${checkboxValues.darkAccentCss};
   --ts-checkbox-on-accent-light: ${checkboxValues.lightOnAccentCss};
   --ts-checkbox-on-accent-dark: ${checkboxValues.darkOnAccentCss};
+  --ts-checkbox-solid-accent-light: ${checkboxValues.lightSolidAccentCss};
+  --ts-checkbox-solid-accent-dark: ${checkboxValues.darkSolidAccentCss};
+  --ts-checkbox-solid-on-accent-light: ${checkboxValues.lightSolidOnAccentCss};
+  --ts-checkbox-solid-on-accent-dark: ${checkboxValues.darkSolidOnAccentCss};
   --ts-checkbox-sticker-accent-light: ${checkboxValues.lightStickerAccentCss};
   --ts-checkbox-sticker-accent-dark: ${checkboxValues.darkStickerAccentCss};
   --ts-checkbox-sticker-on-accent-light: ${checkboxValues.lightStickerOnAccentCss};

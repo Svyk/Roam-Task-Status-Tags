@@ -487,7 +487,7 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
       );
     }
   }
-  assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-on-accent\)/);
+  assert.match(css, /--ts-checkbox-ink: var\(--ts-checkbox-solid-on-accent, var\(--ts-checkbox-on-accent\)\)/);
   assert.match(css, /@media print[\s\S]*:root\[data-ts-checkbox-style\]/);
   assert.match(css, /@media \(forced-colors: active\)[\s\S]*:root\[data-ts-checkbox-style\]/);
   assert.doesNotMatch(css, /\b(?:listitem-task|line-check-div|state-done|state-started|body\.bt-on|bt-dark|bt-light|bt-preset-|bt-anim|bt-picker|--bt-)\b/);
@@ -552,12 +552,13 @@ test("hover lift, active press, forbidden selectors, and static Solid on-accent 
   }
 });
 
-test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (preserving existing styles)", () => {
+test("colour audit: all 25 statuses + custom x 5 styles x 2 themes meet WCAG targets with zero exemptions", () => {
   const LIGHT_SURFACE = { r: 245, g: 248, b: 250 };
   const DARK_SURFACE = { r: 32, g: 43, b: 51 };
   const WHITE = { r: 255, g: 255, b: 255 };
   const BLACK = { r: 0, g: 0, b: 0 };
   const NEAR_BLACK = { r: 16, g: 22, b: 26 };
+  const SOLID_GRADIENT_SHADOW = { r: 15, g: 23, b: 42 };
 
   const ALL_STATUSES = [
     ["ACTIVE", "active", "#14b8a6"],
@@ -585,108 +586,8 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
     ["FLOWER", "flower", "#e879f9"],
     ["SUN", "sun", "#f59e0b"],
     ["MOON", "moon", "#818cf8"],
+    ["CUSTOM", "custom", "#64748b"],
   ];
-
-  // Existing four styles (Outline, Glass, Minimal, Solid) are held unchanged to
-  // avoid drifting colours the user already approved; cases that sat below the
-  // WCAG target at v0.17.0 are pinned to their pre-existing floor so they can
-  // never regress while Sticker meets full 3:1 / 4.5:1 across all 25 statuses.
-  const EXISTING_STYLE_FLOORS = {
-    // Outline glyph vs tinted wash (border vs surface already >= 3.2:1 for all 25)
-    "ACTIVE.outline.light.glyph": 2.98,
-    "IN_REVIEW.outline.light.glyph": 2.99,
-    "INCUBATING.outline.dark.glyph": 2.75,
-    "SERIES.outline.dark.glyph": 2.91,
-    "MOVIE.outline.light.glyph": 2.97,
-    "WATCHLIST.outline.light.glyph": 2.96,
-    "IMPORTANT.outline.dark.glyph": 2.98,
-    "STARRED.outline.light.glyph": 2.95,
-    "DISCUSS.outline.dark.glyph": 2.87,
-    "BILLABLE.outline.light.glyph": 2.99,
-    "BUG.outline.light.glyph": 2.98,
-    "DEADLINE.outline.light.glyph": 2.99,
-    "KAWAII.outline.light.glyph": 2.98,
-    "MOON.outline.light.glyph": 2.99,
-    // Glass borders & inks ported from BetterTask Neon Glass
-    "ACTIVE.glass.light.border": 1.68,
-    "ACTIVE.glass.light.glyph": 2.48,
-    "WAITING.glass.light.border": 2.0,
-    "ALERT.glass.light.tile": 2.78,
-    "ALERT.glass.light.glyph": 2.96,
-    "ALERT.glass.dark.glyph": 2.96,
-    "CANCELLED.glass.light.border": 1.91,
-    "CANCELLED.glass.dark.border": 2.15,
-    "IMPORTANT.glass.light.border": 2.51,
-    "STARRED.glass.light.border": 1.95,
-    "STARRED.glass.light.glyph": 2.29,
-    "DISCUSS.glass.light.border": 2.54,
-    "BILLABLE.glass.light.border": 1.62,
-    "BILLABLE.glass.light.glyph": 2.64,
-    "BUG.glass.light.border": 2.89,
-    "SUN.glass.light.border": 2.0,
-    "SUN.glass.light.glyph": 2.4,
-    // Minimal inks shared with Glass
-    "ACTIVE.minimal.light.glyph": 2.92,
-    "ALERT.minimal.light.tile": 2.78,
-    "STARRED.minimal.light.glyph": 2.43,
-    "SUN.minimal.light.glyph": 2.61,
-    // Solid fills ported from BetterTask Vivid Solid and unmapped accents
-    "ACTIVE.solid.light.tile": 2.73,
-    "ACTIVE.solid.light.glyph": 2.91,
-    "ACTIVE.solid.dark.glyph": 2.91,
-    "WAITING.solid.light.tile": 2.13,
-    "WAITING.solid.light.glyph": 2.27,
-    "WAITING.solid.dark.glyph": 2.27,
-    "IN_REVIEW.solid.light.glyph": 3.47,
-    "IN_REVIEW.solid.dark.glyph": 2.76,
-    "HOLDING.solid.light.glyph": 3.45,
-    "HOLDING.solid.dark.glyph": 2.55,
-    "INCUBATING.solid.light.glyph": 4.46,
-    "INCUBATING.solid.dark.glyph": 4.41,
-    "ALERT.solid.light.tile": 2.78,
-    "ALERT.solid.light.glyph": 2.96,
-    "ALERT.solid.dark.glyph": 2.96,
-    "CANCELLED.solid.light.glyph": 4.24,
-    "CANCELLED.solid.dark.glyph": 4.24,
-    "SERIES.solid.dark.glyph": 4.44,
-    "MOVIE.solid.light.glyph": 3.46,
-    "MOVIE.solid.dark.glyph": 2.79,
-    "WATCHING.solid.light.glyph": 3.47,
-    "WATCHING.solid.dark.glyph": 2.27,
-    "WATCHLIST.solid.light.glyph": 3.52,
-    "WATCHLIST.solid.dark.glyph": 3.52,
-    "UPCOMING.solid.light.glyph": 3.63,
-    "UPCOMING.solid.dark.glyph": 3.63,
-    "REWATCH.solid.light.glyph": 3.47,
-    "REWATCH.solid.dark.glyph": 1.97,
-    "DROPPED.solid.dark.glyph": 4.42,
-    "IMPORTANT.solid.light.glyph": 3.65,
-    "IMPORTANT.solid.dark.glyph": 3.65,
-    "STARRED.solid.light.tile": 1.88,
-    "STARRED.solid.light.glyph": 2.0,
-    "STARRED.solid.dark.glyph": 2.0,
-    "DISCUSS.solid.light.glyph": 4.45,
-    "DISCUSS.solid.dark.glyph": 4.45,
-    "BILLABLE.solid.light.tile": 2.64,
-    "BILLABLE.solid.light.glyph": 2.82,
-    "BILLABLE.solid.dark.glyph": 2.82,
-    "BUG.solid.light.tile": 2.42,
-    "BUG.solid.light.glyph": 2.58,
-    "BUG.solid.dark.glyph": 2.58,
-    "DRAFT.solid.light.glyph": 4.07,
-    "DRAFT.solid.dark.glyph": 4.07,
-    "DEADLINE.solid.light.glyph": 3.38,
-    "DEADLINE.solid.dark.glyph": 3.38,
-    "SUN.solid.light.tile": 2.04,
-    "SUN.solid.light.glyph": 2.17,
-    "SUN.solid.dark.glyph": 2.17,
-    "MOON.solid.dark.tile": 2.55,
-  };
-
-  const floorFor = (id, target) =>
-    Object.prototype.hasOwnProperty.call(EXISTING_STYLE_FLOORS, id)
-      ? EXISTING_STYLE_FLOORS[id]
-      : target;
 
   const parseColor = (raw, surface) => {
     const s = String(raw || "").trim();
@@ -766,6 +667,7 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
   const FULL_SVG_SHAPES = new Set(["alert", "kawaii", "flower"]);
 
   const alertMid = parseSvgGradientMid("--ts-svg-alert", LIGHT_SURFACE);
+  const alertSolidMid = parseSvgGradientMid("--ts-svg-alert-solid", LIGHT_SURFACE);
   const alertStickerLightMid = parseSvgGradientMid("--ts-svg-alert-sticker-light", LIGHT_SURFACE);
   const alertStickerDarkMid = parseSvgGradientMid("--ts-svg-alert-sticker-dark", DARK_SURFACE);
 
@@ -775,8 +677,9 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
     for (const theme of ["light", "dark"]) {
       const surface = theme === "light" ? LIGHT_SURFACE : DARK_SURFACE;
       const accent = theme === "light" ? palette.lightAccent : palette.darkAccent;
-      const onAccent = parseColor(
-        theme === "light" ? palette.lightOnAccentCss : palette.darkOnAccentCss,
+      const solidAccent = theme === "light" ? palette.lightSolidAccent : palette.darkSolidAccent;
+      const solidOnAccent = parseColor(
+        theme === "light" ? palette.lightSolidOnAccentCss : palette.darkSolidOnAccentCss,
         surface
       );
       const stickerAccent = theme === "light" ? palette.lightStickerAccent : palette.darkStickerAccent;
@@ -790,34 +693,34 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
         theme === "light" ? 0.09 : 0.16
       );
 
-      // 1. Outline: stroke vs surface >= 3:1; glyph vs wash >= 3:1 (or pre-existing floor)
+      // 1. Outline: stroke vs surface >= 3:1; glyph vs wash >= 3:1
       assert.ok(
         contrastRatio(accent, surface) >= 3.0,
         `${key} Outline ${theme} stroke vs surface = ${contrastRatio(accent, surface).toFixed(2)}`
       );
       assert.ok(
-        contrastRatio(accent, wash) >= floorFor(`${key}.outline.${theme}.glyph`, 3.0),
+        contrastRatio(accent, wash) >= 3.0,
         `${key} Outline ${theme} glyph vs wash = ${contrastRatio(accent, wash).toFixed(2)}`
       );
 
-      // 2. Glass & Minimal: 3:1 targets (existing BetterTask colours held to pre-existing floor)
+      // 2. Glass & Minimal: tile/border vs surface >= 3:1; glyph vs tile/surface >= 3:1
       if (FULL_SVG_SHAPES.has(shape)) {
         if (shape === "alert") {
           assert.ok(
-            contrastRatio(alertMid, surface) >= floorFor(`${key}.glass.${theme}.tile`, 3.0),
-            `ALERT Glass/Minimal ${theme} tile vs surface`
+            contrastRatio(alertMid, surface) >= 3.0,
+            `ALERT Glass/Minimal ${theme} tile vs surface = ${contrastRatio(alertMid, surface).toFixed(2)}`
           );
           assert.ok(
-            contrastRatio(WHITE, alertMid) >= floorFor(`${key}.glass.${theme}.glyph`, 3.0),
-            `ALERT Glass/Minimal ${theme} glyph vs tile`
+            contrastRatio(WHITE, alertMid) >= 3.0,
+            `ALERT Glass/Minimal ${theme} glyph vs tile = ${contrastRatio(WHITE, alertMid).toFixed(2)}`
           );
           assert.ok(
-            contrastRatio(alertMid, surface) >= floorFor(`${key}.solid.${theme}.tile`, 3.0),
-            `ALERT Solid ${theme} tile vs surface`
+            contrastRatio(alertSolidMid, surface) >= 3.0,
+            `ALERT Solid ${theme} tile vs surface = ${contrastRatio(alertSolidMid, surface).toFixed(2)}`
           );
           assert.ok(
-            contrastRatio(WHITE, alertMid) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
-            `ALERT Solid ${theme} glyph vs tile`
+            contrastRatio(WHITE, alertSolidMid) >= 4.5,
+            `ALERT Solid ${theme} glyph vs tile = ${contrastRatio(WHITE, alertSolidMid).toFixed(2)}`
           );
         } else if (shape === "kawaii") {
           const edgeOrFill = theme === "light" ? parseColor("#ec4899", surface) : parseColor("#f9a8d4", surface);
@@ -845,15 +748,15 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
         const ink = readInkVar(theme === "light" ? lightVarBlock : darkVarBlock, `--ts-${shape}-ink`, surface);
         assert.ok(ink, `missing --ts-${shape}-ink for ${theme}`);
         assert.ok(
-          contrastRatio(glassBorder, surface) >= floorFor(`${key}.glass.${theme}.border`, 3.0),
+          contrastRatio(glassBorder, surface) >= 3.0,
           `${key} Glass ${theme} border vs surface = ${contrastRatio(glassBorder, surface).toFixed(2)}`
         );
         assert.ok(
-          contrastRatio(ink, glassTile) >= floorFor(`${key}.glass.${theme}.glyph`, 3.0),
+          contrastRatio(ink, glassTile) >= 3.0,
           `${key} Glass ${theme} glyph vs tile = ${contrastRatio(ink, glassTile).toFixed(2)}`
         );
         assert.ok(
-          contrastRatio(ink, surface) >= floorFor(`${key}.minimal.${theme}.glyph`, 3.0),
+          contrastRatio(ink, surface) >= 3.0,
           `${key} Minimal ${theme} glyph vs surface = ${contrastRatio(ink, surface).toFixed(2)}`
         );
       } else {
@@ -880,7 +783,7 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
         );
       }
 
-      // 3. Solid: tile vs surface >= 3:1, glyph vs tile >= 4.5:1 (existing colours held to pre-existing floor)
+      // 3. Solid: tile vs surface >= 3:1, glyph vs tile >= 4.5:1
       if (!FULL_SVG_SHAPES.has(shape)) {
         if (PORTED_MASK_SHAPES.has(shape)) {
           const darkSel = `:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="${shape}"] > .check-container > input:not(:checked) ~ .checkmark`;
@@ -888,28 +791,44 @@ test("colour audit: all 25 statuses x 5 styles x 2 themes meet WCAG targets (pre
           const solidBgRaw = (theme === "dark" && getDecl(darkSel, "background")) || getDecl(baseSel, "background");
           assert.ok(solidBgRaw, `missing Solid background for ${shape} ${theme}`);
           const solidTile = parseGradientMid(solidBgRaw, surface);
+          const inkDarkSel = `${darkSel}::before`;
+          const inkBaseSel = `${baseSel}::before`;
+          const solidInkRaw = (theme === "dark" && getDecl(inkDarkSel, "background")) || getDecl(inkBaseSel, "background");
+          assert.ok(solidInkRaw, `missing Solid glyph ink for ${shape} ${theme}`);
+          const solidInk = parseColor(solidInkRaw, surface);
           assert.ok(
-            contrastRatio(solidTile, surface) >= floorFor(`${key}.solid.${theme}.tile`, 3.0),
+            contrastRatio(solidTile, surface) >= 3.0,
             `${key} Solid ${theme} tile vs surface = ${contrastRatio(solidTile, surface).toFixed(2)}`
           );
           assert.ok(
-            contrastRatio(WHITE, solidTile) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
-            `${key} Solid ${theme} glyph vs tile = ${contrastRatio(WHITE, solidTile).toFixed(2)}`
+            contrastRatio(solidInk, solidTile) >= 4.5,
+            `${key} Solid ${theme} glyph vs tile = ${contrastRatio(solidInk, solidTile).toFixed(2)}`
           );
         } else {
-          const solidInk = theme === "dark" ? WHITE : onAccent;
-          assert.ok(
-            contrastRatio(accent, surface) >= 3.0,
-            `${key} Solid ${theme} tile vs surface = ${contrastRatio(accent, surface).toFixed(2)}`
+          const solidGradMid = avgRgb(
+            mixRgb(solidAccent, WHITE, 0.14),
+            mixRgb(solidAccent, SOLID_GRADIENT_SHADOW, 0.14)
           );
           assert.ok(
-            contrastRatio(solidInk, accent) >= floorFor(`${key}.solid.${theme}.glyph`, 4.5),
-            `${key} Solid ${theme} glyph vs tile = ${contrastRatio(solidInk, accent).toFixed(2)}`
+            contrastRatio(solidAccent, surface) >= 3.0,
+            `${key} Solid ${theme} accent vs surface = ${contrastRatio(solidAccent, surface).toFixed(2)}`
+          );
+          assert.ok(
+            contrastRatio(solidGradMid, surface) >= 3.0,
+            `${key} Solid ${theme} gradient vs surface = ${contrastRatio(solidGradMid, surface).toFixed(2)}`
+          );
+          assert.ok(
+            contrastRatio(solidOnAccent, solidAccent) >= 4.5,
+            `${key} Solid ${theme} glyph vs accent = ${contrastRatio(solidOnAccent, solidAccent).toFixed(2)}`
+          );
+          assert.ok(
+            contrastRatio(solidOnAccent, solidGradMid) >= 4.5,
+            `${key} Solid ${theme} glyph vs gradient = ${contrastRatio(solidOnAccent, solidGradMid).toFixed(2)}`
           );
         }
       }
 
-      // 4. Sticker (new style): ALL 25 statuses meet full 3:1 vs surface and 4.5:1 glyph vs tile
+      // 4. Sticker: ALL 25 statuses + custom meet full 3:1 vs surface and 4.5:1 glyph vs tile
       if (shape === "alert") {
         const stickerAlertMid = theme === "light" ? alertStickerLightMid : alertStickerDarkMid;
         assert.ok(

@@ -20,7 +20,8 @@
   --ts-ico-starred: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.2L14.65 8.55L20.55 9.4L16.28 13.55L17.28 19.42L12 16.65L6.72 19.42L7.72 13.55L3.45 9.4L9.35 8.55L12 3.2Z' fill='black' stroke='black' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E");
   --ts-ico-cancelled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.4 17.6L17.6 6.4' fill='none' stroke='black' stroke-width='2.9' stroke-linecap='round'/%3E%3C/svg%3E");
   --ts-ico-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6Z' fill='black'/%3E%3C/svg%3E");
-  --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb923c'/%3E%3Cstop offset='100%25' stop-color='%23ef4444'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb8627'/%3E%3Cstop offset='100%25' stop-color='%23ed3030'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='ga' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e16805'/%3E%3Cstop offset='100%25' stop-color='%23d01212'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23ga)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gs' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gs)' stroke='%23ffffff' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e83232'/%3E%3Cstop offset='100%25' stop-color='%23d42222'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
@@ -157,7 +158,8 @@
   --ts-ico-starred: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.2L14.65 8.55L20.55 9.4L16.28 13.55L17.28 19.42L12 16.65L6.72 19.42L7.72 13.55L3.45 9.4L9.35 8.55L12 3.2Z' fill='black' stroke='black' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E");
   --ts-ico-cancelled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.4 17.6L17.6 6.4' fill='none' stroke='black' stroke-width='2.9' stroke-linecap='round'/%3E%3C/svg%3E");
   --ts-ico-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6Z' fill='black'/%3E%3C/svg%3E");
-  --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb923c'/%3E%3Cstop offset='100%25' stop-color='%23ef4444'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23fb8627'/%3E%3Cstop offset='100%25' stop-color='%23ed3030'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23g)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
+  --ts-svg-alert-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='ga' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e16805'/%3E%3Cstop offset='100%25' stop-color='%23d01212'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M10.45 4.2C11.15 2.95 12.85 2.95 13.55 4.2L21.3 18.2C21.98 19.42 21.1 21 19.7 21H4.3C2.9 21 2.02 19.42 2.7 18.2L10.45 4.2Z' fill='url(%23ga)'/%3E%3Crect x='10.7' y='9' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='12' cy='17.8' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gs' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e02424'/%3E%3Cstop offset='100%25' stop-color='%23c81e1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gs)' stroke='%23ffffff' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-svg-alert-sticker-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='gsd' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23e83232'/%3E%3Cstop offset='100%25' stop-color='%23d42222'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12.45 5.6C13.15 4.35 14.85 4.35 15.55 5.6L23.3 19.6C23.98 20.82 23.1 22.4 21.7 22.4H6.3C4.9 22.4 4.02 20.82 4.7 19.6L12.45 5.6Z' fill='url(%23gsd)' stroke='%23f4efe6' stroke-width='3.4' stroke-linejoin='round' paint-order='stroke'/%3E%3Crect x='12.7' y='10.4' width='2.6' height='6.1' rx='1.3' fill='%23ffffff'/%3E%3Ccircle cx='14' cy='19.2' r='1.4' fill='%23ffffff'/%3E%3C/svg%3E");
   --ts-ico-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(0 -0.4)'%3E %3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E %3Cpath d='M10.4 5.9 L8.6 3.2 M13.6 5.9 L15.4 3.2'/%3E %3Cpath d='M7 11.9 L3.6 10.4 M6.7 15.2 L3.2 15.2 M7.3 18.4 L4.3 20.2 M17 11.9 L20.4 10.4 M17.3 15.2 L20.8 15.2 M16.7 18.4 L19.7 20.2'/%3E %3C/g%3E %3Ccircle cx='12' cy='7.5' r='2.5' fill='black'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M11.3 9.3 C8.3 9.5 6.6 11.9 6.6 14.9 C6.6 18.3 8.6 20.7 11.3 20.9 Z M8.15 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3Cpath fill='black' fill-rule='evenodd' d='M12.7 9.3 C15.7 9.5 17.4 11.9 17.4 14.9 C17.4 18.3 15.4 20.7 12.7 20.9 Z M13.25 14.9 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0 Z'/%3E %3C/g%3E%3C/svg%3E");
@@ -172,9 +174,13 @@
   --ts-ico-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E %3Cpath d='M12 21 C5 15.6 2.5 12.3 2.5 8.6 C2.5 5.6 4.9 3.4 7.6 3.4 C9.5 3.4 11 4.4 12 6 C13 4.4 14.5 3.4 16.4 3.4 C19.1 3.4 21.5 5.6 21.5 8.6 C21.5 12.3 19 15.6 12 21 Z' fill='black'/%3E %3C/svg%3E");
 
   --ts-checkbox-accent-light: rgb(100, 116, 139);
-  --ts-checkbox-accent-dark: rgb(105, 121, 143);
+  --ts-checkbox-accent-dark: rgb(113, 128, 149);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-solid-accent-light: rgb(100, 115, 138);
+  --ts-checkbox-solid-accent-dark: rgb(114, 129, 150);
+  --ts-checkbox-solid-on-accent-light: #ffffff;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(100, 116, 139);
   --ts-checkbox-sticker-accent-dark: rgb(116, 131, 152);
   --ts-checkbox-sticker-on-accent-light: #ffffff;
@@ -183,6 +189,8 @@
   --ts-checkbox-wash-dark: rgba(100, 116, 139, 0.16);
   --ts-checkbox-accent: var(--ts-checkbox-accent-light);
   --ts-checkbox-on-accent: var(--ts-checkbox-on-accent-light);
+  --ts-checkbox-solid-accent: var(--ts-checkbox-solid-accent-light);
+  --ts-checkbox-solid-on-accent: var(--ts-checkbox-solid-on-accent-light);
   --ts-checkbox-sticker-accent: var(--ts-checkbox-sticker-accent-light);
   --ts-checkbox-sticker-on-accent: var(--ts-checkbox-sticker-on-accent-light);
   --ts-checkbox-ink: var(--ts-checkbox-accent);
@@ -197,6 +205,8 @@
 :root[data-ts-theme="dark"] .rm-checkbox[data-ts-checkbox-status] {
   --ts-checkbox-accent: var(--ts-checkbox-accent-dark);
   --ts-checkbox-on-accent: var(--ts-checkbox-on-accent-dark);
+  --ts-checkbox-solid-accent: var(--ts-checkbox-solid-accent-dark);
+  --ts-checkbox-solid-on-accent: var(--ts-checkbox-solid-on-accent-dark);
   --ts-checkbox-sticker-accent: var(--ts-checkbox-sticker-accent-dark);
   --ts-checkbox-sticker-on-accent: var(--ts-checkbox-sticker-on-accent-dark);
   --ts-checkbox-wash: var(--ts-checkbox-wash-dark);
@@ -206,10 +216,14 @@
 }
 
 .rm-checkbox[data-ts-checkbox-status="ACTIVE"] {
-  --ts-checkbox-accent-light: rgb(17, 155, 139);
+  --ts-checkbox-accent-light: rgb(17, 153, 138);
   --ts-checkbox-accent-dark: rgb(20, 184, 166);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-solid-accent-light: rgb(17, 153, 138);
+  --ts-checkbox-solid-accent-dark: rgb(20, 184, 166);
+  --ts-checkbox-solid-on-accent-light: #10161a;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(17, 155, 139);
   --ts-checkbox-sticker-accent-dark: rgb(20, 184, 166);
   --ts-checkbox-sticker-on-accent-light: #10161a;
@@ -223,6 +237,10 @@
   --ts-checkbox-accent-dark: rgb(234, 179, 8);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-solid-accent-light: rgb(172, 132, 6);
+  --ts-checkbox-solid-accent-dark: rgb(234, 179, 8);
+  --ts-checkbox-solid-on-accent-light: #10161a;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(172, 132, 6);
   --ts-checkbox-sticker-accent-dark: rgb(234, 179, 8);
   --ts-checkbox-sticker-on-accent-light: #10161a;
@@ -232,10 +250,14 @@
 }
 
 .rm-checkbox[data-ts-checkbox-status="IN_REVIEW"] {
-  --ts-checkbox-accent-light: rgb(2, 132, 199);
+  --ts-checkbox-accent-light: rgb(12, 145, 205);
   --ts-checkbox-accent-dark: rgb(14, 165, 233);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-solid-accent-light: rgb(12, 145, 205);
+  --ts-checkbox-solid-accent-dark: rgb(14, 165, 233);
+  --ts-checkbox-solid-on-accent-light: #10161a;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(12, 146, 207);
   --ts-checkbox-sticker-accent-dark: rgb(14, 165, 233);
   --ts-checkbox-sticker-on-accent-light: #10161a;
@@ -249,6 +271,10 @@
   --ts-checkbox-accent-dark: rgb(148, 163, 184);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #10161a;
+  --ts-checkbox-solid-accent-light: rgb(126, 139, 157);
+  --ts-checkbox-solid-accent-dark: rgb(148, 163, 184);
+  --ts-checkbox-solid-on-accent-light: #10161a;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(126, 139, 157);
   --ts-checkbox-sticker-accent-dark: rgb(148, 163, 184);
   --ts-checkbox-sticker-on-accent-light: #10161a;
@@ -259,9 +285,13 @@
 
 .rm-checkbox[data-ts-checkbox-status="INCUBATING"] {
   --ts-checkbox-accent-light: rgb(99, 102, 241);
-  --ts-checkbox-accent-dark: rgb(100, 103, 241);
+  --ts-checkbox-accent-dark: rgb(109, 112, 242);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-solid-accent-light: rgb(96, 99, 233);
+  --ts-checkbox-solid-accent-dark: rgb(109, 112, 242);
+  --ts-checkbox-solid-on-accent-light: #ffffff;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(97, 100, 235);
   --ts-checkbox-sticker-accent-dark: rgb(111, 114, 242);
   --ts-checkbox-sticker-on-accent-light: #ffffff;
@@ -275,6 +305,10 @@
   --ts-checkbox-accent-dark: rgb(244, 63, 94);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-solid-accent-light: rgb(244, 63, 94);
+  --ts-checkbox-solid-accent-dark: rgb(244, 63, 94);
+  --ts-checkbox-solid-on-accent-light: #10161a;
+  --ts-checkbox-solid-on-accent-dark: #10161a;
   --ts-checkbox-sticker-accent-light: rgb(244, 63, 94);
   --ts-checkbox-sticker-accent-dark: rgb(244, 63, 94);
   --ts-checkbox-sticker-on-accent-light: #10161a;
@@ -288,6 +322,10 @@
   --ts-checkbox-accent-dark: rgb(113, 120, 131);
   --ts-checkbox-on-accent-light: #ffffff;
   --ts-checkbox-on-accent-dark: #ffffff;
+  --ts-checkbox-solid-accent-light: rgb(30, 41, 59);
+  --ts-checkbox-solid-accent-dark: rgb(113, 120, 131);
+  --ts-checkbox-solid-on-accent-light: #ffffff;
+  --ts-checkbox-solid-on-accent-dark: #ffffff;
   --ts-checkbox-sticker-accent-light: rgb(30, 41, 59);
   --ts-checkbox-sticker-accent-dark: rgb(123, 129, 140);
   --ts-checkbox-sticker-on-accent-light: #ffffff;
@@ -711,17 +749,17 @@
  */
 :root[data-ts-checkbox-style] .rm-checkbox[data-ts-checkbox-status] {
   --ts-gloss: rgba(255, 255, 255, 0.65);
-  --ts-active-ink: linear-gradient(145deg, #0284c7, #06b6d4);
+  --ts-active-ink: linear-gradient(145deg, #0275b0, #05a3bd);
   --ts-waiting-ink: linear-gradient(180deg, #d97706, #b45309);
-  --ts-billable-ink: linear-gradient(155deg, #16a34a, #65a30d);
+  --ts-billable-ink: linear-gradient(155deg, #149644, #5d950c);
   --ts-important-ink: linear-gradient(180deg, #e11d48, #be123c);
   --ts-discuss-ink: linear-gradient(155deg, #7c3aed, #6d28d9);
-  --ts-starred-ink: linear-gradient(150deg, #f59e0b, #d97706);
+  --ts-starred-ink: linear-gradient(150deg, #d58909, #b76405);
   --ts-cancelled-ink: linear-gradient(135deg, #64748b, #475569);
   --ts-bug-ink: linear-gradient(160deg, #65a30d, #3f6212);
   --ts-draft-ink: linear-gradient(150deg, #3b82f6, #1d4ed8);
   --ts-deadline-ink: linear-gradient(180deg, #f97316, #c2410c);
-  --ts-sun-ink: linear-gradient(150deg, #f59e0b, #ea580c);
+  --ts-sun-ink: linear-gradient(150deg, #d78b09, #cc4d0a);
   --ts-moon-ink: linear-gradient(150deg, #818cf8, #4338ca);
   --ts-unmapped-ink: linear-gradient(
     150deg,
@@ -965,7 +1003,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 50% !important;
-  border-color: #22d3ee !important;
+  border-color: #0e9bb1 !important;
   background: radial-gradient(
     circle at 30% 25%,
     rgba(56, 189, 248, 0.28),
@@ -974,6 +1012,14 @@
   box-shadow:
     inset 0 1px 0 var(--ts-gloss),
     0 0 10px rgba(34, 211, 238, 0.28) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #22d3ee !important;
 }
 
 :root[data-ts-checkbox-style]
@@ -1010,13 +1056,21 @@
   ~ .checkmark {
   border-radius: 5px !important;
   border-style: dashed !important;
-  border-color: #f59e0b !important;
+  border-color: #c57e08 !important;
   background: radial-gradient(
     circle at 30% 25%,
     rgba(251, 191, 36, 0.24),
     rgba(245, 158, 11, 0.1)
   ) !important;
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.22) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #f59e0b !important;
 }
 
 :root[data-ts-checkbox-style]
@@ -1053,7 +1107,7 @@
   ~ .checkmark {
   border-radius: 50% !important;
   overflow: hidden !important;
-  border-color: #4ade80 !important;
+  border-color: #1ea24e !important;
   background: radial-gradient(
     circle at 30% 25%,
     rgba(163, 230, 53, 0.28),
@@ -1062,6 +1116,14 @@
   box-shadow:
     inset 0 0 0 1px rgba(250, 204, 21, 0.28),
     0 0 9px rgba(74, 222, 128, 0.28) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #4ade80 !important;
 }
 
 :root[data-ts-checkbox-style]
@@ -1099,7 +1161,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 5px !important;
-  border-color: #fb7185 !important;
+  border-color: #fa4f68 !important;
   background: linear-gradient(
     145deg,
     rgba(244, 63, 94, 0.34),
@@ -1108,6 +1170,14 @@
   box-shadow:
     inset 0 1px 0 var(--ts-gloss),
     0 0 10px rgba(244, 63, 94, 0.34) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #fb7185 !important;
 }
 
 :root[data-ts-checkbox-style]
@@ -1143,7 +1213,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 7px 7px 7px 2px !important;
-  border-color: #a78bfa !important;
+  border-color: #9878f9 !important;
   background: linear-gradient(
     145deg,
     rgba(167, 139, 250, 0.26),
@@ -1152,6 +1222,14 @@
   box-shadow:
     inset 0 1px 0 var(--ts-gloss),
     0 0 9px rgba(139, 92, 246, 0.28) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #a78bfa !important;
 }
 
 :root[data-ts-checkbox-style]
@@ -1263,7 +1341,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 50% !important;
-  border-color: rgba(217, 119, 6, 0.62) !important;
+  border-color: #d57506 !important;
   background: radial-gradient(
     circle at 35% 30%,
     rgba(254, 240, 138, 0.36),
@@ -1323,7 +1401,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 5px !important;
-  border-color: rgba(100, 116, 139, 0.5) !important;
+  border-color: rgba(100, 116, 139, 0.8) !important;
   background: rgba(148, 163, 184, 0.12) !important;
   box-shadow: none !important;
 }
@@ -1333,7 +1411,7 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark {
-  border-color: rgba(148, 163, 184, 0.42) !important;
+  border-color: rgba(148, 163, 184, 0.62) !important;
   background: rgba(148, 163, 184, 0.1) !important;
 }
 
@@ -1371,7 +1449,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 6px !important;
-  border-color: #65a30d !important;
+  border-color: #629d0d !important;
   background: linear-gradient(
     145deg,
     rgba(163, 230, 53, 0.24),
@@ -1649,7 +1727,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-radius: 50% !important;
-  border-color: #f59e0b !important;
+  border-color: #c57e08 !important;
   background: radial-gradient(
     circle at 35% 30%,
     rgba(253, 224, 71, 0.32),
@@ -1752,8 +1830,8 @@
 /* ---- Visual Preset: Solid (Vivid Solid) ---- */
 :root[data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status],
 :root[data-ts-theme="dark"][data-ts-checkbox-style="solid"] .rm-checkbox[data-ts-checkbox-status] {
-  --ts-checkbox-ink: var(--ts-checkbox-on-accent);
-  --ts-unmapped-ink: var(--ts-checkbox-on-accent);
+  --ts-checkbox-ink: var(--ts-checkbox-solid-on-accent, var(--ts-checkbox-on-accent));
+  --ts-unmapped-ink: var(--ts-checkbox-solid-on-accent, var(--ts-checkbox-on-accent));
 }
 
 :root[data-ts-checkbox-style="solid"]
@@ -1767,40 +1845,26 @@
   > input:not(:checked)
   ~ .checkmark {
   border-style: solid !important;
-  border-color: var(--ts-checkbox-accent) !important;
+  border-color: var(--ts-checkbox-solid-accent, var(--ts-checkbox-accent)) !important;
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--ts-checkbox-accent) 76%, #ffffff),
-    color-mix(in srgb, var(--ts-checkbox-accent) 56%, #0f172a)
+    color-mix(in srgb, var(--ts-checkbox-solid-accent, var(--ts-checkbox-accent)) 86%, #ffffff),
+    color-mix(in srgb, var(--ts-checkbox-solid-accent, var(--ts-checkbox-accent)) 86%, #0f172a)
   ) !important;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--ts-checkbox-accent) 40%, transparent) !important;
-}
-
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="in-review"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="holding"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="incubating"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="series"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="movie"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="watching"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="watchlist"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="upcoming"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="rewatch"],
-:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="dropped"] {
-  --ts-checkbox-ink: #ffffff;
-  --ts-unmapped-ink: #ffffff;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ts-checkbox-solid-accent, var(--ts-checkbox-accent)) 40%, transparent) !important;
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #0277b3 !important;
+  background: linear-gradient(145deg, #24b6f7, #0277b3) !important;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.42) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
   > .check-container
   > input:not(:checked)
@@ -1816,12 +1880,33 @@
   > input:not(:checked)
   ~ .checkmark {
   border-style: solid !important;
+  border-color: #b06005 !important;
+  background: linear-gradient(145deg, #dd9f04, #a95d05) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-style: solid !important;
   border-color: #f59e0b !important;
   background: linear-gradient(145deg, #fbbf24, #d97706) !important;
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important;
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #116a33 !important;
+  background: linear-gradient(145deg, #34da71, #116a33) !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
   > .check-container
   > input:not(:checked)
@@ -1835,6 +1920,11 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
   > .check-container
   > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
+  > .check-container
+  > input:not(:checked)
   ~ .checkmark {
   border-color: #f43f5e !important;
   background: linear-gradient(145deg, #fb7185, #e11d48) !important;
@@ -1845,13 +1935,28 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
   > .check-container
   > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
+  > .check-container
+  > input:not(:checked)
   ~ .checkmark {
   border-color: #8b5cf6 !important;
-  background: linear-gradient(145deg, #a78bfa, #6d28d9) !important;
+  background: linear-gradient(145deg, #a589fa, #6c26d8) !important;
   box-shadow: 0 0 10px rgba(139, 92, 246, 0.42) !important;
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="starred"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark {
+  border-color: #a45a05 !important;
+  background: linear-gradient(145deg, #d2b104, #a45a05) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.45) !important;
+}
+
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="starred"]
   > .check-container
   > input:not(:checked)
@@ -1865,13 +1970,23 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
   > .check-container
   > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
+  > .check-container
+  > input:not(:checked)
   ~ .checkmark {
   border-color: #64748b !important;
-  background: linear-gradient(145deg, #94a3b8, #475569) !important;
+  background: linear-gradient(145deg, #8e9eb4, #435063) !important;
   box-shadow: none !important;
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark,
+:root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
   > .check-container
   > input:not(:checked)
@@ -1882,10 +1997,23 @@
 }
 
 :root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  background-image: var(--ts-svg-alert-solid);
+}
+
+:root[data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark,
+  ~ .checkmark {
+  border-color: #395c0b !important;
+  background: linear-gradient(145deg, #93dc1b, #395c0b) !important;
+  box-shadow: 0 0 10px rgba(132, 204, 22, 0.38) !important;
+}
+
 :root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
   > .check-container
@@ -1907,7 +2035,7 @@
   > input:not(:checked)
   ~ .checkmark {
   border-color: #3b82f6 !important;
-  background: linear-gradient(145deg, #60a5fa, #1d4ed8) !important;
+  background: linear-gradient(145deg, #4e9bf9, #1b48c8) !important;
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.38) !important;
 }
 
@@ -1955,7 +2083,12 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark,
+  ~ .checkmark {
+  border-color: #b24208 !important;
+  background: linear-gradient(145deg, #d9b704, #b24208) !important;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.45) !important;
+}
+
 :root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
   > .check-container
@@ -1970,15 +2103,43 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark,
+  ~ .checkmark {
+  border-color: #818cf8 !important;
+  background: linear-gradient(145deg, #818cf8, #312e81) !important;
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.42) !important;
+}
+
 :root[data-ts-theme="dark"][data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark {
-  border-color: #818cf8 !important;
-  background: linear-gradient(145deg, #818cf8, #312e81) !important;
+  border-color: #97a0f9 !important;
+  background: linear-gradient(145deg, #97a0f9, #373492) !important;
   box-shadow: 0 0 10px rgba(129, 140, 248, 0.42) !important;
+}
+
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  background: #ffffff;
 }
 
 :root[data-ts-checkbox-style="solid"]
@@ -2002,27 +2163,12 @@
   > input:not(:checked)
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="discuss"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="starred"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="solid"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before,
@@ -2035,13 +2181,8 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="solid"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
-  > .check-container
-  > input:not(:checked)
   ~ .checkmark::before {
-  background: #ffffff;
+  background: #10161a;
 }
 
 /* ---- Visual Preset: Minimal (Minimal Crisp) ---- */
