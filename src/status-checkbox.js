@@ -47,7 +47,7 @@ export function checkboxSizeToAttributeValue(value) {
   return null;
 }
 
-export function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
+export function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.GLASS) {
   const candidate =
     value && typeof value === "object"
       ? value.target?.value ?? value.currentTarget?.value ?? value.value

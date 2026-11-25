@@ -332,6 +332,8 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       );
       assert.equal(styleSetting.action.type, "select");
       assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal"]);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
+      styleSetting.action.onChange("Outline");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
       styleSetting.action.onChange("Glass");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
@@ -340,7 +342,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       styleSetting.action.onChange("Minimal");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "minimal");
       styleSetting.action.onChange("unknown-style");
-      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
       styleSetting.action.onChange("Solid");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
 
@@ -644,10 +646,11 @@ test("status-change pop triggers only on extension writes, respects setting off,
   globalThis.MutationObserver = PopMutationObserver;
 
   let panelConfig = null;
+  const savedSettings = new Map([["task-status-checkbox-style", "Outline"]]);
   const extensionAPI = {
     settings: {
-      get: () => null,
-      set: async () => {},
+      get: (key) => (savedSettings.has(key) ? savedSettings.get(key) : null),
+      set: async (key, value) => { savedSettings.set(key, value); },
       panel: { create: async (cfg) => { panelConfig = cfg; } },
     },
     ui: { commandPalette: noopApi, slashCommand: noopApi },
@@ -657,6 +660,10 @@ test("status-change pop triggers only on extension writes, respects setting off,
   try {
     mod = await import(`../src/extension.js?pop=${Date.now()}`);
     await mod.onload({ extensionAPI, extension: { version: "0.15.0" } });
+
+    // Saved Outline style is preserved (never overwritten by Glass fallback)
+    assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
+    assert.equal(savedSettings.get("task-status-checkbox-style"), "Outline");
 
     // Initial render claims checkbox without popping
     assert.equal(checkbox.getAttribute("data-ts-checkbox-status"), "ACTIVE");

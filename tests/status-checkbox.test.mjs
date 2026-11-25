@@ -191,19 +191,20 @@ test("every default status derives contrast-safe integer light and dark accents"
   }
 });
 
-test("checkbox style normalization falls back to Outline and maps attribute values", () => {
+test("checkbox style normalization falls back to Glass and maps attribute values", () => {
   assert.equal(CHECKBOX_STYLE_ATTRIBUTE, "data-ts-checkbox-style");
   assert.deepEqual(Object.values(CHECKBOX_STYLE_VALUES), ["Outline", "Glass", "Solid", "Minimal"]);
+  assert.equal(normalizeCheckboxStyle("Outline"), "Outline");
   assert.equal(normalizeCheckboxStyle("Glass"), "Glass");
   assert.equal(normalizeCheckboxStyle({ target: { value: "Solid" } }), "Solid");
   assert.equal(normalizeCheckboxStyle("Minimal"), "Minimal");
-  assert.equal(normalizeCheckboxStyle("Neon"), "Outline");
-  assert.equal(normalizeCheckboxStyle(null), "Outline");
+  assert.equal(normalizeCheckboxStyle("Neon"), "Glass");
+  assert.equal(normalizeCheckboxStyle(null), "Glass");
   assert.equal(checkboxStyleToAttributeValue("Outline"), null);
   assert.equal(checkboxStyleToAttributeValue("Glass"), "glass");
   assert.equal(checkboxStyleToAttributeValue("Solid"), "solid");
   assert.equal(checkboxStyleToAttributeValue("Minimal"), "minimal");
-  assert.equal(checkboxStyleToAttributeValue("invalid"), null);
+  assert.equal(checkboxStyleToAttributeValue("invalid"), "glass");
   assert.equal(pickOnAccentColor({ r: 255, g: 255, b: 0 }), "#10161a");
   assert.equal(pickOnAccentColor({ r: 30, g: 41, b: 59 }), "#ffffff");
   assert.equal(pickOnAccentColor({ r: 244, g: 63, b: 94 }), "#ffffff");

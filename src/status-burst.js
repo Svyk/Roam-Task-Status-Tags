@@ -109,7 +109,7 @@ export function createStatusBurstSystem({
   documentLike = typeof document !== "undefined" ? document : null,
   windowLike = typeof window !== "undefined" ? window : globalThis,
   lifecycle = null,
-  getStyle = () => "Outline",
+  getStyle = () => "Glass",
   isEnabled = () => true,
   nowFn = null,
   randomFn = Math.random,

@@ -40,7 +40,7 @@ function checkboxSizeToAttributeValue(value) {
   if (normalized === CHECKBOX_SIZE_VALUES.EXTRA_LARGE) return "xlarge";
   return null;
 }
-function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.OUTLINE) {
+function normalizeCheckboxStyle(value, fallback = CHECKBOX_STYLE_VALUES.GLASS) {
   const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
   const normalized = String(candidate || "").trim();
   return Object.values(CHECKBOX_STYLE_VALUES).includes(normalized) ? normalized : fallback;
@@ -3306,7 +3306,7 @@ function createStatusBurstSystem({
   documentLike = typeof document !== "undefined" ? document : null,
   windowLike = typeof window !== "undefined" ? window : globalThis,
   lifecycle = null,
-  getStyle = () => "Outline",
+  getStyle = () => "Glass",
   isEnabled = () => true,
   nowFn = null,
   randomFn = Math.random
@@ -6109,7 +6109,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return normalizeThemeSetting(parseMaybeJson(raw), fallback);
   }
   function loadCheckboxStyleSetting() {
-    const fallback = CHECKBOX_STYLE_VALUES.OUTLINE;
+    const fallback = CHECKBOX_STYLE_VALUES.GLASS;
     if (!extensionAPI?.settings?.get) return fallback;
     const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxStyle);
     if (raw === null || typeof raw === "undefined") {
@@ -6828,7 +6828,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return attrValue;
   }
   function setCheckboxStyleSetting(nextValue) {
-    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
+    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.GLASS);
     syncDocumentCheckboxStyle();
     notifyStylePreviewListeners();
   }

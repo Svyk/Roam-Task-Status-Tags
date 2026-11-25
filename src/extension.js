@@ -1084,7 +1084,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function loadCheckboxStyleSetting() {
-    const fallback = CHECKBOX_STYLE_VALUES.OUTLINE;
+    const fallback = CHECKBOX_STYLE_VALUES.GLASS;
     if (!extensionAPI?.settings?.get) return fallback;
     const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxStyle);
     if (raw === null || typeof raw === "undefined") {
@@ -1951,7 +1951,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function setCheckboxStyleSetting(nextValue) {
-    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.OUTLINE);
+    checkboxStyleSetting = normalizeCheckboxStyle(nextValue, CHECKBOX_STYLE_VALUES.GLASS);
     syncDocumentCheckboxStyle();
     notifyStylePreviewListeners();
   }
