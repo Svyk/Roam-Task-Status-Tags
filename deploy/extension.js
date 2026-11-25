@@ -520,7 +520,9 @@ function includingRoot(root, selector) {
 }
 function clearOwnedStatusCheckboxes(root) {
   const checkboxes = includingRoot(root, OWNED_CHECKBOX_SELECTOR).filter(
-    (checkbox) => !checkbox.closest?.(".ts-style-preview, .ts-status-chooser, .ts-rendered-icon")
+    (checkbox) => !checkbox.closest?.(
+      ".ts-style-preview, .ts-status-chooser, .ts-rendered-icon, .ts-status-names-panel"
+    )
   );
   checkboxes.forEach(clearStatusCheckboxAnnotation);
   return checkboxes.length;
@@ -5303,15 +5305,36 @@ var EXTRA_STATUS_DEFAULTS = Object.freeze([
   Object.freeze({ key: "SUN", name: "Sun" }),
   Object.freeze({ key: "MOON", name: "Moon" })
 ]);
-function mergeExtraStatuses(list) {
+function getAvailableExtraStatuses(list) {
   const source = Array.isArray(list) ? list : [];
   const keys = new Set(source.map((entry) => entry?.key));
   const names = new Set(
     source.map((entry) => String(entry?.name || "").trim().toLowerCase())
   );
-  const added = EXTRA_STATUS_DEFAULTS.filter(
+  return EXTRA_STATUS_DEFAULTS.filter(
     (entry) => !keys.has(entry.key) && !names.has(entry.name.toLowerCase())
   ).map((entry) => ({ ...entry }));
+}
+function mergeExtraStatus(list, keyOrName) {
+  const source = Array.isArray(list) ? list : [];
+  const query = String(keyOrName || "").trim();
+  if (!query) return { list: source, added: null };
+  const folded = query.toLowerCase();
+  const target = EXTRA_STATUS_DEFAULTS.find(
+    (entry) => entry.key === query || entry.key.toLowerCase() === folded || entry.name.toLowerCase() === folded
+  );
+  if (!target) return { list: source, added: null };
+  const available = getAvailableExtraStatuses(source);
+  const match = available.find((entry) => entry.key === target.key);
+  if (!match) return { list: source, added: null };
+  return {
+    list: [...source.map((entry) => ({ ...entry })), { ...match }],
+    added: { ...match }
+  };
+}
+function mergeExtraStatuses(list) {
+  const source = Array.isArray(list) ? list : [];
+  const added = getAvailableExtraStatuses(source);
   if (!added.length) return { list: source, added: [] };
   return {
     list: [...source.map((entry) => ({ ...entry })), ...added],
@@ -5970,7 +5993,10 @@ function createTaskStatusExtension({
     return cssString(statusKey);
   }
   function getRenderableStatusKeys() {
-    return uniqueStrings(Object.keys(STATUSES || {}));
+    return uniqueStrings([
+      ...Object.keys(STATUSES || {}),
+      ...EXTRA_STATUS_DEFAULTS.map((entry) => entry.key)
+    ]);
   }
   function getDefaultStatusColor(statusKey) {
     return DEFAULT_STATUS_BASE_COLORS[statusKey] || DEFAULT_CUSTOM_STATUS_BASE_COLOR;
@@ -6458,6 +6484,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     rebuildStatusIndexesFromMemory();
     await registerAllCommands();
     return { key, name };
+  }
+  async function addExtraStatus(keyOrName) {
+    const { list: nextList, added } = mergeExtraStatus(statusList, keyOrName);
+    if (!added) return { added: null };
+    statusList = nextList;
+    await saveSettingAsync(SETTINGS_KEYS.statusList, statusList);
+    await unregisterAllCommands();
+    rebuildStatusIndexesFromMemory();
+    await registerAllCommands();
+    return { added };
   }
   async function addExtraStatuses() {
     const { list: nextList, added } = mergeExtraStatuses(statusList);
@@ -8162,6 +8198,22 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           setWorkingKey(null);
         }
       };
+      const addSingleExtraStatusFromPanel = async (extraKey) => {
+        setExtraStatusError(null);
+        setExtraStatusInfo(null);
+        setWorkingKey(`__EXTRA_${extraKey}__`);
+        try {
+          const result4 = await addExtraStatus(extraKey);
+          refreshStatusRows();
+          if (result4.added) {
+            setInfoByKey((prev) => ({ ...prev, [result4.added.key]: "Added." }));
+          }
+        } catch (e) {
+          setExtraStatusError(e?.message || String(e));
+        } finally {
+          setWorkingKey(null);
+        }
+      };
       const addExtraStatusesFromPanel = async () => {
         setExtraStatusError(null);
         setExtraStatusInfo(null);
@@ -8173,8 +8225,6 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
             setExtraStatusInfo(
               result4.added.length === 1 ? "Added 1 status" : `Added ${result4.added.length} statuses`
             );
-          } else {
-            setExtraStatusInfo("All eleven are already in your list");
           }
         } catch (e) {
           setExtraStatusError(e?.message || String(e));
@@ -8710,38 +8760,88 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           ) : null
         )
       );
-      const addMoreStatusesRow = React.createElement(
+      const availableExtras = getAvailableExtraStatuses(statusRows);
+      const moreStatusesGallery = availableExtras.length ? React.createElement(
         "div",
-        { className: "ts-status-add-row ts-status-extra-row", key: "add-more-statuses" },
+        { className: "ts-extra-gallery", key: "more-statuses-gallery" },
         React.createElement(
           "div",
-          { className: "ts-status-row-main" },
-          React.createElement("span", {
-            className: "ts-status-add-spacer",
-            "aria-hidden": "true"
-          }),
+          { className: "ts-extra-gallery-header" },
+          React.createElement(
+            "span",
+            { className: "ts-extra-gallery-title" },
+            "More statuses"
+          ),
           React.createElement(
             "button",
             {
               type: "button",
-              className: "bp3-button bp3-small",
+              className: "bp3-button bp3-small bp3-minimal ts-extra-gallery-add-all",
               disabled: Boolean(workingKey),
-              onClick: () => void addExtraStatusesFromPanel()
+              onClick: () => addExtraStatusesFromPanel()
             },
-            "Add more statuses"
-          ),
-          extraStatusError ? React.createElement(
-            "span",
-            { className: "bp3-text-small ts-status-row-error" },
-            extraStatusError
-          ) : null,
-          !extraStatusError && extraStatusInfo ? React.createElement(
-            "span",
-            { className: "bp3-text-small ts-status-row-info" },
-            extraStatusInfo
-          ) : null
-        )
-      );
+            "Add all"
+          )
+        ),
+        React.createElement(
+          "div",
+          { className: "ts-extra-gallery-chips" },
+          ...availableExtras.map(
+            (extra) => React.createElement(
+              "button",
+              {
+                type: "button",
+                key: extra.key,
+                className: "ts-extra-chip",
+                "data-ts-extra-key": extra.key,
+                disabled: Boolean(workingKey),
+                title: `Add ${extra.name}`,
+                onClick: () => addSingleExtraStatusFromPanel(extra.key)
+              },
+              React.createElement(
+                "span",
+                { className: "ts-extra-chip-icon", "aria-hidden": "true" },
+                React.createElement(
+                  "span",
+                  {
+                    className: "rm-checkbox rm-todo",
+                    [CHECKBOX_STATUS_ATTRIBUTE]: extra.key,
+                    [CHECKBOX_SHAPE_ATTRIBUTE]: getStatusCheckboxShape(extra.key, extra.name),
+                    [CHECKBOX_TILT_ATTRIBUTE]: String(computeStickerTiltSlot(null, extra.key))
+                  },
+                  React.createElement(
+                    "label",
+                    { className: "check-container" },
+                    React.createElement("input", {
+                      type: "checkbox",
+                      checked: false,
+                      readOnly: true,
+                      tabIndex: -1,
+                      "aria-hidden": "true"
+                    }),
+                    React.createElement("span", { className: "checkmark" })
+                  )
+                )
+              ),
+              React.createElement(
+                "span",
+                { className: "ts-extra-chip-label" },
+                extra.name
+              )
+            )
+          )
+        ),
+        extraStatusError ? React.createElement(
+          "div",
+          { className: "bp3-text-small ts-status-row-error" },
+          extraStatusError
+        ) : null,
+        !extraStatusError && extraStatusInfo ? React.createElement(
+          "div",
+          { className: "bp3-text-small ts-status-row-info" },
+          extraStatusInfo
+        ) : null
+      ) : null;
       return React.createElement(
         "div",
         { className: "ts-status-names-panel", ref: rootRef },
@@ -8916,35 +9016,16 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               return [row];
             }),
             addStatusRow,
-            addMoreStatusesRow
+            moreStatusesGallery
           )
         )
       );
     };
-    const STYLE_PREVIEW_PREFERRED_KEYS = [
-      "ACTIVE",
-      "WAITING",
-      "IN_REVIEW",
-      "HOLDING",
-      "ALERT",
-      "WATCHING"
-    ];
-    const getStylePreviewSamples = () => {
-      const activeKeys = CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active);
-      const picked = [];
-      for (const key of STYLE_PREVIEW_PREFERRED_KEYS) {
-        if (STATUSES[key]?.active && !picked.includes(key)) picked.push(key);
-      }
-      for (const key of activeKeys) {
-        if (picked.length >= 6) break;
-        if (!picked.includes(key)) picked.push(key);
-      }
-      return picked.slice(0, 6).map((key) => ({
-        key,
-        label: STATUSES[key]?.label || STATUSES[key]?.name || key,
-        shape: getStatusCheckboxShape(key, STATUSES[key]?.name)
-      }));
-    };
+    const getStylePreviewSamples = () => CONFIG.cycleOrder.filter((key) => STATUSES[key]?.active).map((key) => ({
+      key,
+      label: STATUSES[key]?.label || STATUSES[key]?.name || key,
+      shape: getStatusCheckboxShape(key, STATUSES[key]?.name)
+    }));
     const CheckboxStylePreview = () => {
       if (!React?.createElement) return null;
       const readSnapshot = () => ({
@@ -9368,7 +9449,9 @@ export {
   STATUS_DEFAULTS_VERSION,
   createTaskStatusTextHelpers,
   extension_default as default,
+  getAvailableExtraStatuses,
   isEditableField,
+  mergeExtraStatus,
   mergeExtraStatuses,
   migrateStatusListDefaults,
   nextTaskCycleStatus,

@@ -5413,6 +5413,123 @@ a.rm-page-ref[data-task-status-key="CANCELLED"],
   margin-top: 4px;
 }
 
+.ts-extra-gallery {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ts-menu-border-subtle);
+  border-radius: 10px;
+  background: var(--ts-preview-surface-bg);
+  color: var(--ts-menu-text);
+}
+
+.ts-extra-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ts-extra-gallery-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ts-menu-muted);
+}
+
+.ts-extra-gallery-add-all {
+  font-size: 12px !important;
+  color: var(--ts-menu-accent) !important;
+}
+
+.ts-extra-gallery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ts-extra-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid var(--ts-menu-border-subtle);
+  border-radius: 8px;
+  background: var(--ts-menu-surface);
+  color: var(--ts-menu-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.ts-extra-chip:hover:not(:disabled) {
+  background: var(--ts-menu-hover);
+  border-color: var(--ts-menu-border);
+}
+
+.ts-extra-chip:focus-visible {
+  outline: 2px solid var(--ts-menu-accent);
+  outline-offset: 1px;
+}
+
+.ts-extra-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ts-extra-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  pointer-events: none;
+}
+
+.ts-extra-chip-icon .rm-checkbox[data-ts-checkbox-status] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ts-extra-chip-icon .rm-checkbox[data-ts-checkbox-status] > .check-container {
+  display: inline-block;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.ts-extra-chip-icon .rm-checkbox[data-ts-checkbox-status] > .check-container > input {
+  position: absolute;
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.ts-extra-chip-icon .rm-checkbox[data-ts-checkbox-status] > .check-container > .checkmark {
+  position: absolute;
+  inset: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.ts-extra-chip-label {
+  white-space: nowrap;
+}
+
 .ts-status-names-list {
   display: flex;
   flex-direction: column;

@@ -382,7 +382,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
         assert.equal(previewTree.props.className, "ts-style-preview");
         assert.equal(previewTree.props["data-ts-preview-style"], "Solid");
         assert.equal(previewTree.props["data-ts-preview-theme"], "light");
-        assert.equal(previewTree.children[0].length, 6);
+        assert.equal(previewTree.children[0].length, 14);
         const firstCheckbox = previewTree.children[0][0].children[0];
         assert.equal(firstCheckbox.props.className, "rm-checkbox rm-todo");
         assert.equal(firstCheckbox.props["data-ts-checkbox-status"], "ACTIVE");
@@ -495,6 +495,129 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       console.info = originalConsoleInfo;
     }
   } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+    globalThis.MutationObserver = originalMutationObserver;
+  }
+});
+
+test("More statuses gallery adds one extra at a time without duplicates, supports Add all, and disappears when all added", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const originalMutationObserver = globalThis.MutationObserver;
+
+  const document = new FakeDocument();
+  const activeCommands = new Set();
+  const cmdApi = commandApi(activeCommands);
+  const settingsStore = new Map();
+  let panelConfig = null;
+  class QuietObserver {
+    observe() {}
+    disconnect() {}
+  }
+  const windowLike = new EventTarget();
+  Object.assign(windowLike, {
+    document,
+    CSS: { supports: () => true },
+    React: {
+      createElement: (type, props, ...children) => ({ type, props, children }),
+      useEffect: () => {},
+      useMemo: (fn) => fn(),
+      useRef: (value) => ({ current: value }),
+      useState: (value) => [typeof value === "function" ? value() : value, () => {}],
+    },
+    getComputedStyle: () => ({ backgroundColor: "rgb(255, 255, 255)", color: "rgb(20, 184, 166)" }),
+    setTimeout,
+    clearTimeout,
+    requestAnimationFrame: (cb) => setTimeout(cb, 0),
+    cancelAnimationFrame: clearTimeout,
+    innerWidth: 1280,
+    innerHeight: 800,
+    roamAlphaAPI: {
+      data: {
+        async: { pull: async () => null },
+        block: { update: async () => {} },
+        page: { update: async () => {} },
+      },
+      ui: {
+        commandPalette: cmdApi,
+        blockContextMenu: cmdApi,
+        msContextMenu: cmdApi,
+      },
+    },
+  });
+  globalThis.window = windowLike;
+  globalThis.document = document;
+  globalThis.MutationObserver = QuietObserver;
+
+  const extensionAPI = {
+    settings: {
+      get: (key) => (settingsStore.has(key) ? settingsStore.get(key) : null),
+      set: async (key, value) => { settingsStore.set(key, value); },
+      panel: { create: async (cfg) => { panelConfig = cfg; } },
+    },
+    ui: { commandPalette: cmdApi, slashCommand: cmdApi },
+  };
+
+  let mod = null;
+  try {
+    mod = await import(`../src/extension.js?gallery=${Date.now()}`);
+    await mod.onload({ extensionAPI, extension: { version: "0.18.0" } });
+
+    const statusNamesSetting = panelConfig.settings.find((entry) => entry.id === "task-status-status-names");
+    const previewSetting = panelConfig.settings.find((entry) => entry.id === "task-status-style-preview");
+    const findNodes = (node, pred, out = []) => {
+      if (!node || typeof node !== "object") return out;
+      if (Array.isArray(node)) {
+        node.forEach((child) => findNodes(child, pred, out));
+        return out;
+      }
+      if (pred(node)) out.push(node);
+      if (Array.isArray(node.children)) findNodes(node.children, pred, out);
+      return out;
+    };
+
+    // Initial state: 14 active statuses, 11 chips in More statuses gallery
+    const initialTree = statusNamesSetting.action.component();
+    const initialChips = findNodes(initialTree, (n) => n.props?.className === "ts-extra-chip");
+    assert.equal(initialChips.length, 11);
+    const starredChip = initialChips.find((n) => n.props["data-ts-extra-key"] === "STARRED");
+    assert.ok(starredChip, "Starred chip should exist");
+
+    // Clicking Starred adds exactly one status (14 -> 15)
+    await starredChip.props.onClick();
+    assert.equal(windowLike.RoamTaskStatusTags.statuses().length, 15);
+    assert.equal(previewSetting.action.component().children[0].length, 15);
+
+    // Clicking the same chip a second time cannot duplicate it
+    await starredChip.props.onClick();
+    assert.equal(windowLike.RoamTaskStatusTags.statuses().length, 15);
+
+    // Remaining gallery shows 10 chips without Starred
+    const afterOneTree = statusNamesSetting.action.component();
+    const afterOneChips = findNodes(afterOneTree, (n) => n.props?.className === "ts-extra-chip");
+    assert.equal(afterOneChips.length, 10);
+    assert.equal(afterOneChips.some((n) => n.props["data-ts-extra-key"] === "STARRED"), false);
+
+    // Clicking Add all adds the remaining 10 (15 -> 25) and the gallery disappears
+    const addAllBtn = findNodes(afterOneTree, (n) =>
+      String(n.props?.className || "").includes("ts-extra-gallery-add-all")
+    )[0];
+    assert.ok(addAllBtn, "Add all button should exist");
+    await addAllBtn.props.onClick();
+    assert.equal(windowLike.RoamTaskStatusTags.statuses().length, 25);
+    assert.equal(previewSetting.action.component().children[0].length, 25);
+    const afterAllTree = statusNamesSetting.action.component();
+    assert.equal(
+      findNodes(afterAllTree, (n) => n.props?.className === "ts-extra-gallery").length,
+      0
+    );
+
+    await mod.onunload();
+    mod = null;
+    assert.equal(activeCommands.size, 0);
+  } finally {
+    await mod?.onunload?.();
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;
     globalThis.MutationObserver = originalMutationObserver;

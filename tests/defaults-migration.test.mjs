@@ -6,6 +6,8 @@ import {
   EXTRA_STATUS_DEFAULTS,
   MEDIA_STATUS_DEFAULTS,
   STATUS_DEFAULTS_VERSION,
+  getAvailableExtraStatuses,
+  mergeExtraStatus,
   mergeExtraStatuses,
   migrateStatusListDefaults,
   nextTaskCycleStatus,
@@ -163,6 +165,45 @@ test("Add more statuses merge appends missing extras in table order and is idemp
   assert.equal(readded.list.at(-1).key, "STARRED");
 });
 
+test("single-extra gallery merge adds exactly one status and rejects duplicate clicks by key or name", () => {
+  const initial = [...v1List, ...MEDIA_STATUS_DEFAULTS.map((entry) => ({ ...entry }))];
+  assert.equal(getAvailableExtraStatuses(initial).length, 11);
+
+  // Clicking one extra adds exactly one status
+  const first = mergeExtraStatus(initial, "STARRED");
+  assert.deepEqual(first.added, { key: "STARRED", name: "Starred" });
+  assert.equal(first.list.length, initial.length + 1);
+  assert.equal(first.list.at(-1).key, "STARRED");
+  assert.equal(getAvailableExtraStatuses(first.list).length, 10);
+
+  // A second click on the same key or name (any case) cannot duplicate it
+  const dupByKey = mergeExtraStatus(first.list, "STARRED");
+  assert.equal(dupByKey.added, null);
+  assert.equal(dupByKey.list, first.list);
+
+  const dupByName = mergeExtraStatus(first.list, "  starred ");
+  assert.equal(dupByName.added, null);
+  assert.equal(dupByName.list, first.list);
+
+  // Adding by name works for another unadded extra
+  const second = mergeExtraStatus(first.list, "Discuss");
+  assert.deepEqual(second.added, { key: "DISCUSS", name: "Discuss" });
+  assert.equal(second.list.length, initial.length + 2);
+
+  // Hand-added status with matching name blocks that extra chip too
+  const withCustomBug = [...second.list, { key: "CUSTOM_BUG", name: "bug" }];
+  assert.equal(
+    getAvailableExtraStatuses(withCustomBug).some((entry) => entry.key === "BUG"),
+    false
+  );
+  assert.equal(mergeExtraStatus(withCustomBug, "BUG").added, null);
+
+  // Adding all remaining empties the available gallery
+  const all = mergeExtraStatuses(second.list);
+  assert.equal(all.added.length, 9);
+  assert.deepEqual(getAvailableExtraStatuses(all.list), []);
+});
+
 test("the runtime wrapper and chooser use the group-aware helpers", async () => {
   const source = await readFile(new URL("../src/extension.js", import.meta.url), "utf8");
   assert.match(source, /nextTaskCycleStatus\(CONFIG\.cycleOrder, currentStatus, statusIsNonTask\)/);
@@ -172,8 +213,9 @@ test("the runtime wrapper and chooser use the group-aware helpers", async () => 
   assert.match(source, /const mediaKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "media"\)/);
   assert.match(source, /const extraKeys = activeKeys\.filter\(\(key\) => statusGroup\(key\) === "extra"\)/);
   assert.match(source, /for \(const groupKeys of \[taskKeys, mediaKeys, extraKeys\]\)/);
-  assert.match(source, /Add more statuses/);
-  assert.match(source, /All eleven are already in your list/);
+  assert.match(source, /More statuses/);
+  assert.match(source, /Add all/);
+  assert.match(source, /ts-extra-gallery/);
   assert.match(source, /statusNames: getStatusNameMap\(\)/);
 });
 
