@@ -1214,6 +1214,24 @@
   filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.58));
 }
 
+/*
+ * A triangle covers under half of its box, so at the shared inset Alert drew
+ * smaller than every round or square tile. In the filled styles it is as tall
+ * as the tile and about 10% wider, the usual keyline correction for triangles.
+ */
+:root[data-ts-checkbox-style="glass"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="solid"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: -31%;
+}
+
 :root[data-ts-checkbox-style]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
   > .check-container:hover

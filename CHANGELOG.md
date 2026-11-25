@@ -7,6 +7,7 @@
 - Add the fifth checkbox style **Sticker**: opaque die-cut status tiles with a 1.5px paper rim (warm off-white in dark mode, white with a soft drop shadow in light mode), stable per-block tilt, hover straighten-and-lift, and a slap landing animation on status change (motion gated by **Animate status icons** and reduced motion).
 - Replace the single **Add more statuses** button in settings with a visual **More statuses** gallery showing one icon chip per available extra status (plus an **Add all** button), and expand the settings **Style preview** strip to wrap and show every active status.
 - Audit WCAG contrast across all 25 built-in statuses, 5 styles, and 2 themes: keep the four existing styles' colours unchanged so approved palettes do not drift, and certify every Sticker status (including unmapped and custom statuses) to at least 3:1 against the surface and 4.5:1 for the glyph.
+- Draw the **Alert** triangle in Glass and Solid as tall as the other tiles and about 10% wider. A triangle covers under half of its box, so at the shared size it was the smallest icon in the list.
 - Document sizing measurements, evidence, and final geometry in `docs/spec-depot-port.md` section 13, update the gallery fixture for all five styles and four sizes, and regenerate `docs/images/*.png`.
 
 ## 0.17.0 - 2026-11-24
