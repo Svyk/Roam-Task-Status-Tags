@@ -3143,60 +3143,117 @@
 /*
  * Uniform checkbox scaling (Compact sets no data-ts-checkbox-size attribute and
  * keeps Roam's native geometry byte-for-byte).
- * Medium (16px, default), Large (18px), and Extra large (20px) zoom every task
- * checkbox uniformly on Roam's 12x12 .check-container (whose .checkmark tile is
- * 14x14 at top:-1px; left:-1px) so plain TODOs, DONE ticks, Outline, Glass,
- * Solid, Minimal, and Sticker tiles all reach exact 16/18/20px outer sizes,
- * keep a 7px gap to the first letter, and preserve 29px one-line block height.
+ *
+ * Roam's own .check-container and .checkmark are 12x12 at top: 0; left: 0
+ * (plain TODOs, DONE boxes, status DONE boxes, and Outline status checkboxes),
+ * while styled unchecked status tiles (Glass, Solid, Minimal, Sticker) expand
+ * .checkmark to 14x14 at top: -1px; left: -1px.
+ *
+ * Medium (16px, default), Large (18px), and Extra large (20px) therefore use
+ * two zoom factors on .check-container:
+ * - size/12 (1.3333 / 1.5 / 1.6667) for 12px native boxes
+ * - size/14 (1.1429 / 1.2857 / 1.4286) for 14px styled status tiles
+ * so every box lands at exact 16/18/20px with matching left edge, centre height,
+ * 7px gap to the first letter, 29px one-line block height, and zero jump when
+ * data-ts-checkbox-status is added.
  */
 :root[data-ts-checkbox-size="medium"] .rm-checkbox > .check-container {
+  zoom: 1.3333;
+  vertical-align: -1.85px;
+}
+
+:root[data-ts-checkbox-size="large"] .rm-checkbox > .check-container {
+  zoom: 1.5;
+  vertical-align: -2.32px;
+}
+
+:root[data-ts-checkbox-size="xlarge"] .rm-checkbox > .check-container {
+  zoom: 1.6667;
+  vertical-align: -2.7px;
+}
+
+:root[data-ts-checkbox-size="medium"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done)
+  > .check-container {
   --ts-sticker-rim-width: 1.3125px;
   zoom: 1.1429;
   vertical-align: -1.15px;
 }
 
-:root[data-ts-checkbox-size="large"] .rm-checkbox > .check-container {
+:root[data-ts-checkbox-size="large"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done)
+  > .check-container {
   --ts-sticker-rim-width: 1.1667px;
   zoom: 1.2858;
   vertical-align: -1.7px;
 }
 
-:root[data-ts-checkbox-size="xlarge"] .rm-checkbox > .check-container {
+:root[data-ts-checkbox-size="xlarge"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done)
+  > .check-container {
   --ts-sticker-rim-width: 1.05px;
   zoom: 1.4286;
   vertical-align: -2.15px;
 }
 
-:root[data-ts-checkbox-size="medium"] .rm-checkbox {
-  margin-right: 4.35px;
-}
-
-:root[data-ts-checkbox-size="large"] .rm-checkbox {
-  margin-right: 4.5px;
-}
-
+:root[data-ts-checkbox-size="medium"] .rm-checkbox,
+:root[data-ts-checkbox-size="large"] .rm-checkbox,
 :root[data-ts-checkbox-size="xlarge"] .rm-checkbox {
-  margin-right: 4.65px;
+  margin-left: 0;
+  margin-right: 3.2px;
 }
 
 :root[data-ts-checkbox-size="medium"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"],
+:root[data-ts-checkbox-size="large"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"],
+:root[data-ts-checkbox-size="xlarge"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+  margin-right: -0.6px;
+}
+
+:root[data-ts-checkbox-size="medium"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done) {
+  margin-left: 1.14px;
+  margin-right: 4.35px;
+}
+
+:root[data-ts-checkbox-size="large"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done) {
+  margin-left: 1.29px;
+  margin-right: 4.5px;
+}
+
+:root[data-ts-checkbox-size="xlarge"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done) {
+  margin-left: 1.43px;
+  margin-right: 4.65px;
+}
+
+:root[data-ts-checkbox-size="medium"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"]:not(.rm-done) {
   margin-right: 0.55px;
 }
 
-:root[data-ts-checkbox-size="large"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+:root[data-ts-checkbox-size="large"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"]:not(.rm-done) {
   margin-right: 0.7px;
 }
 
-:root[data-ts-checkbox-size="xlarge"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"] {
+:root[data-ts-checkbox-size="xlarge"][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-pill-hidden="true"]:not(.rm-done) {
   margin-right: 0.85px;
 }
 
-/* Click target equals the visible 14px base tile (16/18/20px zoomed); no slop onto text. */
+/* Click target equals the visible box (12px base or 14px styled tile -> 16/18/20px zoomed); no slop onto text. */
 :root[data-ts-checkbox-size]
   .rm-checkbox[data-ts-checkbox-status]
+  > .check-container::after {
+  inset: 0;
+}
+
+:root[data-ts-checkbox-size][data-ts-checkbox-style]
+  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done)
   > .check-container::after {
   inset: -1px;
 }
@@ -3207,16 +3264,17 @@
 :root[data-ts-checkbox-size] .ts-rendered-icon .rm-checkbox,
 :root[data-ts-checkbox-size] .ts-status-names-panel .rm-checkbox {
   --ts-sticker-rim-width: 1.5px;
-  margin-right: 0;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 :root[data-ts-checkbox-size] .ts-status-chooser .rm-checkbox > .check-container,
 :root[data-ts-checkbox-size] .ts-style-preview .rm-checkbox > .check-container,
 :root[data-ts-checkbox-size] .ts-rendered-icon .rm-checkbox > .check-container,
 :root[data-ts-checkbox-size] .ts-status-names-panel .rm-checkbox > .check-container {
-  --ts-sticker-rim-width: 1.5px;
-  zoom: 1;
-  vertical-align: baseline;
+  --ts-sticker-rim-width: 1.5px !important;
+  zoom: 1 !important;
+  vertical-align: baseline !important;
 }
 
 /*

@@ -208,9 +208,16 @@
         border-color: var(--svy-border);
       }
 
-      /* Roam native checkbox metrics: 12x12 .check-container, 14x14 .checkmark at -1px */
+      /*
+       * Roam Desktop native checkbox metrics (measured from Roam's site.css, no theme):
+       * - .check-container: 12x12 inline-block, position: relative
+       * - .checkmark: position: absolute; top: 0; left: 0; 12x12; box-sizing: border-box;
+       *   border ~1px; border-radius: 2px
+       * - .check-container .checkmark::after (tick): left: 3.5px; top: 0.25px; width: 5px; height: 10px
+       * (The 14x14 tile at top: -1px; left: -1px is added by this extension's status CSS only.)
+       */
       .rm-checkbox { display: inline; vertical-align: baseline; }
-      .status-row .rm-checkbox { display: inline-flex; align-items: center; justify-content: center; margin-right: 0 !important; }
+      .status-row .rm-checkbox { display: inline-flex; align-items: center; justify-content: center; margin-left: 0 !important; margin-right: 0 !important; }
       .check-container {
         display: inline-block;
         position: relative;
@@ -228,27 +235,29 @@
       }
       .checkmark {
         position: absolute;
-        top: -1px;
-        left: -1px;
-        width: 14px;
-        height: 14px;
-        border: 1.5px solid #738091;
-        border-radius: 4px;
+        top: 0;
+        left: 0;
+        width: 12px;
+        height: 12px;
+        box-sizing: border-box;
+        border: 1px solid #738091;
+        border-radius: 2px;
         background: transparent;
       }
       .check-container input:checked ~ .checkmark {
         background: #1684b7;
-        border-color: #1684b7;
+        border: 0;
       }
       .check-container input:checked ~ .checkmark::after {
         content: "";
         position: absolute;
+        box-sizing: border-box;
         left: 3.5px;
-        top: 0.5px;
-        width: 3.5px;
-        height: 7px;
+        top: 0.25px;
+        width: 5px;
+        height: 10px;
         border: solid #ffffff;
-        border-width: 0 1.8px 1.8px 0;
+        border-width: 0 2px 2px 0;
         transform: rotate(45deg);
       }
 
@@ -1039,7 +1048,7 @@
               '<head><meta charset="utf-8" /><link rel="stylesheet" href="' + cssHref + '" />' +
               "<style>" + baseCss + "\n" + paletteCss + "\n" +
               "body { background: var(--svy-raised); margin: 0; padding: 6px 4px; display: flex; align-items: center; gap: 10px; overflow: hidden; }\n" +
-              ".rm-checkbox { display: inline-flex; align-items: center; justify-content: center; margin-right: 0 !important; }\n" +
+              ".rm-checkbox { display: inline-flex; align-items: center; justify-content: center; margin-left: 0 !important; margin-right: 0 !important; }\n" +
               "</style></head><body" + bodyClass + ">" + icons + "</body></html>").replace(/"/g, "&quot;") +
               '"></iframe></div>'
             );

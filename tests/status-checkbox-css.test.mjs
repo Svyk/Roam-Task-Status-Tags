@@ -502,6 +502,51 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.doesNotMatch(css, /:root\s*\{/);
 });
 
+test("checkbox size CSS uses size/12 for native boxes, size/14 for styled status tiles, and neither for Compact", () => {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // Compact adds no size CSS: no compact attribute selector and every zoom rule is gated by :root[data-ts-checkbox-size...].
+  assert.doesNotMatch(stripped, /data-ts-checkbox-size="compact"/);
+  const zoomRules = [...stripped.matchAll(/([^{}@]+)\{([^{}]*\bzoom\s*:[^{}]*)\}/g)];
+  assert.ok(zoomRules.length >= 7, "expected 6 size zoom rules plus extension-UI zoom reset");
+  for (const [, header, body] of zoomRules) {
+    for (const selector of header.split(",").map((s) => s.trim()).filter(Boolean)) {
+      assert.match(
+        selector,
+        /^:root\[data-ts-checkbox-size(?:="(?:medium|large|xlarge)")?\]/,
+        `zoom rule must be gated by :root[data-ts-checkbox-size...], got: ${selector}`
+      );
+    }
+    assert.doesNotMatch(
+      body,
+      /(?:^|;)\s*(?:width|height)\s*:/,
+      `size rule must scale with zoom only, not width/height: ${header}`
+    );
+  }
+
+  const expectedPairs = [
+    ["medium", "1.3333", "1.1429"],
+    ["large", "1.5", "1.2858"],
+    ["xlarge", "1.6667", "1.4286"],
+  ];
+  for (const [size, nativeZoom, tileZoom] of expectedPairs) {
+    const nativeRule = ruleBody(`:root[data-ts-checkbox-size="${size}"] .rm-checkbox > .check-container {`);
+    assert.match(
+      nativeRule,
+      new RegExp(`zoom:\\s*${nativeZoom.replace(".", "\\.")};`),
+      `${size} native 12px box must use zoom ${nativeZoom}`
+    );
+
+    const tileSelector = `:root[data-ts-checkbox-size="${size}"][data-ts-checkbox-style]\n  .rm-checkbox[data-ts-checkbox-status]:not(.rm-done)\n  > .check-container {`;
+    const tileRule = ruleBody(tileSelector);
+    assert.match(
+      tileRule,
+      new RegExp(`zoom:\\s*${tileZoom.replace(".", "\\.")};`),
+      `${size} styled 14px status tile must use zoom ${tileZoom}`
+    );
+  }
+});
+
 test("hover lift, active press, forbidden selectors, and static Solid on-accent contrast are enforced", () => {
   assert.doesNotMatch(css, /backdrop-filter\s*:/i);
   assert.doesNotMatch(css, /:has\(/i);
