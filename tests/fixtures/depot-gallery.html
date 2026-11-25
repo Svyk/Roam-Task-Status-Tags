@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-ts-theme="light" data-ts-checkbox-style="glass" data-ts-checkbox-size="large">
+<html lang="en" data-ts-theme="light" data-ts-checkbox-style="glass" data-ts-checkbox-size="medium">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -506,8 +506,8 @@
           </div>
           <div class="control-group" role="group" aria-label="Checkbox size">
             <button type="button" data-size-choice="compact" aria-pressed="false">Compact 14</button>
-            <button type="button" data-size-choice="medium" aria-pressed="false">Medium 16</button>
-            <button type="button" data-size-choice="large" aria-pressed="true">Large 18</button>
+            <button type="button" data-size-choice="medium" aria-pressed="true">Medium 16</button>
+            <button type="button" data-size-choice="large" aria-pressed="false">Large 18</button>
             <button type="button" data-size-choice="xlarge" aria-pressed="false">XL 20</button>
           </div>
           <div class="control-group" role="group" aria-label="Animate status icons">
@@ -919,7 +919,7 @@
           }).join("");
 
           var styleMeta = STYLES.find(function (s) { return s.id === currentStyle; }) || STYLES[1];
-          var sizeMeta = SIZES.find(function (s) { return s.id === currentSize; }) || SIZES[2];
+          var sizeMeta = SIZES.find(function (s) { return s.id === currentSize; }) || SIZES[1];
           var titleEl = document.getElementById("rows-section-title");
           if (titleEl) {
             titleEl.textContent = styleMeta.label + " · " + sizeMeta.label + " · " + (currentTheme === "dark" ? "Dark" : "Light") + " (Inter 14px / 21px, 7px gap)";
@@ -994,7 +994,7 @@
           var baseCss = document.getElementById("ts-gallery-base").textContent;
           var paletteCss = document.getElementById("ts-gallery-palette").textContent;
           var styleAttr = style.id === "outline" ? "" : ' data-ts-checkbox-style="' + style.id + '"';
-          var sizeMeta = SIZES.find(function (s) { return s.id === sizeId; }) || SIZES[2];
+          var sizeMeta = SIZES.find(function (s) { return s.id === sizeId; }) || SIZES[1];
           var sizeAttr = sizeMeta.attr ? ' data-ts-checkbox-size="' + sizeMeta.attr + '"' : "";
           var ambientAttr = ambientOn && !paused ? ' data-ts-ambient-motion="on"' : "";
           var bodyClass = paused ? ' class="motion-paused"' : "";
@@ -1087,7 +1087,7 @@
 
         var currentTheme = "light";
         var currentStyle = "glass";
-        var currentSize = "large";
+        var currentSize = "medium";
         var currentAmbient = true;
         var motionPaused = false;
 
@@ -1098,7 +1098,7 @@
           } else {
             document.documentElement.setAttribute("data-ts-checkbox-style", currentStyle);
           }
-          var sizeMeta = SIZES.find(function (s) { return s.id === currentSize; }) || SIZES[2];
+          var sizeMeta = SIZES.find(function (s) { return s.id === currentSize; }) || SIZES[1];
           if (sizeMeta.attr) {
             document.documentElement.setAttribute("data-ts-checkbox-size", sizeMeta.attr);
           } else {

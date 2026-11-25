@@ -30,7 +30,7 @@ var CHECKBOX_SIZE_VALUES = Object.freeze({
   LARGE: "Large",
   EXTRA_LARGE: "Extra large"
 });
-function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.LARGE) {
+function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.MEDIUM) {
   const candidate = value && typeof value === "object" ? value.target?.value ?? value.currentTarget?.value ?? value.value : value;
   const normalized = String(candidate || "").trim();
   return Object.values(CHECKBOX_SIZE_VALUES).includes(normalized) ? normalized : fallback;
@@ -6212,7 +6212,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return normalizeCheckboxStyle(parseMaybeJson(raw), fallback);
   }
   function loadCheckboxSizeSetting() {
-    const fallback = CHECKBOX_SIZE_VALUES.LARGE;
+    const fallback = CHECKBOX_SIZE_VALUES.MEDIUM;
     if (!extensionAPI?.settings?.get) return fallback;
     const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxSize);
     if (raw === null || typeof raw === "undefined") {
@@ -6949,7 +6949,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     return attrValue;
   }
   function setCheckboxSizeSetting(nextValue) {
-    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.LARGE);
+    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.MEDIUM);
     syncDocumentCheckboxSize();
     notifyStylePreviewListeners();
   }

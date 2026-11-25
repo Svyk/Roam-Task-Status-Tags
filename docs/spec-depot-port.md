@@ -287,10 +287,10 @@ The clean-room boundary in section 1 is superseded for BetterTask for Thymer (`g
 
 ### Final numbers and decisions (v0.18.0)
 
-- **Setting `task-status-checkbox-size` ("Checkbox size"):** `Compact` (14px, no root attribute, byte-for-byte v0.17.0 geometry), `Medium` (16px, `data-ts-checkbox-size="medium"`), `Large` (18px, default, `data-ts-checkbox-size="large"`), `Extra large` (20px, `data-ts-checkbox-size="xlarge"`). Removed on unload.
+- **Setting `task-status-checkbox-size` ("Checkbox size"):** `Compact` (14px, no root attribute, byte-for-byte v0.17.0 geometry), `Medium` (16px, default, `data-ts-checkbox-size="medium"`), `Large` (18px, `data-ts-checkbox-size="large"`), `Extra large` (20px, `data-ts-checkbox-size="xlarge"`). Removed on unload. The default was set to Medium on the user's preference after testing; Large stays the size where 24-grid strokes land on whole pixels.
 - **Scaling mechanism:** uniform CSS `zoom` on `.rm-checkbox > .check-container` keyed to the native 14px `.checkmark` base so plain TODO boxes, DONE theme ticks, Outline, Glass, Solid, Minimal, and Sticker tiles all scale identically:
-  - `Medium`: `zoom: 1.1429` (`16/14`), `vertical-align: -1.15px`, `margin-right: 4.35px` (plain/DONE) / `0.55px` (hidden-pill status).
-  - `Large` (default): `zoom: 1.2858` (`18/14`), `vertical-align: -1.7px`, `margin-right: 4.5px` (plain/DONE) / `0.7px` (hidden-pill status).
+  - `Medium` (default): `zoom: 1.1429` (`16/14`), `vertical-align: -1.15px`, `margin-right: 4.35px` (plain/DONE) / `0.55px` (hidden-pill status).
+  - `Large`: `zoom: 1.2858` (`18/14`), `vertical-align: -1.7px`, `margin-right: 4.5px` (plain/DONE) / `0.7px` (hidden-pill status).
   - `Extra large`: `zoom: 1.4286` (`20/14`), `vertical-align: -2.15px`, `margin-right: 4.65px` (plain/DONE) / `0.85px` (hidden-pill status).
   - Click target (`> .check-container::after`): `inset: -1px`, matching the exact zoomed 14px tile (16/18/20px) with zero dead zone and zero slop into the first letter. Chooser icons (16px) and settings previews reset to `zoom: 1`.
 - **Measured in headless Chromium (Inter 14px/21px, 29px block, `white-space: pre-wrap`):**

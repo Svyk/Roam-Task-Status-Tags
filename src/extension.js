@@ -1131,7 +1131,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function loadCheckboxSizeSetting() {
-    const fallback = CHECKBOX_SIZE_VALUES.LARGE;
+    const fallback = CHECKBOX_SIZE_VALUES.MEDIUM;
     if (!extensionAPI?.settings?.get) return fallback;
     const raw = extensionAPI.settings.get(SETTINGS_KEYS.checkboxSize);
     if (raw === null || typeof raw === "undefined") {
@@ -2020,7 +2020,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
   }
 
   function setCheckboxSizeSetting(nextValue) {
-    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.LARGE);
+    checkboxSizeSetting = normalizeCheckboxSize(nextValue, CHECKBOX_SIZE_VALUES.MEDIUM);
     syncDocumentCheckboxSize();
     notifyStylePreviewListeners();
   }

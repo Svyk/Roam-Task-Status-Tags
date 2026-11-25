@@ -27,7 +27,7 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 - **Solid**: saturated app-icon tiles with vivid top-to-bottom gradients, crisp inner highlights, and white glyphs.
 - **Minimal**: bare vector status glyphs with no box and a soft tinted wash on hover.
 - **Sticker**: opaque die-cut vinyl tiles with a 1.5px paper rim (warm off-white on dark themes, white with a soft drop shadow on light themes), stable per-block tilt, hover straighten-and-lift, and a slap landing animation on status change.
-- **Checkbox size**: `Compact` (14px, Roam's own), `Medium` (16px), `Large` (18px, default), and `Extra large` (20px) scale status tiles, plain TODOs, and DONE boxes together while keeping a steady 7px gap to text and unchanged 29px line height.
+- **Checkbox size**: `Compact` (14px, Roam's own), `Medium` (16px, default), `Large` (18px), and `Extra large` (20px) scale status tiles, plain TODOs, and DONE boxes together while keeping a steady 7px gap to text and unchanged 29px line height.
 - **Eleven extra statuses**: opt-in one at a time via the visual **More statuses** gallery in settings (with an **Add all** shortcut) for Important, Starred, Discuss, Billable, Bug, Draft, Deadline, Kawaii, Flower, Sun, and Moon.
 - **Animate status icons**: subtle looping ambient motion on Glass, Solid, and Minimal icons, plus Sticker hover straighten/lift and slap landing; on by default and disabled under reduced motion, forced colors, and print.
 - **Transition bursts**: per-status particle bursts drawn on a lightweight canvas when this extension sets or changes an unchecked status in Glass, Solid, or Minimal (Outline keeps its CSS pop; Sticker uses its slap landing).
@@ -297,7 +297,7 @@ Open `Settings -> Extensions -> Task Status Tags`, pick **Settings…** at the b
 
 - `Theme` matches your Roam theme (`Follow Roam`, default) or forces `Light` or `Dark`.
 - `Checkbox style` selects `Outline`, `Glass` (default), `Solid`, `Minimal`, or `Sticker`, with a live **Style preview** strip underneath showing every active status.
-- `Checkbox size` selects `Compact` (14px), `Medium` (16px), `Large` (18px, default), or `Extra large` (20px) and applies to every task checkbox so text stays lined up.
+- `Checkbox size` selects `Compact` (14px), `Medium` (16px, default), `Large` (18px), or `Extra large` (20px) and applies to every task checkbox so text stays lined up.
 - `Style native checkboxes by task status` turns checkbox decoration on or off without changing status pills or graph data.
 - `Status label display` chooses between **Checkbox only — reveal on intent** (recommended) and **Checkbox + status pill**. If checkbox styling is disabled, labels automatically remain visible.
 - `Animate Alert status` toggles the attention pulse on unchecked Alert tasks.

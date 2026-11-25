@@ -240,7 +240,7 @@ test("sticker tilt slot is deterministic from blockUid or statusKey fallback and
   assert.equal(checkbox.getAttribute(CHECKBOX_TILT_ATTRIBUTE), null);
 });
 
-test("checkbox size normalization defaults to Large and maps root attribute values", () => {
+test("checkbox size normalization defaults to Medium and maps root attribute values", () => {
   assert.equal(CHECKBOX_SIZE_ATTRIBUTE, "data-ts-checkbox-size");
   assert.deepEqual(Object.values(CHECKBOX_SIZE_VALUES), [
     "Compact",
@@ -252,13 +252,13 @@ test("checkbox size normalization defaults to Large and maps root attribute valu
   assert.equal(normalizeCheckboxSize("Medium"), "Medium");
   assert.equal(normalizeCheckboxSize({ target: { value: "Large" } }), "Large");
   assert.equal(normalizeCheckboxSize("Extra large"), "Extra large");
-  assert.equal(normalizeCheckboxSize("Huge"), "Large");
-  assert.equal(normalizeCheckboxSize(null), "Large");
+  assert.equal(normalizeCheckboxSize("Huge"), "Medium");
+  assert.equal(normalizeCheckboxSize(null), "Medium");
   assert.equal(checkboxSizeToAttributeValue("Compact"), null);
   assert.equal(checkboxSizeToAttributeValue("Medium"), "medium");
   assert.equal(checkboxSizeToAttributeValue("Large"), "large");
   assert.equal(checkboxSizeToAttributeValue("Extra large"), "xlarge");
-  assert.equal(checkboxSizeToAttributeValue("invalid"), "large");
+  assert.equal(checkboxSizeToAttributeValue("invalid"), "medium");
 });
 
 test("all 25 built-in statuses meet Solid 3:1 and Sticker 4.5:1 glyph contrast in light and dark", () => {

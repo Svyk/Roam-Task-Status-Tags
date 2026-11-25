@@ -30,7 +30,7 @@ export const CHECKBOX_SIZE_VALUES = Object.freeze({
   EXTRA_LARGE: "Extra large",
 });
 
-export function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.LARGE) {
+export function normalizeCheckboxSize(value, fallback = CHECKBOX_SIZE_VALUES.MEDIUM) {
   const candidate =
     value && typeof value === "object"
       ? value.target?.value ?? value.currentTarget?.value ?? value.value

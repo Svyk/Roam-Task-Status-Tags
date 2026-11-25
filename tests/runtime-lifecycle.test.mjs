@@ -354,15 +354,15 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(sizeSetting.name, "Checkbox size");
       assert.equal(sizeSetting.action.type, "select");
       assert.deepEqual(sizeSetting.action.items, ["Compact", "Medium", "Large", "Extra large"]);
-      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "large");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "medium");
       sizeSetting.action.onChange("Compact");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), null);
-      sizeSetting.action.onChange("Medium");
-      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "medium");
+      sizeSetting.action.onChange("Large");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "large");
       sizeSetting.action.onChange("Extra large");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "xlarge");
       sizeSetting.action.onChange("unknown-size");
-      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "large");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-size"), "medium");
 
       const previewSetting = latestPanelConfig.settings.find(
         (entry) => entry.id === "task-status-style-preview"
