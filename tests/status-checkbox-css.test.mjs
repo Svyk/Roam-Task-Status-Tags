@@ -454,6 +454,10 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.match(css, /:root\[data-ts-checkbox-style="glass"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="solid"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="minimal"\]/);
+  assert.match(css, /:root\[data-ts-checkbox-style="sticker"\]/);
+  assert.match(css, /@keyframes ts-status-pop-slap/);
+  assert.match(css, /data-ts-checkbox-tilt="0"/);
+  assert.match(css, /data-ts-checkbox-tilt="3"/);
   assert.match(css, /:root\[data-ts-checkbox-size="medium"\]/);
   assert.match(css, /:root\[data-ts-checkbox-size="large"\]/);
   assert.match(css, /:root\[data-ts-checkbox-size="xlarge"\]/);
@@ -605,6 +609,7 @@ test("ambient icon motion is gated to non-Outline styles, animates transform/opa
     "ts-flower-sway",
     "ts-sun-glow",
     "ts-moon-rock",
+    "ts-status-pop-slap",
   ];
   for (const name of expectedKeyframes) {
     const start = stripped.indexOf(`@keyframes ${name}`);
@@ -640,15 +645,15 @@ test("ambient icon motion is gated to non-Outline styles, animates transform/opa
       if (!selector.includes("data-ts-ambient-motion")) continue;
       assert.match(
         selector,
-        /:root(?:\[data-ts-theme="dark"\])?\[data-ts-checkbox-style(?:="(?:glass|solid|minimal)")?\]\[data-ts-ambient-motion="on"\]/,
+        /:root(?:\[data-ts-theme="dark"\])?\[data-ts-checkbox-style(?:="(?:glass|solid|minimal|sticker)")?\]\[data-ts-ambient-motion="on"\]/,
         `ambient rule must require non-Outline data-ts-checkbox-style and data-ts-ambient-motion="on": ${selector}`
       );
       assert.match(
         selector,
-        /\.rm-checkbox\[data-ts-checkbox-status\]\[data-ts-checkbox-shape(?:="[^"]+")?\]/,
+        /\.rm-checkbox(?:\.rm-todo)?\[data-ts-checkbox-status\]/,
         `ambient rule must stay scoped to owned checkboxes: ${selector}`
       );
-      assert.match(selector, /input:not\(:checked\)\s*~\s*\.checkmark::(?:before|after)/);
+      assert.match(selector, /input:not\(:checked\)\s*~\s*\.checkmark(?:$|::(?:before|after))/);
     }
   }
 

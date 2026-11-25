@@ -11,6 +11,7 @@ import {
   CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
+  CHECKBOX_TILT_ATTRIBUTE,
   CHECKBOX_UID_ATTRIBUTE,
   EXTRA_STATUS_SHAPES,
   HIDDEN_STATUS_PILL_ATTRIBUTE,
@@ -26,6 +27,7 @@ import {
   clearOwnedStatusPillPresentations,
   clearStatusCheckboxAnnotation,
   clearStatusPillPresentation,
+  computeStickerTiltSlot,
   contrastRatio,
   countExactStatusTagOccurrences,
   createStatusPopTracker,
@@ -193,22 +195,49 @@ test("every default status derives contrast-safe integer light and dark accents"
 
 test("checkbox style normalization falls back to Glass and maps attribute values", () => {
   assert.equal(CHECKBOX_STYLE_ATTRIBUTE, "data-ts-checkbox-style");
-  assert.deepEqual(Object.values(CHECKBOX_STYLE_VALUES), ["Outline", "Glass", "Solid", "Minimal"]);
+  assert.deepEqual(Object.values(CHECKBOX_STYLE_VALUES), [
+    "Outline",
+    "Glass",
+    "Solid",
+    "Minimal",
+    "Sticker",
+  ]);
   assert.equal(normalizeCheckboxStyle("Outline"), "Outline");
   assert.equal(normalizeCheckboxStyle("Glass"), "Glass");
   assert.equal(normalizeCheckboxStyle({ target: { value: "Solid" } }), "Solid");
   assert.equal(normalizeCheckboxStyle("Minimal"), "Minimal");
+  assert.equal(normalizeCheckboxStyle("Sticker"), "Sticker");
   assert.equal(normalizeCheckboxStyle("Neon"), "Glass");
   assert.equal(normalizeCheckboxStyle(null), "Glass");
   assert.equal(checkboxStyleToAttributeValue("Outline"), null);
   assert.equal(checkboxStyleToAttributeValue("Glass"), "glass");
   assert.equal(checkboxStyleToAttributeValue("Solid"), "solid");
   assert.equal(checkboxStyleToAttributeValue("Minimal"), "minimal");
+  assert.equal(checkboxStyleToAttributeValue("Sticker"), "sticker");
   assert.equal(checkboxStyleToAttributeValue("invalid"), "glass");
   assert.equal(pickOnAccentColor({ r: 255, g: 255, b: 0 }), "#10161a");
   assert.equal(pickOnAccentColor({ r: 30, g: 41, b: 59 }), "#ffffff");
   assert.equal(pickOnAccentColor({ r: 244, g: 63, b: 94 }), "#ffffff");
   assert.equal(pickOnAccentColor({ r: 234, g: 179, b: 8 }), "#10161a");
+});
+
+test("sticker tilt slot is deterministic from blockUid or statusKey fallback and cleaned up", () => {
+  assert.equal(CHECKBOX_TILT_ATTRIBUTE, "data-ts-checkbox-tilt");
+  const seen = new Set();
+  for (let i = 0; i < 40; i += 1) {
+    const slot = computeStickerTiltSlot(`blockUid${i}`, "ACTIVE");
+    assert.ok([0, 1, 2, 3].includes(slot));
+    assert.equal(computeStickerTiltSlot(`blockUid${i}`, "WAITING"), slot, "blockUid wins over statusKey");
+    seen.add(slot);
+  }
+  assert.equal(seen.size, 4, "all four tilt slots should be reachable");
+  assert.equal(computeStickerTiltSlot(null, "ACTIVE"), computeStickerTiltSlot("", "ACTIVE"));
+
+  const { checkbox } = taskRender();
+  applyStatusCheckboxAnnotation(checkbox, { statusKey: "ACTIVE", shape: "active" }, "uid-abc");
+  assert.equal(checkbox.getAttribute(CHECKBOX_TILT_ATTRIBUTE), String(computeStickerTiltSlot("uid-abc", "ACTIVE")));
+  clearStatusCheckboxAnnotation(checkbox);
+  assert.equal(checkbox.getAttribute(CHECKBOX_TILT_ATTRIBUTE), null);
 });
 
 test("checkbox size normalization defaults to Large and maps root attribute values", () => {

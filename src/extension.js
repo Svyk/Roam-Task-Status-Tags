@@ -24,7 +24,7 @@ import {
   parseCarryOverSetting,
   resetTagTitles,
 } from "./repeat-status-reset.js";
-import { createStatusBurstSystem } from "./status-burst.js";
+import { createStatusBurstSystem, isBurstStyleActive } from "./status-burst.js";
 import { createStatusView, queryStatusTasks } from "./status-view.js";
 import {
   THEME_ATTRIBUTE,
@@ -59,12 +59,14 @@ import {
   CHECKBOX_STATUS_ATTRIBUTE,
   CHECKBOX_STYLE_ATTRIBUTE,
   CHECKBOX_STYLE_VALUES,
+  CHECKBOX_TILT_ATTRIBUTE,
   CHECKBOX_UID_ATTRIBUTE,
   checkboxSizeToAttributeValue,
   checkboxStyleToAttributeValue,
   clearOwnedStatusCheckboxes,
   clearOwnedStatusPillPresentations,
   clearStatusPillPresentation,
+  computeStickerTiltSlot,
   createStatusPopTracker,
   getStatusCheckboxShape,
   getStatusGroup,
@@ -1731,7 +1733,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           ) {
             consumedPopUids.add(blockUid);
           }
-        } else if (!checkboxStyleToAttributeValue(checkboxStyleSetting)) {
+        } else if (!isBurstStyleActive(checkboxStyleSetting)) {
           statusPopTracker.restorePopAttributeIfActive(
             presentation.checkbox,
             presentation.statusKey
@@ -1799,7 +1801,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!statusChangeAnimationEnabled || !checkboxStylingEnabled || !checkbox || !statusKey) {
       return false;
     }
-    if (checkboxStyleToAttributeValue(checkboxStyleSetting)) {
+    if (isBurstStyleActive(checkboxStyleSetting)) {
       const input = checkbox.querySelector?.('input[type="checkbox"]');
       if (input?.checked === true) return false;
       const color =
@@ -2606,6 +2608,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       box.setAttribute(
         CHECKBOX_SHAPE_ATTRIBUTE,
         getStatusCheckboxShape(glyphStatusKey, STATUSES[glyphStatusKey]?.name)
+      );
+      box.setAttribute(
+        CHECKBOX_TILT_ATTRIBUTE,
+        String(computeStickerTiltSlot(null, glyphStatusKey))
       );
       const container = document.createElement("span");
       container.className = "check-container";
@@ -4456,6 +4462,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
                 className: "rm-checkbox rm-todo",
                 [CHECKBOX_STATUS_ATTRIBUTE]: sample.key,
                 [CHECKBOX_SHAPE_ATTRIBUTE]: sample.shape,
+                [CHECKBOX_TILT_ATTRIBUTE]: String(computeStickerTiltSlot(null, sample.key)),
               },
               React.createElement(
                 "label",
@@ -4516,7 +4523,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: SETTINGS_KEYS.checkboxStyle,
           name: "Checkbox style",
           description:
-            "Choose how unchecked task checkboxes look: Outline, Glass, Solid, or Minimal. Checked tasks stay with your Roam theme.",
+            "Choose how unchecked task checkboxes look: Outline, Glass, Solid, Minimal, or Sticker. Checked tasks stay with your Roam theme.",
           action: {
             type: "select",
             items: Object.values(CHECKBOX_STYLE_VALUES),
@@ -4578,7 +4585,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: SETTINGS_KEYS.statusChangeAnimation,
           name: "Animate status changes",
           description:
-            "Plays a particle burst (Glass, Solid, Minimal) or short pop (Outline) when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+            "Plays a particle burst (Glass, Solid, Minimal), slap landing (Sticker), or short pop (Outline) when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setStatusChangeAnimationEnabled(value),
@@ -4588,7 +4595,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           id: SETTINGS_KEYS.ambientMotion,
           name: "Animate status icons",
           description:
-            "Adds subtle looping motion to unchecked status icons in Glass, Solid, and Minimal styles. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+            "Adds subtle looping motion to unchecked status icons in Glass, Solid, and Minimal styles, and hover lift and slap motion in Sticker. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setAmbientMotionEnabled(value),

@@ -331,7 +331,7 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
         (entry) => entry.id === "task-status-checkbox-style"
       );
       assert.equal(styleSetting.action.type, "select");
-      assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal"]);
+      assert.deepEqual(styleSetting.action.items, ["Outline", "Glass", "Solid", "Minimal", "Sticker"]);
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
       styleSetting.action.onChange("Outline");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), null);
@@ -341,6 +341,8 @@ test("overlapping independent loads keep one portal/runtime and stale init stays
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "solid");
       styleSetting.action.onChange("Minimal");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "minimal");
+      styleSetting.action.onChange("Sticker");
+      assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "sticker");
       styleSetting.action.onChange("unknown-style");
       assert.equal(document.documentElement.getAttribute("data-ts-checkbox-style"), "glass");
       styleSetting.action.onChange("Solid");

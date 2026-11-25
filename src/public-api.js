@@ -1,6 +1,8 @@
 import {
   CHECKBOX_SHAPE_ATTRIBUTE,
   CHECKBOX_STATUS_ATTRIBUTE,
+  CHECKBOX_TILT_ATTRIBUTE,
+  computeStickerTiltSlot,
 } from "./status-checkbox.js";
 
 export const API_VERSION = 1;
@@ -356,6 +358,10 @@ export function createPublicApi({
       box.className = "rm-checkbox rm-todo";
       box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, entry.key);
       box.setAttribute(CHECKBOX_SHAPE_ATTRIBUTE, String(entry.glyph || "custom"));
+      box.setAttribute(
+        CHECKBOX_TILT_ATTRIBUTE,
+        String(computeStickerTiltSlot(null, entry.key))
+      );
 
       const container = doc.createElement("span");
       container.className = "check-container";

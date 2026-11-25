@@ -4,6 +4,7 @@
 var CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 var CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 var CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
+var CHECKBOX_TILT_ATTRIBUTE = "data-ts-checkbox-tilt";
 var CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 var CHECKBOX_SIZE_ATTRIBUTE = "data-ts-checkbox-size";
 var CHECKBOX_PILL_HIDDEN_ATTRIBUTE = "data-ts-pill-hidden";
@@ -20,7 +21,8 @@ var CHECKBOX_STYLE_VALUES = Object.freeze({
   OUTLINE: "Outline",
   GLASS: "Glass",
   SOLID: "Solid",
-  MINIMAL: "Minimal"
+  MINIMAL: "Minimal",
+  STICKER: "Sticker"
 });
 var CHECKBOX_SIZE_VALUES = Object.freeze({
   COMPACT: "Compact",
@@ -50,7 +52,17 @@ function checkboxStyleToAttributeValue(value) {
   if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
   if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
   if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
+  if (normalized === CHECKBOX_STYLE_VALUES.STICKER) return "sticker";
   return null;
+}
+function computeStickerTiltSlot(blockUid, statusKey = "") {
+  const seed = String(blockUid || "").trim() || String(statusKey || "").trim();
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 4;
 }
 var DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
 var DEFAULT_DARK_SURFACE = Object.freeze({ r: 32, g: 43, b: 51 });
@@ -355,6 +367,7 @@ function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_TILT_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
   checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
@@ -372,6 +385,10 @@ function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = null) {
   const certifiedUid = String(blockUid || "").trim();
   if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
   else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.setAttribute(
+    CHECKBOX_TILT_ATTRIBUTE,
+    String(computeStickerTiltSlot(certifiedUid, decision.statusKey))
+  );
   return true;
 }
 function syncStatusCheckboxForPill({
@@ -970,6 +987,10 @@ function createPublicApi({
       box.className = "rm-checkbox rm-todo";
       box.setAttribute(CHECKBOX_STATUS_ATTRIBUTE, entry.key);
       box.setAttribute(CHECKBOX_SHAPE_ATTRIBUTE, String(entry.glyph || "custom"));
+      box.setAttribute(
+        CHECKBOX_TILT_ATTRIBUTE,
+        String(computeStickerTiltSlot(null, entry.key))
+      );
       const container = doc.createElement("span");
       container.className = "check-container";
       const fakeInput = doc.createElement("input");
@@ -6647,7 +6668,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
           )) {
             consumedPopUids.add(blockUid);
           }
-        } else if (!checkboxStyleToAttributeValue(checkboxStyleSetting)) {
+        } else if (!isBurstStyleActive(checkboxStyleSetting)) {
           statusPopTracker.restorePopAttributeIfActive(
             presentation.checkbox,
             presentation.statusKey
@@ -6705,7 +6726,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
     if (!statusChangeAnimationEnabled || !checkboxStylingEnabled || !checkbox || !statusKey) {
       return false;
     }
-    if (checkboxStyleToAttributeValue(checkboxStyleSetting)) {
+    if (isBurstStyleActive(checkboxStyleSetting)) {
       const input = checkbox.querySelector?.('input[type="checkbox"]');
       if (input?.checked === true) return false;
       const color = normalizeCssColorValue(statusColorOverrides?.[statusKey]?.base) || getDefaultStatusColor(statusKey);
@@ -7373,6 +7394,10 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
       box.setAttribute(
         CHECKBOX_SHAPE_ATTRIBUTE,
         getStatusCheckboxShape(glyphStatusKey, STATUSES[glyphStatusKey]?.name)
+      );
+      box.setAttribute(
+        CHECKBOX_TILT_ATTRIBUTE,
+        String(computeStickerTiltSlot(null, glyphStatusKey))
       );
       const container = document.createElement("span");
       container.className = "check-container";
@@ -8958,7 +8983,8 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
               {
                 className: "rm-checkbox rm-todo",
                 [CHECKBOX_STATUS_ATTRIBUTE]: sample.key,
-                [CHECKBOX_SHAPE_ATTRIBUTE]: sample.shape
+                [CHECKBOX_SHAPE_ATTRIBUTE]: sample.shape,
+                [CHECKBOX_TILT_ATTRIBUTE]: String(computeStickerTiltSlot(null, sample.key))
               },
               React.createElement(
                 "label",
@@ -9015,7 +9041,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.checkboxStyle,
           name: "Checkbox style",
-          description: "Choose how unchecked task checkboxes look: Outline, Glass, Solid, or Minimal. Checked tasks stay with your Roam theme.",
+          description: "Choose how unchecked task checkboxes look: Outline, Glass, Solid, Minimal, or Sticker. Checked tasks stay with your Roam theme.",
           action: {
             type: "select",
             items: Object.values(CHECKBOX_STYLE_VALUES),
@@ -9072,7 +9098,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.statusChangeAnimation,
           name: "Animate status changes",
-          description: "Plays a particle burst (Glass, Solid, Minimal) or short pop (Outline) when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+          description: "Plays a particle burst (Glass, Solid, Minimal), slap landing (Sticker), or short pop (Outline) when you set or change a task status. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setStatusChangeAnimationEnabled(value)
@@ -9081,7 +9107,7 @@ a.rm-page-ref[data-task-status-key="${keySelector}"],
         {
           id: SETTINGS_KEYS.ambientMotion,
           name: "Animate status icons",
-          description: "Adds subtle looping motion to unchecked status icons in Glass, Solid, and Minimal styles. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
+          description: "Adds subtle looping motion to unchecked status icons in Glass, Solid, and Minimal styles, and hover lift and slap motion in Sticker. Purely cosmetic, writes no task data, and stays still for reduced-motion, forced-colors, and print.",
           action: {
             type: "switch",
             onChange: (value) => setAmbientMotionEnabled(value)

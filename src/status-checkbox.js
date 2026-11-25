@@ -1,6 +1,7 @@
 export const CHECKBOX_STATUS_ATTRIBUTE = "data-ts-checkbox-status";
 export const CHECKBOX_SHAPE_ATTRIBUTE = "data-ts-checkbox-shape";
 export const CHECKBOX_UID_ATTRIBUTE = "data-ts-checkbox-block-uid";
+export const CHECKBOX_TILT_ATTRIBUTE = "data-ts-checkbox-tilt";
 export const CHECKBOX_STYLE_ATTRIBUTE = "data-ts-checkbox-style";
 export const CHECKBOX_SIZE_ATTRIBUTE = "data-ts-checkbox-size";
 export const CHECKBOX_PILL_HIDDEN_ATTRIBUTE = "data-ts-pill-hidden";
@@ -19,6 +20,7 @@ export const CHECKBOX_STYLE_VALUES = Object.freeze({
   GLASS: "Glass",
   SOLID: "Solid",
   MINIMAL: "Minimal",
+  STICKER: "Sticker",
 });
 
 export const CHECKBOX_SIZE_VALUES = Object.freeze({
@@ -63,7 +65,18 @@ export function checkboxStyleToAttributeValue(value) {
   if (normalized === CHECKBOX_STYLE_VALUES.GLASS) return "glass";
   if (normalized === CHECKBOX_STYLE_VALUES.SOLID) return "solid";
   if (normalized === CHECKBOX_STYLE_VALUES.MINIMAL) return "minimal";
+  if (normalized === CHECKBOX_STYLE_VALUES.STICKER) return "sticker";
   return null;
+}
+
+export function computeStickerTiltSlot(blockUid, statusKey = "") {
+  const seed = String(blockUid || "").trim() || String(statusKey || "").trim();
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 4;
 }
 
 const DEFAULT_LIGHT_SURFACE = Object.freeze({ r: 245, g: 248, b: 250 });
@@ -434,6 +447,7 @@ export function clearStatusCheckboxAnnotation(checkbox) {
   checkbox.removeAttribute(CHECKBOX_STATUS_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_SHAPE_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.removeAttribute(CHECKBOX_TILT_ATTRIBUTE);
   checkbox.removeAttribute(CHECKBOX_PILL_HIDDEN_ATTRIBUTE);
   checkbox.removeAttribute(ALERT_BEACON_ATTRIBUTE);
   checkbox.removeAttribute(STATUS_POP_ATTRIBUTE);
@@ -453,6 +467,10 @@ export function applyStatusCheckboxAnnotation(checkbox, decision, blockUid = nul
   const certifiedUid = String(blockUid || "").trim();
   if (certifiedUid) checkbox.setAttribute(CHECKBOX_UID_ATTRIBUTE, certifiedUid);
   else checkbox.removeAttribute(CHECKBOX_UID_ATTRIBUTE);
+  checkbox.setAttribute(
+    CHECKBOX_TILT_ATTRIBUTE,
+    String(computeStickerTiltSlot(certifiedUid, decision.statusKey))
+  );
   return true;
 }
 

@@ -256,6 +256,7 @@ test("burst color helpers and module attribution / boundary guards", async () =>
   assert.equal(generic.length, 3);
   assert.equal(generic[0], "#0ea5e9");
   assert.equal(isBurstStyleActive("Outline"), false);
+  assert.equal(isBurstStyleActive("Sticker"), false);
   assert.equal(isBurstStyleActive("Glass"), true);
   assert.equal(isBurstStyleActive("Solid"), true);
   assert.equal(isBurstStyleActive("Minimal"), true);
