@@ -2196,6 +2196,7 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark {
+  border-width: 0 !important;
   border-color: transparent !important;
   border-style: solid !important;
   border-radius: 5.5px !important;
@@ -2213,6 +2214,7 @@
   > .check-container:hover
   > input:not(:checked)
   ~ .checkmark {
+  border-width: 0 !important;
   border-color: transparent !important;
   background: rgba(148, 163, 184, 0.14) !important;
   box-shadow: none !important;
@@ -2234,6 +2236,11 @@
   display: none;
 }
 
+/*
+ * Normalise Minimal drawn glyph extents to 62-80% of the tile size across all
+ * four checkbox sizes (with border-width: 0 so Blink zoom never snaps a hidden
+ * border). Keep Minimal quiet with no drop-shadow glow on full-SVG shapes.
+ */
 :root[data-ts-checkbox-style="minimal"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="active"]
   > .check-container
@@ -2243,12 +2250,18 @@
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="waiting"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark::before,
+  ~ .checkmark::before {
+  inset: -16%;
+}
+
 :root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
   > .check-container
   > input:not(:checked)
-  ~ .checkmark::before,
+  ~ .checkmark::before {
+  inset: -9%;
+}
+
 :root[data-ts-checkbox-style="minimal"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="important"]
   > .check-container
@@ -2260,15 +2273,96 @@
   > input:not(:checked)
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: -2%;
+}
+
+:root[data-ts-checkbox-style="minimal"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="starred"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before,
 :root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="cancelled"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 3%;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="billable"]
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 6%;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 7%;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 6%;
+  filter: none;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 5%;
+  filter: none;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="alert"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="kawaii"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark::before,
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="flower"]
+  > .check-container:hover
+  > input:not(:checked)
+  ~ .checkmark::before {
+  filter: none;
+}
+
+:root[data-ts-checkbox-style="minimal"]
+  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
+  > .check-container
+  > input:not(:checked)
+  ~ .checkmark::before {
+  inset: 12%;
+}
+
 :root[data-ts-checkbox-style="minimal"]
   .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="series"]
   > .check-container
@@ -2304,35 +2398,7 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before {
-  inset: 4%;
-}
-
-:root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="bug"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="draft"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="deadline"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="sun"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before,
-:root[data-ts-checkbox-style="minimal"]
-  .rm-checkbox[data-ts-checkbox-status][data-ts-checkbox-shape="moon"]
-  > .check-container
-  > input:not(:checked)
-  ~ .checkmark::before {
-  inset: 2%;
+  inset: 13%;
 }
 
 :root[data-ts-checkbox-style="minimal"]
@@ -2350,8 +2416,8 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before {
-  width: 13px;
-  height: 13px;
+  width: 10px;
+  height: 10px;
 }
 
 :root[data-ts-checkbox-style="minimal"]
@@ -2359,8 +2425,8 @@
   > .check-container
   > input:not(:checked)
   ~ .checkmark::before {
-  width: 9.5px;
-  height: 9.5px;
+  width: 7px;
+  height: 7px;
 }
 
 /* ---- Visual Preset: Sticker (Die-Cut Sticker) ---- */

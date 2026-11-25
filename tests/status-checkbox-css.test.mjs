@@ -459,6 +459,14 @@ test("checkbox styles stay scoped to owned checkboxes and glyphs paint with --ts
   assert.match(css, /:root\[data-ts-checkbox-style="glass"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="solid"\]/);
   assert.match(css, /:root\[data-ts-checkbox-style="minimal"\]/);
+  assert.match(
+    css,
+    /:root\[data-ts-checkbox-style="minimal"\][\s\S]*?border-width: 0 !important;[\s\S]*?background: transparent !important;[\s\S]*?box-shadow: none !important;/
+  );
+  assert.match(
+    css,
+    /:root\[data-ts-checkbox-style="minimal"\][\s\S]*?\[data-ts-checkbox-shape="alert"\][\s\S]*?filter: none;/
+  );
   assert.match(css, /:root\[data-ts-checkbox-style="sticker"\]/);
   assert.match(css, /@keyframes ts-status-pop-slap/);
   assert.match(css, /data-ts-checkbox-tilt="0"/);
