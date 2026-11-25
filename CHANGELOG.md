@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.2 - 2026-11-24
+
+- Plain TODO and DONE boxes now match the status icon size at Medium, Large, and Extra large (16, 18, and 20px). They were about 14% smaller because Roam's own checkbox is 12px while styled status tiles are 14px.
+- Align the left edge, vertical centre, and 7px text gap across plain TODO, DONE, and status rows so nothing jumps when a status attribute is added. Compact still adds no size CSS.
+
 ## 0.18.1 - 2026-11-24
 
 - Make **Medium** (16px) the default checkbox size for new installs without changing any saved preference.

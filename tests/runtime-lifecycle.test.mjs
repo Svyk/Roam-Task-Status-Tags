@@ -562,7 +562,7 @@ test("More statuses gallery adds one extra at a time without duplicates, support
   let mod = null;
   try {
     mod = await import(`../src/extension.js?gallery=${Date.now()}`);
-    await mod.onload({ extensionAPI, extension: { version: "0.18.1" } });
+    await mod.onload({ extensionAPI, extension: { version: "0.18.2" } });
 
     const statusNamesSetting = panelConfig.settings.find((entry) => entry.id === "task-status-status-names");
     const previewSetting = panelConfig.settings.find((entry) => entry.id === "task-status-style-preview");
@@ -1000,7 +1000,7 @@ test("AI agent tools register with setting, enforce agent guards, attribute user
   let mod = null;
   try {
     mod = await import(`../src/extension.js?ai-lifecycle=${Date.now()}`);
-    await mod.onload({ extensionAPI, extension: { version: "0.18.1" } });
+    await mod.onload({ extensionAPI, extension: { version: "0.18.2" } });
 
     assert.deepEqual([...registeredTools.keys()], [
       "list_statuses",
