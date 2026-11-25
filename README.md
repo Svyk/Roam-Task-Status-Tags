@@ -24,8 +24,8 @@ Roam Task Status Tags adds workflow statuses to Roam TODOs while keeping Roam's 
 
 - **Glass** (default): translucent frosted icon tiles with colored gradient strokes, soft outer glow, and per-status silhouettes.
 - **Outline**: colored border and subtle tinted wash with a centered status glyph, unchanged from v0.14.0 for built-in statuses.
-- **Solid**: saturated app-icon tiles with vivid top-to-bottom gradients, crisp inner highlights, and white glyphs.
-- **Minimal**: bare vector status glyphs with no box and a soft tinted wash on hover.
+- **Solid**: saturated app-icon tiles with vivid top-to-bottom gradients, crisp inner highlights, and contrast-matched glyphs.
+- **Minimal**: bare, evenly sized vector status glyphs with no box or glow and a soft tinted wash on hover.
 - **Sticker**: opaque die-cut vinyl tiles with a 1.5px paper rim (warm off-white on dark themes, white with a soft drop shadow on light themes), stable per-block tilt, hover straighten-and-lift, and a slap landing animation on status change.
 - **Checkbox size**: `Compact` (14px, Roam's own), `Medium` (16px, default), `Large` (18px), and `Extra large` (20px) scale status tiles, plain TODOs, and DONE boxes together while keeping a steady 7px gap to text and unchanged 29px line height.
 - **Eleven extra statuses**: opt-in one at a time via the visual **More statuses** gallery in settings (with an **Add all** shortcut) for Important, Starred, Discuss, Billable, Bug, Draft, Deadline, Kawaii, Flower, Sun, and Moon.

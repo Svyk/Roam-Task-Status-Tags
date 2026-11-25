@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.1 - 2026-11-24
+
+- Make **Medium** (16px) the default checkbox size for new installs without changing any saved preference.
+- Fix WCAG contrast across Outline, Glass, Solid, and Minimal in both light and dark modes for all 25 built-in statuses and custom statuses (at least 3:1 for outlines, borders, and tiles against the surface, 3:1 for glyphs in Outline, Glass, and Minimal, and 4.5:1 for glyphs in Solid) with zero exemptions while keeping every status in its colour family and leaving Sticker untouched.
+- Use dedicated Solid accent and glyph ink tokens so bright Solid fills pair with near-black glyphs without changing other styles, darken light-theme Glass borders and light inks where needed, raise dark-theme Cancelled Glass border visibility, and deepen the Alert triangle gradient while keeping its white exclamation mark.
+- Normalise **Minimal** glyph sizes so every status draws between 62% and 80% of the tile size at every checkbox size (Compact through Extra large) with crisp strokes of at least 1.5px at Medium and no drop-shadow glow.
+- Regenerate `docs/images/*.png` from the updated gallery fixture.
+
 ## 0.18.0 - 2026-11-24
 
 - Add **Checkbox size** setting (`Compact` 14px, `Medium` 16px, `Large` 18px default, `Extra large` 20px) that scales every task checkbox (status tiles, plain TODOs, and DONE ticks) uniformly without changing 29px line height or moving wrapped first lines, and normalizes the checkbox-to-text gap to 7px across plain TODO, DONE, and hidden-pill status tasks.
